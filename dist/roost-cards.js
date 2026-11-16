@@ -6,7 +6,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.6.1";
+const ROOST_VERSION = "0.6.2";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -380,6 +380,14 @@ class RoostTile extends RoostBase {
     const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
     if (d === "climate") return on ? `${cap(s.state.replace("_only", "").replace("heat_cool", "auto"))}${s.attributes.temperature != null ? ` · ${s.attributes.temperature}°` : ""}` : "Off";
     if (d === "cover") { const pos = s.attributes.current_position; return cap(s.state) + (pos != null && pos > 0 && pos < 100 ? ` · ${pos}%` : ""); }
+    if (d === "binary_sensor") {
+      const cls = s.attributes.device_class;
+      if (["door", "window", "opening", "garage_door"].includes(cls)) return s.state === "on" ? "Open" : "Closed";
+      if (["motion", "occupancy", "presence", "moving"].includes(cls)) return s.state === "on" ? "Someone there" : "Nobody";
+      if (cls === "lock") return s.state === "on" ? "Unlocked" : "Locked";
+    }
+    if (d === "alarm_control_panel") return { disarmed: "Disarmed", armed_away: "Armed (away)", armed_home: "Armed (home)", armed_night: "Armed (night)", arming: "Arming", pending: "Pending", triggered: "Alarm!" }[s.state] || cap(s.state.replace(/_/g, " "));
+    if (d === "lock") return s.state === "locked" ? "Locked" : "Unlocked";
     if (d === "light" && on && s.attributes.brightness != null) return `On · ${Math.round((s.attributes.brightness / 255) * 100)}%`;
     if (["sensor", "binary_sensor", "input_number", "number"].includes(d) && !["on", "off"].includes(s.state)) {
       return `${s.state}${s.attributes.unit_of_measurement ? ` ${s.attributes.unit_of_measurement}` : ""}`;

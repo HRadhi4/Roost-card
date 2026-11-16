@@ -2,6 +2,9 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.6.2 — 2026-11-16
+- **Tiles say the right word**: doors and windows show "Open" or "Closed", motion and presence sensors show "Someone there" or "Nobody", alarms show "Disarmed" or "Armed (away)", locks show "Locked" or "Unlocked" (instead of "On" and "Off").
+
 ## 0.6.1 — 2026-11-16
 - **Round scene buttons are smaller by default** (58 px with small names), like the original quick actions. The size can still be changed with "Button size".
 

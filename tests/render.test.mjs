@@ -88,6 +88,9 @@ const gh = g.shadowRoot.innerHTML;
 if ((g.shadowRoot.querySelectorAll(".chip").length !== 2) || !/mdi:door-open/.test(gh) || !/data-g="climates"/.test(gh)) { fails++; console.error("FAIL chips grouping", g.shadowRoot.querySelectorAll(".chip").length); }
 g._open = "climates"; g.render();
 if (!/Cool · 23°/.test(g.shadowRoot.innerHTML) || g.shadowRoot.querySelectorAll("[data-m]").length !== 2) { fails++; console.error("FAIL chips AC list"); }
+// Doors say Closed, not Off.
+const dt = document.createElement("roost-tile"); dt.setConfig({ entity: "binary_sensor.front_door" }); document.body.appendChild(dt); dt.hass = hass(true);
+if (!/Closed/.test(dt.shadowRoot.innerHTML)) { fails++; console.error("FAIL door tile word"); }
 // Rooms: pills switch the room instantly, and the room's cards get Home Assistant.
 const rooms = document.createElement("roost-rooms");
 rooms.setConfig({ rooms: [{ name: "Living", icon: "mdi:sofa", cards: [{ type: "custom:roost-tile", entity: "light.kitchen" }] },
