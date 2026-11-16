@@ -6,7 +6,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.6.2";
+const ROOST_VERSION = "0.6.3";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -49,7 +49,7 @@ const SHAPE_OPTIONS = pick([["rounded", "Rounded square"], ["circle", "Circle"],
 const ANIMATIONS = { spin: "roost-spin 1.3s linear infinite", glow: "roost-glow 2s ease-in-out infinite", pulse: "roost-pulse 1.6s ease-in-out infinite",
   bounce: "roost-bounce 1.4s ease-in-out infinite", wiggle: "roost-wiggle 1.2s ease-in-out infinite" };
 // The corner roundness for a box of a given size in a given shape.
-const shapeRadius = (shape, box) => (shape === "circle" ? "50%" : shape === "square" ? `${Math.round(box * 0.14)}px` : `${Math.round(box * 0.31)}px`);
+const shapeRadius = (shape, box) => (shape === "circle" ? "50%" : shape === "square" ? `${Math.round(box * 0.14)}px` : `${Math.round(box * 0.34)}px`);
 // Background, text colour, border and shadow for something "on" in a colour, in one of the fill styles.
 function fillLook(fill, glow, g, p) {
   const shadow = glow === "none" ? "none" : glow === "strong" ? `0 22px 44px -10px ${g[2]},0 0 26px -8px ${g[2]}` : `0 18px 36px -14px ${g[2]}`;
@@ -319,7 +319,7 @@ if (!customElements.get("roost-editor")) customElements.define("roost-editor", R
 // ------------------------------------------------------------------ Roost Tile
 class RoostTile extends RoostBase {
   static get defaults() {
-    return { color: "purple", size: "large", radius: 22, fill: "gradient", glow: "soft", icon_shape: "rounded", icon_size: 24, name_size: 17, off_tint: true, align: "left",
+    return { color: "purple", size: "large", radius: 22, fill: "gradient", glow: "soft", icon_shape: "rounded", icon_size: 22, name_size: 15, off_tint: false, align: "left",
       show_switch: true, show_state: true, show_since: true, animation: "auto", locked: false, confirm: false, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
   }
 
@@ -411,8 +411,8 @@ class RoostTile extends RoostBase {
     const kind = c.animation === "auto" ? (dom === "light" ? "glow" : dom === "fan" || /fan/.test(s?.attributes.icon || "") ? "spin" : dom === "media_player" && s?.state === "playing" ? "bars" : "none") : c.animation;
     const anim = on && ANIMATIONS[kind] ? `animation:${ANIMATIONS[kind]}` : "";
     const look = fillLook(c.fill, c.glow, g, p);
-    const isz = Math.max(12, Number(c.icon_size) || 24), box = c.icon_shape === "none" ? isz : Math.round(isz * 2);
-    const nsz = Number(c.name_size) === 17 && h < 140 ? 15 : Math.max(11, Number(c.name_size) || 17); // the default name shrinks a little on small tiles
+    const isz = Math.max(12, Number(c.icon_size) || 22), box = c.icon_shape === "none" ? isz : Math.round(isz * 1.9);
+    const nsz = Number(c.name_size) === 15 && h < 140 ? 14 : Math.max(11, Number(c.name_size) || 15); // the default name shrinks a little on small tiles
     const center = c.align === "center";
     const bars = on && kind === "bars" ? `<span class="bars">${[0, 0.2, 0.4, 0.1].map((d) => `<i style="animation-delay:${d}s"></i>`).join("")}</span>` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
@@ -431,8 +431,8 @@ class RoostTile extends RoostBase {
       .sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:${on ? "#fff" : p.knob};transform:translateX(${on ? 18 : 0}px);transition:transform .12s}
       .lk{position:absolute;top:18px;right:16px;opacity:.8;--mdc-icon-size:18px}
       .nm{font-size:${nsz}px;font-weight:600;line-height:1.2}
-      .lb{font-size:13.5px;line-height:1.3;opacity:.85;margin-top:3px;color:${on ? "inherit" : p.muted}}
-      .ago{font-size:12.5px;opacity:.65;margin-top:4px;color:${on ? "inherit" : p.muted}}
+      .lb{font-size:12px;line-height:1.3;opacity:.85;margin-top:3px;color:${on ? "inherit" : p.muted}}
+      .ago{font-size:11px;opacity:.65;margin-top:4px;color:${on ? "inherit" : p.muted}}
     </style>
     <div class="card" role="button" tabindex="0" aria-label="${esc(this.name(c.entity))}">
       <div class="ic"></div>

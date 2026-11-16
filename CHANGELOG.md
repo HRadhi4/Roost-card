@@ -2,6 +2,9 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.6.3 — 2026-11-16
+- **Tiles now look exactly like the original phone dashboard by default**: plain grey when off (the hint of colour when off is now a setting you can turn on), a 42 px icon box with a 22 px icon, and a 15 px name with smaller state and "for 5 min" lines.
+
 ## 0.6.2 — 2026-11-16
 - **Tiles say the right word**: doors and windows show "Open" or "Closed", motion and presence sensors show "Someone there" or "Nobody", alarms show "Disarmed" or "Armed (away)", locks show "Locked" or "Unlocked" (instead of "On" and "Off").
 

@@ -57,10 +57,10 @@ animation: auto        # auto, none, glow, spin, pulse, bounce, wiggle or bars
 fill: gradient         # gradient, solid, glass or outline
 glow: soft             # soft, strong or none
 icon_shape: rounded    # rounded, circle, square or none
-icon_size: 24          # px
-name_size: 17          # px
+icon_size: 22          # px
+name_size: 15          # px
 align: left            # left or center
-off_tint: true         # a hint of the colour when off
+off_tint: false        # true: a hint of the colour when off
 show_state: true       # "On · 78%"
 problem: ""            # e.g. "Not working · battery" greys the tile out
 show_switch: true
