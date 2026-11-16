@@ -110,7 +110,7 @@ color: purple
 style: card              # card, or round (round button with the name under it)
 size: large
 shape: rounded        # round style: rounded, circle or square
-button_size: 70       # round style, px
+button_size: 58       # round style, px
 fill: gradient        # gradient, solid, glass or outline
 show_name: true
 ```

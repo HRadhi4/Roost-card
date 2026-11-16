@@ -6,7 +6,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.6.0";
+const ROOST_VERSION = "0.6.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -777,7 +777,7 @@ class RoostThermostat extends RoostBase {
 
 // ------------------------------------------------------------------ Roost Scene
 class RoostScene extends RoostBase {
-  static get defaults() { return { color: "purple", style: "card", size: "large", radius: 22, fill: "gradient", glow: "soft", shape: "rounded", button_size: 70, show_name: true, theme: "auto" }; }
+  static get defaults() { return { color: "purple", style: "card", size: "large", radius: 22, fill: "gradient", glow: "soft", shape: "rounded", button_size: 58, show_name: true, theme: "auto" }; }
 
   validate(c) { if (!c.entity && !c.tap_action) throw new Error("Choose a scene, script or action"); }
 
@@ -829,10 +829,10 @@ class RoostScene extends RoostBase {
     if (!this._hass || !this._config) return;
     const c = this._config, g = this.colour(), p = this.p, h = SIZES[c.size] || SIZES.large;
     const round = c.style === "round";
-    const look = fillLook(c.fill, c.glow, g, p), bs = Math.max(36, Number(c.button_size) || 70);
+    const look = fillLook(c.fill, c.glow, g, p), bs = Math.max(36, Number(c.button_size) || 58);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{position:relative;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;transition:transform .12s;
-        ${round ? `display:flex;flex-direction:column;align-items:center;gap:8px;padding:4px;color:${p.text}`
+        ${round ? `display:flex;flex-direction:column;align-items:center;gap:7px;padding:2px;color:${p.text}`
     : `min-height:${h}px;height:100%;border-radius:${c.radius}px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;
           background:${look.bg};color:${look.fg};border:${c.fill === "outline" ? 2 : 1}px solid ${look.border};box-shadow:${look.shadow};${look.blur ? "backdrop-filter:blur(14px);" : ""}`}}
       .card:active{transform:scale(.95)}
@@ -841,7 +841,7 @@ class RoostScene extends RoostBase {
           border:${c.fill === "outline" ? 2 : 1}px solid ${look.border};box-shadow:${look.shadow};${look.blur ? "backdrop-filter:blur(14px);" : ""}`
     : `width:34px;height:34px;border-radius:12px;background:${look.light ? "rgba(255,255,255,.22)" : `color-mix(in srgb, ${g[0]} 30%, transparent)`}`}}
       .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:${round ? Math.round(bs * 0.4) : 18}px}
-      .nm{font-size:${round ? 12 : 14}px;font-weight:${round ? 600 : 700};line-height:1.2;text-align:${round ? "center" : "left"}${round ? ";margin:0 -6px;letter-spacing:-.1px" : ""}}
+      .nm{font-size:${round ? 11 : 14}px;font-weight:${round ? 600 : 700};line-height:1.2;text-align:${round ? "center" : "left"}${round ? ";margin:0 -6px;letter-spacing:-.1px" : ""}}
       .done{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:#3DD68C;display:none;align-items:center;justify-content:center;color:#fff}
       .done.show{display:flex;animation:roost-tick 1.6s ease-out forwards}
     </style>

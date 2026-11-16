@@ -2,6 +2,9 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.6.1 — 2026-11-16
+- **Round scene buttons are smaller by default** (58 px with small names), like the original quick actions. The size can still be changed with "Button size".
+
 ## 0.6.0 — 2026-11-16
 **Many more ways to style every card**
 - **Tiles**: choose how a tile looks when on (colour fade, one colour, see-through glass, or a coloured outline), how strong the glow is, the icon box (rounded, circle, square or none), the icon size, the name size, left or centred text, and whether it shows a hint of colour when off. New animations: pulse, bounce and wiggle. The state line can be hidden.
