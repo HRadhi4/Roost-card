@@ -6,7 +6,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.5.3";
+const ROOST_VERSION = "0.6.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -40,6 +40,25 @@ const FONT_NUM = "'Space Grotesk', Inter, var(--ha-font-family-body, Roboto), sy
 const COLOR_OPTIONS = [{ value: "active", label: "Selected purple" }, ...Object.keys(COLORS).map((k) => ({ value: k, label: k[0].toUpperCase() + k.slice(1) })), { value: "custom", label: "My own colours" }];
 const SIZES = { small: 128, medium: 152, large: 176 };
 
+// Small helpers for the settings screens and for the shared looks.
+const pick = (pairs) => ({ select: { mode: "dropdown", options: pairs.map(([value, label]) => ({ value, label })) } });
+const slider = (min, max, step = 1, unit = "px") => ({ number: { min, max, step, mode: "slider", unit_of_measurement: unit } });
+const FILL_OPTIONS = pick([["gradient", "Colour fade"], ["solid", "One colour"], ["glass", "See-through glass"], ["outline", "Coloured outline only"]]);
+const GLOW_OPTIONS = pick([["soft", "Soft glow"], ["strong", "Strong glow"], ["none", "No glow"]]);
+const SHAPE_OPTIONS = pick([["rounded", "Rounded square"], ["circle", "Circle"], ["square", "Square"], ["none", "No box, just the icon"]]);
+const ANIMATIONS = { spin: "roost-spin 1.3s linear infinite", glow: "roost-glow 2s ease-in-out infinite", pulse: "roost-pulse 1.6s ease-in-out infinite",
+  bounce: "roost-bounce 1.4s ease-in-out infinite", wiggle: "roost-wiggle 1.2s ease-in-out infinite" };
+// The corner roundness for a box of a given size in a given shape.
+const shapeRadius = (shape, box) => (shape === "circle" ? "50%" : shape === "square" ? `${Math.round(box * 0.14)}px` : `${Math.round(box * 0.31)}px`);
+// Background, text colour, border and shadow for something "on" in a colour, in one of the fill styles.
+function fillLook(fill, glow, g, p) {
+  const shadow = glow === "none" ? "none" : glow === "strong" ? `0 22px 44px -10px ${g[2]},0 0 26px -8px ${g[2]}` : `0 18px 36px -14px ${g[2]}`;
+  if (fill === "solid") return { bg: g[0], fg: g[3], border: "transparent", shadow, light: true };
+  if (fill === "glass") return { bg: `color-mix(in srgb, ${g[0]} 26%, ${p.panel})`, fg: p.text, border: `color-mix(in srgb, ${g[0]} 55%, transparent)`, shadow, light: false, blur: true };
+  if (fill === "outline") return { bg: p.off, fg: p.text, border: g[0], shadow: glow === "none" ? "none" : `0 0 0 1px ${g[0]},0 14px 30px -18px ${g[2]}`, light: false };
+  return { bg: `linear-gradient(135deg,${g[0]} 0%,${g[1]} 100%)`, fg: g[3], border: "transparent", shadow, light: true };
+}
+
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const rgb = (v) => (Array.isArray(v) && v.length === 3 ? `rgb(${v.join(",")})` : typeof v === "string" && v ? v : null);
 const UNAVAILABLE = ["unavailable", "unknown"];
@@ -65,6 +84,9 @@ const KEYFRAMES = `
 @keyframes roost-sheen{0%{transform:translateX(-140%) skewX(-18deg)}60%,100%{transform:translateX(900%) skewX(-18deg)}}
 @keyframes roost-ping{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.6);opacity:0}}
 @keyframes roost-eq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+@keyframes roost-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
+@keyframes roost-bounce{0%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}60%{transform:translateY(-2px)}}
+@keyframes roost-wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important}}`;
 
 // ------------------------------------------------------------------ shared base
@@ -235,6 +257,14 @@ const LABELS = {
   show_date: "Show the date", show_clock: "Show the clock", layout: "Layout", show_labels: "Show names under icons",
   items: "Buttons", entities: "Devices", fixed: "Stick to the screen edge", max_width: "Dial size",
 };
+Object.assign(LABELS, {
+  fill: "Look when on", glow: "Glow", icon_shape: "Icon box", icon_size: "Icon size", name_size: "Name size",
+  off_tint: "Hint of colour when off", align: "Line up", show_state: "Show the state (On, Off, 23°)",
+  shape: "Button shape", button_size: "Button size", show_name: "Show the name",
+  active_style: "How the chosen button looks", bar_height: "Bar height", background: "Background",
+  chip_shape: "Chip shape", ring_size: "Ring size", ring_width: "Ring thickness",
+  show_orb: "Show the sun / moon", show_stars: "Twinkling stars at night", show_sheen: "Soft light sweep", min_height: "Height",
+});
 const computeLabel = (s) => s.label || LABELS[s.name] || s.name;
 
 // ------------------------------------------------------------------ the editor
@@ -289,7 +319,8 @@ if (!customElements.get("roost-editor")) customElements.define("roost-editor", R
 // ------------------------------------------------------------------ Roost Tile
 class RoostTile extends RoostBase {
   static get defaults() {
-    return { color: "purple", size: "large", radius: 22, show_switch: true, show_since: true, animation: "auto", locked: false, confirm: false, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
+    return { color: "purple", size: "large", radius: 22, fill: "gradient", glow: "soft", icon_shape: "rounded", icon_size: 24, name_size: 17, off_tint: true, align: "left",
+      show_switch: true, show_state: true, show_since: true, animation: "auto", locked: false, confirm: false, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
   }
 
   validate(c) { if (!c.entity) throw new Error("Choose a device (entity)"); }
@@ -309,11 +340,19 @@ class RoostTile extends RoostBase {
             { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
             { name: "radius", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
           ] },
-          { name: "animation", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Automatic (lights glow, fans spin, TV shows sound bars)" }, { value: "none", label: "None" }, { value: "glow", label: "Glow" }, { value: "spin", label: "Spin" }, { value: "bars", label: "Sound bars" }] } } },
+          { type: "grid", name: "", schema: [{ name: "fill", selector: FILL_OPTIONS }, { name: "glow", selector: GLOW_OPTIONS }] },
+          { name: "off_tint", selector: { boolean: {} } },
+          { name: "animation", selector: pick([["auto", "Automatic (lights glow, fans spin, TV shows sound bars)"], ["none", "None"], ["glow", "Glow"], ["spin", "Spin"],
+            ["pulse", "Pulse"], ["bounce", "Bounce"], ["wiggle", "Wiggle"], ["bars", "Sound bars"]]) },
           THEME_FIELD,
+        ] },
+        { type: "expandable", name: "", title: "Icon and text", icon: "mdi:format-size", schema: [
+          { type: "grid", name: "", schema: [{ name: "icon_shape", selector: SHAPE_OPTIONS }, { name: "icon_size", selector: slider(16, 40) }] },
+          { type: "grid", name: "", schema: [{ name: "name_size", selector: slider(12, 24) }, { name: "align", selector: pick([["left", "Left"], ["center", "Centre"]]) }] },
         ] },
         { type: "expandable", name: "", title: "What it shows", icon: "mdi:eye-outline", schema: [
           { name: "show_switch", selector: { boolean: {} } },
+          { name: "show_state", selector: { boolean: {} } },
           { name: "show_since", selector: { boolean: {} } },
           { name: "power_entity", selector: { entity: { domain: "sensor" } } },
         ] },
@@ -362,23 +401,28 @@ class RoostTile extends RoostBase {
     const showSwitch = c.show_switch && togglable && !un && !c.locked;
     const dom = s ? s.entity_id.split(".")[0] : "";
     const kind = c.animation === "auto" ? (dom === "light" ? "glow" : dom === "fan" || /fan/.test(s?.attributes.icon || "") ? "spin" : dom === "media_player" && s?.state === "playing" ? "bars" : "none") : c.animation;
-    const anim = on && kind === "spin" ? "animation:roost-spin 1.3s linear infinite" : on && kind === "glow" ? "animation:roost-glow 2s ease-in-out infinite" : "";
+    const anim = on && ANIMATIONS[kind] ? `animation:${ANIMATIONS[kind]}` : "";
+    const look = fillLook(c.fill, c.glow, g, p);
+    const isz = Math.max(12, Number(c.icon_size) || 24), box = c.icon_shape === "none" ? isz : Math.round(isz * 2);
+    const nsz = Number(c.name_size) === 17 && h < 140 ? 15 : Math.max(11, Number(c.name_size) || 17); // the default name shrinks a little on small tiles
+    const center = c.align === "center";
     const bars = on && kind === "bars" ? `<span class="bars">${[0, 0.2, 0.4, 0.1].map((d) => `<i style="animation-delay:${d}s"></i>`).join("")}</span>` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{position:relative;min-height:${h}px;height:100%;border-radius:${c.radius}px;padding:16px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
-        display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden;transition:transform .12s;
-        background:${on ? `linear-gradient(135deg,${g[0]} 0%,${g[1]} 100%)` : p.off};color:${on ? g[3] : p.text};
-        border:1px solid ${on ? "transparent" : `color-mix(in srgb, ${g[0]} 35%, ${p.border})`};box-shadow:${on ? `0 18px 36px -14px ${g[2]}` : "none"};opacity:${un ? 0.55 : 1}}
+        display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden;transition:transform .12s;${center ? "align-items:center;text-align:center;" : ""}
+        background:${on ? look.bg : p.off};color:${on ? look.fg : p.text};${on && look.blur ? "backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);" : ""}
+        border:${on && c.fill === "outline" ? 2 : 1}px solid ${on ? look.border : c.off_tint ? `color-mix(in srgb, ${g[0]} 35%, ${p.border})` : p.border};box-shadow:${on ? look.shadow : "none"};opacity:${un ? 0.55 : 1}}
       .card:active{transform:scale(.96)}
-      .ic{width:48px;height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;flex:none;
-        background:${on ? "rgba(255,255,255,.24)" : `color-mix(in srgb, ${g[0]} 18%, ${p.inset})`};color:${on ? "inherit" : un ? p.muted : g[this.dark ? 1 : 0]}}
-      .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:24px;${anim}}
+      .ic{width:${box}px;height:${box}px;border-radius:${shapeRadius(c.icon_shape, box)};display:flex;align-items:center;justify-content:center;flex:none;
+        background:${c.icon_shape === "none" ? "transparent" : on ? (look.light ? "rgba(255,255,255,.24)" : `color-mix(in srgb, ${g[0]} 30%, transparent)`) : c.off_tint ? `color-mix(in srgb, ${g[0]} 18%, ${p.inset})` : p.inset};
+        color:${on ? (look.light ? "inherit" : g[this.dark ? 1 : 0]) : un ? p.muted : c.off_tint ? g[this.dark ? 1 : 0] : p.muted}}
+      .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:${isz}px;${anim}}
       .bars{position:absolute;right:18px;bottom:18px;display:flex;align-items:flex-end;gap:3px;height:22px}
       .bars i{display:block;width:4px;height:22px;border-radius:2px;background:currentColor;transform-origin:bottom;animation:roost-eq .9s ease-in-out infinite}
-      .sw{position:absolute;top:16px;right:14px;width:42px;height:24px;border-radius:999px;background:${on ? "rgba(255,255,255,.38)" : p.track}}
+      .sw{position:absolute;top:16px;right:14px;width:42px;height:24px;border-radius:999px;background:${on ? (look.light ? "rgba(255,255,255,.38)" : `linear-gradient(135deg,${g[0]},${g[1]})`) : p.track}}
       .sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:${on ? "#fff" : p.knob};transform:translateX(${on ? 18 : 0}px);transition:transform .12s}
       .lk{position:absolute;top:18px;right:16px;opacity:.8;--mdc-icon-size:18px}
-      .nm{font-size:${h < 140 ? 15 : 17}px;font-weight:600;line-height:1.2}
+      .nm{font-size:${nsz}px;font-weight:600;line-height:1.2}
       .lb{font-size:13.5px;line-height:1.3;opacity:.85;margin-top:3px;color:${on ? "inherit" : p.muted}}
       .ago{font-size:12.5px;opacity:.65;margin-top:4px;color:${on ? "inherit" : p.muted}}
     </style>
@@ -387,7 +431,7 @@ class RoostTile extends RoostBase {
       ${showSwitch ? '<span class="sw" aria-hidden="true"></span>' : ""}
       ${c.locked ? '<ha-icon class="lk" icon="mdi:lock" aria-label="Locked"></ha-icon>' : ""}${broken ? '<ha-icon class="lk" icon="mdi:battery-alert-variant-outline" style="color:#FF9F6B;--mdc-icon-size:20px" aria-label="Not working"></ha-icon>' : ""}${bars}
       <div><div class="nm t">${esc(this.name(c.entity))}</div>
-        <div class="lb t">${esc(broken ? c.problem : s ? this.stateText(s, on, un) + (c.locked && !un ? " · protected" : "") : "Device not found")}</div>
+        ${c.show_state || broken || !s ? `<div class="lb t">${esc(broken ? c.problem : s ? this.stateText(s, on, un) + (c.locked && !un ? " · protected" : "") : "Device not found")}</div>` : ""}
         ${c.show_since && s && !UNAVAILABLE.includes(s.state) ? `<div class="ago t">${esc(since(s.last_changed))}</div>` : ""}</div>
     </div>`;
     this.icon(this.shadowRoot.querySelector(".ic"), c.icon, c.entity);
@@ -402,7 +446,7 @@ class RoostTile extends RoostBase {
 // air conditioners into one snowflake, people into one row of bubbles (colour = home, grey = away).
 // Tap a group to see its list.
 class RoostChips extends RoostBase {
-  static get defaults() { return { entities: [], theme: "auto", align: "stretch", size: "medium" }; }
+  static get defaults() { return { entities: [], theme: "auto", align: "stretch", size: "medium", chip_shape: "pill", background: "solid" }; }
 
   validate(c) { if (!Array.isArray(c.entities) || !c.entities.length) throw new Error("Choose at least one device"); }
 
@@ -417,6 +461,8 @@ class RoostChips extends RoostBase {
         { type: "grid", name: "", schema: [
           { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
           { name: "show_words", label: "Words next to door icons (“Closed”)", selector: { boolean: {} } },
+          { name: "chip_shape", selector: pick([["pill", "Pill"], ["rounded", "Rounded square"], ["square", "Square"]]) },
+          { name: "background", selector: pick([["solid", "Solid"], ["glass", "See-through glass"], ["none", "None"]]) },
           { name: "align", label: "Line up", selector: { select: { mode: "dropdown", options: [{ value: "stretch", label: "One row, equal sizes" }, { value: "center", label: "Centre (may use two rows)" }, { value: "start", label: "Left (may use two rows)" }] } } },
         ] },
         THEME_FIELD,
@@ -512,7 +558,8 @@ class RoostChips extends RoostBase {
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .row{${c.align === "stretch" ? "display:grid;grid-auto-flow:column;grid-auto-columns:minmax(max-content,1fr);gap:6px"
     : `display:flex;flex-wrap:wrap;gap:8px;justify-content:${c.align === "start" ? "flex-start" : "center"}`}}
-      .chip{min-width:max-content;white-space:nowrap;height:${h}px;padding:0 ${c.align === "stretch" ? 6 : 14}px;border-radius:999px;border:1px solid ${p.border};background:${p.panel};
+      .chip{min-width:max-content;white-space:nowrap;height:${h}px;padding:0 ${c.align === "stretch" ? 6 : 14}px;border-radius:${c.chip_shape === "square" ? 10 : c.chip_shape === "rounded" ? 16 : 999}px;
+        border:1px solid ${c.background === "none" ? "transparent" : p.border};background:${c.background === "none" ? "transparent" : c.background === "glass" ? "color-mix(in srgb, " + p.panel + " 60%, transparent);backdrop-filter:blur(14px)" : p.panel};
         color:${p.text};display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font:inherit;font-size:14px;font-weight:600;-webkit-tap-highlight-color:transparent}
       .chip:active{transform:scale(.95)}
       :host{container-type:inline-size}
@@ -730,7 +777,7 @@ class RoostThermostat extends RoostBase {
 
 // ------------------------------------------------------------------ Roost Scene
 class RoostScene extends RoostBase {
-  static get defaults() { return { color: "purple", style: "card", size: "large", radius: 22, theme: "auto" }; }
+  static get defaults() { return { color: "purple", style: "card", size: "large", radius: 22, fill: "gradient", glow: "soft", shape: "rounded", button_size: 70, show_name: true, theme: "auto" }; }
 
   validate(c) { if (!c.entity && !c.tap_action) throw new Error("Choose a scene, script or action"); }
 
@@ -742,9 +789,17 @@ class RoostScene extends RoostBase {
         { type: "expandable", name: "", title: "Colour and shape", icon: "mdi:palette", schema: [
           ...colourFields(),
           { name: "style", selector: { select: { mode: "dropdown", options: [{ value: "card", label: "Coloured card" }, { value: "round", label: "Round button with name under it" }] } } },
+          { type: "grid", name: "", schema: [{ name: "fill", selector: FILL_OPTIONS }, { name: "glow", selector: GLOW_OPTIONS }] },
+          { name: "show_name", selector: { boolean: {} } },
+        ] },
+        { type: "expandable", name: "", title: "Size and shape", icon: "mdi:shape-outline", schema: [
           { type: "grid", name: "", schema: [
-            { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
-            { name: "radius", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
+            { name: "size", label: "Card size (coloured card)", selector: pick([["small", "Small"], ["medium", "Medium"], ["large", "Large"]]) },
+            { name: "radius", label: "Corner roundness (coloured card)", selector: slider(0, 40, 2) },
+          ] },
+          { type: "grid", name: "", schema: [
+            { name: "shape", label: "Button shape (round button)", selector: pick([["rounded", "Rounded square"], ["circle", "Circle"], ["square", "Square"]]) },
+            { name: "button_size", label: "Button size (round button)", selector: slider(44, 100, 2) },
           ] },
           THEME_FIELD,
         ] },
@@ -774,22 +829,24 @@ class RoostScene extends RoostBase {
     if (!this._hass || !this._config) return;
     const c = this._config, g = this.colour(), p = this.p, h = SIZES[c.size] || SIZES.large;
     const round = c.style === "round";
+    const look = fillLook(c.fill, c.glow, g, p), bs = Math.max(36, Number(c.button_size) || 70);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{position:relative;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;transition:transform .12s;
         ${round ? `display:flex;flex-direction:column;align-items:center;gap:8px;padding:4px;color:${p.text}`
     : `min-height:${h}px;height:100%;border-radius:${c.radius}px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;
-          background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 14px 30px -14px ${g[2]}`}}
+          background:${look.bg};color:${look.fg};border:${c.fill === "outline" ? 2 : 1}px solid ${look.border};box-shadow:${look.shadow};${look.blur ? "backdrop-filter:blur(14px);" : ""}`}}
       .card:active{transform:scale(.95)}
       .ic{display:flex;align-items:center;justify-content:center;flex:none;
-        ${round ? `width:70px;height:70px;border-radius:${Math.min(35, c.radius)}px;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 12px 24px -10px ${g[2]}`
-    : "width:34px;height:34px;border-radius:12px;background:rgba(255,255,255,.22)"}}
-      .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:${round ? 28 : 18}px}
+        ${round ? `width:${bs}px;height:${bs}px;border-radius:${shapeRadius(c.shape, bs)};background:${look.bg};color:${look.light ? look.fg : g[this.dark ? 1 : 0]};
+          border:${c.fill === "outline" ? 2 : 1}px solid ${look.border};box-shadow:${look.shadow};${look.blur ? "backdrop-filter:blur(14px);" : ""}`
+    : `width:34px;height:34px;border-radius:12px;background:${look.light ? "rgba(255,255,255,.22)" : `color-mix(in srgb, ${g[0]} 30%, transparent)`}`}}
+      .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:${round ? Math.round(bs * 0.4) : 18}px}
       .nm{font-size:${round ? 12 : 14}px;font-weight:${round ? 600 : 700};line-height:1.2;text-align:${round ? "center" : "left"}${round ? ";margin:0 -6px;letter-spacing:-.1px" : ""}}
       .done{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:#3DD68C;display:none;align-items:center;justify-content:center;color:#fff}
       .done.show{display:flex;animation:roost-tick 1.6s ease-out forwards}
     </style>
     <div class="card" role="button" tabindex="0" aria-label="${esc(this.name(c.entity, "Scene"))}"><div class="ic"></div>
-      <div class="nm t">${esc(this.name(c.entity, "Scene"))}</div><span class="done"><ha-icon icon="mdi:check" style="--mdc-icon-size:14px"></ha-icon></span></div>`;
+      ${c.show_name ? `<div class="nm t">${esc(this.name(c.entity, "Scene"))}</div>` : ""}<span class="done"><ha-icon icon="mdi:check" style="--mdc-icon-size:14px"></ha-icon></span></div>`;
     this.icon(this.shadowRoot.querySelector(".ic"), c.icon, c.entity);
     const card = this.shadowRoot.querySelector(".card");
     this.press(card, async () => {
@@ -803,7 +860,7 @@ class RoostScene extends RoostBase {
 // The greeting card: a sky that follows the sun (twinkling stars at night), a floating sun or moon,
 // a soft light sweep, the date and time, the weather, and an optional "what's next" pill.
 class RoostHero extends RoostBase {
-  static get defaults() { return { sky: "auto", sun: "sun.sun", show_date: true, show_clock: true, upcoming: [], upcoming_title: "Next", radius: 26, theme: "auto" }; }
+  static get defaults() { return { sky: "auto", sun: "sun.sun", show_date: true, show_clock: true, show_orb: true, show_stars: true, show_sheen: true, min_height: 180, upcoming: [], upcoming_title: "Next", radius: 26, theme: "auto" }; }
 
   watched() { return [this._config.weather, this._config.sun, ...(this._config.upcoming || []).map((u) => u.entity)].filter(Boolean); }
 
@@ -831,7 +888,8 @@ class RoostHero extends RoostBase {
           { name: "sky_start", label: "First colour (my own colours)", selector: { color_rgb: {} } },
           { name: "sky_end", label: "Second colour (my own colours)", selector: { color_rgb: {} } },
           { name: "sun", label: "Sun (for day and night)", selector: { entity: { domain: "sun" } } },
-          { name: "radius", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
+          { type: "grid", name: "", schema: [{ name: "radius", selector: slider(0, 40, 2) }, { name: "min_height", selector: slider(120, 280, 10) }] },
+          { type: "grid", name: "", schema: [{ name: "show_orb", selector: { boolean: {} } }, { name: "show_stars", selector: { boolean: {} } }, { name: "show_sheen", selector: { boolean: {} } }] },
           THEME_FIELD,
         ] },
       ],
@@ -872,7 +930,7 @@ class RoostHero extends RoostBase {
       ? (day ? "linear-gradient(115deg,#2563EB 0%,#60A5FA 50%,#FDBA74 100%)" : "linear-gradient(115deg,#1B1E52 0%,#38287E 52%,#7A3A90 100%)")
       : (() => { const g = this.colour("sky"); return `linear-gradient(115deg,${g[0]} 0%,${g[1]} 100%)`; })();
     let stars = "";
-    if (!day) for (let j = 0; j < 22; j++) stars += `<span class="star" style="left:${(j * 37 + 11) % 96}%;top:${(j * 53 + 7) % 88}%;width:${1 + (j % 3)}px;height:${1 + (j % 3)}px;animation-duration:${2.4 + (j % 5) * 0.7}s;animation-delay:${((j * 0.37) % 3).toFixed(2)}s"></span>`;
+    if (!day && c.show_stars) for (let j = 0; j < 22; j++) stars += `<span class="star" style="left:${(j * 37 + 11) % 96}%;top:${(j * 53 + 7) % 88}%;width:${1 + (j % 3)}px;height:${1 + (j % 3)}px;animation-duration:${2.4 + (j % 5) * 0.7}s;animation-delay:${((j * 0.37) % 3).toFixed(2)}s"></span>`;
     const orb = day ? "background:radial-gradient(circle at 40% 40%,#FFF7D6,#FDE047 55%,#F59E0B);box-shadow:0 0 50px 16px rgba(253,224,71,.45)"
       : "background:radial-gradient(circle at 36% 34%,#FFFBEA 0%,#F6E3A6 62%,#E2C273 100%);box-shadow:0 0 40px 12px rgba(255,234,170,.28)";
     const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -887,20 +945,20 @@ class RoostHero extends RoostBase {
       pill = `<div class="pill"><span class="dot"><span></span></span><span class="t" style="flex:1">${esc(c.upcoming_title || "Next")} <b>${esc(nx.name)}</b> at ${esc(at)}</span><b class="num">in ${esc(left)}</b></div>`;
     }
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .card{position:relative;overflow:hidden;border-radius:${c.radius}px;padding:20px;min-height:180px;color:#fff;background:${sky}}
+      .card{position:relative;overflow:hidden;border-radius:${c.radius}px;padding:20px;min-height:${Number(c.min_height) || 180}px;color:#fff;background:${sky}}
       .star{position:absolute;border-radius:50%;background:#fff;animation:roost-twinkle 3s ease-in-out infinite}
       .sheen{position:absolute;top:0;bottom:0;left:0;width:70px;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.12),rgba(255,255,255,0));animation:roost-sheen 8s ease-in-out 1s infinite;pointer-events:none}
       .orb{position:absolute;right:24px;top:22px;width:56px;height:56px;border-radius:50%;${orb};animation:roost-float 6s ease-in-out infinite}
       .body{position:relative;display:flex;flex-direction:column;gap:8px}
       .top{font-size:13px;opacity:.85}
-      .hi{font-size:27px;font-weight:700;letter-spacing:-.4px;line-height:1.15;padding-right:68px;font-family:${FONT_NUM}}
+      .hi{font-size:27px;font-weight:700;letter-spacing:-.4px;line-height:1.15;padding-right:${c.show_orb ? 68 : 0}px;font-family:${FONT_NUM}}
       .wx{font-size:14px;line-height:1.5;opacity:.9;cursor:${w ? "pointer" : "default"}}
       .pill{display:flex;align-items:center;gap:10px;background:rgba(10,8,40,.3);border-radius:16px;padding:10px 12px;margin-top:6px;font-size:13px;line-height:1.35}
       .pill b.num{font-size:14px;flex:none}
       .dot{position:relative;width:10px;height:10px;border-radius:50%;background:#E9E2FF;flex:none}
       .dot span{position:absolute;inset:0;border-radius:50%;background:#E9E2FF;animation:roost-ping 1.8s ease-out infinite}
     </style>
-    <div class="card">${stars}<span class="sheen"></span><span class="orb"></span>
+    <div class="card">${stars}${c.show_sheen ? '<span class="sheen"></span>' : ""}${c.show_orb ? '<span class="orb"></span>' : ""}
       <div class="body">
         ${top ? `<span class="top t">${esc(top)}</span>` : ""}
         <span class="hi t">${esc(part)}${who ? `, ${esc(who)}` : ""}</span>
@@ -915,7 +973,7 @@ class RoostHero extends RoostBase {
 // ------------------------------------------------------------------ Roost Nav
 // A bottom bar on phones and a side rail on tablets ("auto"), or always one of them.
 class RoostNav extends RoostBase {
-  static get defaults() { return { items: [], layout: "auto", show_labels: false, fixed: true, color: "active", theme: "auto" }; }
+  static get defaults() { return { items: [], layout: "auto", show_labels: true, fixed: true, color: "active", active_style: "filled", background: "glass", bar_height: 54, icon_size: 22, radius: 26, theme: "auto" }; }
 
   validate(c) { if (!Array.isArray(c.items) || !c.items.length) throw new Error("Add at least one button"); }
 
@@ -948,9 +1006,17 @@ class RoostNav extends RoostBase {
           { name: "layout", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Bar on phones, rail on tablets" }, { value: "bar", label: "Always a bottom bar" }, { value: "rail", label: "Always a side rail" }] } } },
           { name: "show_labels", selector: { boolean: {} } },
         ] },
-        { name: "fixed", selector: { boolean: {} } },
-        ...colourFields("color", "Colour of the chosen button"),
-        THEME_FIELD,
+        { name: "fixed", label: "Pinned to the edge of the screen", selector: { boolean: {} } },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+          ...colourFields("color", "Colour of the chosen button"),
+          { name: "active_style", selector: pick([["filled", "Filled square with glow"], ["soft", "Soft tinted square"], ["pill", "Filled pill"], ["line", "Line under it"], ["dot", "Dot under it"], ["icon", "Coloured icon only"]]) },
+          { type: "grid", name: "", schema: [
+            { name: "background", selector: pick([["glass", "See-through glass"], ["solid", "Solid"], ["none", "None"]]) },
+            { name: "radius", selector: slider(0, 40, 2) },
+          ] },
+          { type: "grid", name: "", schema: [{ name: "bar_height", selector: slider(40, 76, 2) }, { name: "icon_size", selector: slider(16, 32) }] },
+          THEME_FIELD,
+        ] },
       ],
       computeLabel,
     };
@@ -975,14 +1041,22 @@ class RoostNav extends RoostBase {
     const pos = c.fixed ? (rail ? "position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:4" : "position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4") : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       :host{${c.fixed ? (rail ? "height:0;" : "height:calc(76px + env(safe-area-inset-bottom));") : ""}display:block}
-      nav{${pos};display:${rail ? "flex" : "grid"};${rail ? "flex-direction:column" : `grid-template-columns:repeat(${c.items.length},minmax(0,1fr))`};gap:${rail ? 12 : 4}px;padding:${rail ? "14px 10px" : "7px"};border-radius:${rail ? 28 : 26}px;
-        background:${p.panel};border:1px solid ${p.border};backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 18px 40px -16px rgba(0,0,0,.5);
+      nav{${pos};display:${rail ? "flex" : "grid"};${rail ? "flex-direction:column" : `grid-template-columns:repeat(${c.items.length},minmax(0,1fr))`};gap:${rail ? 12 : 4}px;padding:${rail ? "14px 10px" : "7px"};border-radius:${Number(c.radius) + (rail ? 2 : 0)}px;
+        ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};box-shadow:0 18px 40px -16px rgba(0,0,0,.5);`
+    : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[0]}47;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 18px 40px -12px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;`}
         ${rail ? "width:max-content" : `width:${c.fixed ? "calc(100vw - 24px)" : "100%"};max-width:536px`};${c.fixed ? "" : "margin:0 auto"}}
-      a{min-width:${rail ? 56 : 0}px;min-height:${c.show_labels ? 60 : 52}px;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-        color:${p.muted};text-decoration:none;font-size:11px;font-weight:600;-webkit-tap-highlight-color:transparent;padding:4px 8px;transition:background .12s}
-      a.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -10px ${g[2]}}
+      a{position:relative;min-width:${rail ? 56 : 0}px;min-height:${Number(c.bar_height) || 54}px;border-radius:${c.active_style === "pill" ? 999 : Math.max(8, Number(c.radius) - 8)}px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+        color:${p.muted};text-decoration:none;font-size:10.5px;font-weight:600;-webkit-tap-highlight-color:transparent;padding:4px 6px;transition:background .12s}
+      ${{
+    filled: `a.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 22px -8px ${g[2]}}`,
+    pill: `a.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 22px -8px ${g[2]}}`,
+    soft: `a.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]}}`,
+    line: `a.on{color:${g[this.dark ? 1 : 0]}}a.on::after{content:"";position:absolute;bottom:3px;left:30%;right:30%;height:3px;border-radius:3px;background:linear-gradient(90deg,${g[0]},${g[1]})}`,
+    dot: `a.on{color:${g[this.dark ? 1 : 0]}}a.on::after{content:"";position:absolute;bottom:3px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:${g[1]};box-shadow:0 0 8px ${g[2]}}`,
+    icon: `a.on{color:${g[this.dark ? 1 : 0]}}a.on ha-icon{filter:drop-shadow(0 0 6px ${g[2]})}`,
+  }[c.active_style] || ""}
       a:active{transform:scale(.94)}
-      a ha-icon{--mdc-icon-size:24px}
+      a ha-icon{--mdc-icon-size:${Number(c.icon_size) || 22}px}
       @media (max-width: 360px){nav{gap:2px;padding:6px}a{min-width:48px;padding:4px 2px}}
     </style>
     <nav aria-label="Navigation">${c.items.map((it, i) => `<a href="${esc(it.path)}" data-i="${i}" class="${this.active(it.path) ? "on" : ""}" aria-label="${esc(it.name || it.path)}">
@@ -1003,7 +1077,7 @@ class RoostNav extends RoostBase {
 // ------------------------------------------------------------------ Roost Row
 // A long row: a ring with the number (an AC's set temperature, or any sensor), a name, a short state line and an arrow.
 class RoostRow extends RoostBase {
-  static get defaults() { return { color: "blue", min: 16, max: 30, radius: 22, tap_action: { action: "more-info" }, theme: "auto" }; }
+  static get defaults() { return { color: "blue", min: 16, max: 30, radius: 22, ring_size: 64, ring_width: 6, tap_action: { action: "more-info" }, theme: "auto" }; }
 
   validate(c) { if (!c.entity) throw new Error("Choose a device"); }
 
@@ -1018,6 +1092,7 @@ class RoostRow extends RoostBase {
             { name: "max", label: "Ring is full at", selector: { number: { mode: "box" } } },
           ] },
           ...colourFields("color", "Ring colour"),
+          { type: "grid", name: "", schema: [{ name: "ring_size", selector: slider(40, 96, 2) }, { name: "ring_width", selector: slider(2, 12) }] },
           { name: "radius", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
           THEME_FIELD,
         ] },
@@ -1050,14 +1125,15 @@ class RoostRow extends RoostBase {
     const r = s && !un ? this.reading(s) : { value: null, text: null, line: s ? "Offline" : "Device not found" };
     const mn = r.min ?? c.min, mx = r.max ?? c.max;
     const f = r.value == null ? 0 : Math.max(0, Math.min(1, (r.value - mn) / (mx - mn || 1)));
-    const R = 26, C = 2 * Math.PI * R, L = C * 0.75;
+    const rs = Math.max(40, Number(c.ring_size) || 64), rw = Math.max(2, Number(c.ring_width) || 6);
+    const R = 32 - rw / 2 - 3, C = 2 * Math.PI * R, L = C * 0.75;
     const on = s && !un && !OFF_STATES.includes(s.state);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .row{display:flex;align-items:center;gap:16px;padding:14px 18px 14px 14px;border-radius:${c.radius}px;background:${p.panel};border:1px solid ${p.border};color:${p.text};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s;opacity:${un ? 0.55 : 1}}
       .row:active{transform:scale(.98)}
-      .ring{position:relative;width:64px;height:64px;flex:none;display:flex;align-items:center;justify-content:center}
+      .ring{position:relative;width:${rs}px;height:${rs}px;flex:none;display:flex;align-items:center;justify-content:center}
       .ring svg{position:absolute;inset:0}
-      .ring .v{font-size:19px;font-weight:700;font-family:${FONT_NUM}}
+      .ring .v{font-size:${Math.round(rs * 0.3)}px;font-weight:700;font-family:${FONT_NUM}}
       .ring ha-icon{--mdc-icon-size:24px;color:${on ? g[1] : p.muted}}
       .tx{flex:1;min-width:0}
       .n{font-size:17px;font-weight:600;line-height:1.25}
@@ -1066,8 +1142,8 @@ class RoostRow extends RoostBase {
     </style>
     <div class="row" role="button" tabindex="0" aria-label="${esc(this.name(c.entity))}">
       <span class="ring"><svg viewBox="0 0 64 64"><defs><linearGradient id="rg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/></linearGradient></defs>
-        <circle cx="32" cy="32" r="${R}" fill="none" stroke="${p.track}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 32 32)"/>
-        ${f > 0 ? `<circle cx="32" cy="32" r="${R}" fill="none" stroke="${on ? "url(#rg)" : p.tick}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(L * f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 32 32)"/>` : ""}</svg>
+        <circle cx="32" cy="32" r="${R}" fill="none" stroke="${p.track}" stroke-width="${rw}" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 32 32)"/>
+        ${f > 0 ? `<circle cx="32" cy="32" r="${R}" fill="none" stroke="${on ? "url(#rg)" : p.tick}" stroke-width="${rw}" stroke-linecap="round" stroke-dasharray="${(L * f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 32 32)"/>` : ""}</svg>
         ${c.icon || r.text == null ? `<ha-icon icon="${esc(c.icon || "mdi:information-outline")}"></ha-icon>` : `<span class="v">${esc(r.text)}</span>`}</span>
       <span class="tx"><div class="n t">${esc(this.name(c.entity))}</div>${r.line ? `<div class="l t">${esc(r.line)}</div>` : ""}</span>
       <ha-icon class="ch" icon="mdi:chevron-right"></ha-icon>
@@ -1079,7 +1155,7 @@ class RoostRow extends RoostBase {
 // ------------------------------------------------------------------ Roost Rooms
 // A row of room pills; the chosen room's cards show below. Switching is instant (all rooms are built once).
 class RoostRooms extends RoostBase {
-  static get defaults() { return { rooms: [], columns: 2, color: "active", show_names: "active", theme: "auto" }; }
+  static get defaults() { return { rooms: [], columns: 2, color: "active", show_names: "active", active_style: "filled", background: "solid", theme: "auto" }; }
 
   validate(c) { if (!Array.isArray(c.rooms) || !c.rooms.length) throw new Error("Add at least one room"); }
 
@@ -1112,6 +1188,10 @@ class RoostRooms extends RoostBase {
             { value: "active", label: "Only on the chosen room" }, { value: "all", label: "On every room" }, { value: "none", label: "Icons only" }] } } },
         ] },
         ...colourFields("color", "Colour of the chosen room"),
+        { type: "grid", name: "", schema: [
+          { name: "active_style", label: "How the chosen room looks", selector: pick([["filled", "Filled with glow"], ["soft", "Soft tint"], ["line", "Line under it"]]) },
+          { name: "background", label: "Bar background", selector: pick([["solid", "Solid"], ["glass", "See-through glass"], ["none", "None"]]) },
+        ] },
         THEME_FIELD,
       ],
       computeLabel,
@@ -1156,12 +1236,14 @@ class RoostRooms extends RoostBase {
     const c = this._config, p = this.p, g = this.colour();
     const showName = (i) => c.show_names === "all" || (c.show_names === "active" && i === this._active);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .bar{border-radius:999px;border:1px solid ${p.border};background:${p.panel};padding:4px;margin-bottom:12px}
+      .bar{border-radius:999px;border:1px solid ${c.background === "none" ? "transparent" : p.border};background:${c.background === "none" ? "transparent" : c.background === "glass" ? `color-mix(in srgb, ${p.panel} 60%, transparent);backdrop-filter:blur(14px)` : p.panel};padding:4px;margin-bottom:12px}
       .pills{display:flex;gap:2px;justify-content:space-between;overflow-x:auto;scrollbar-width:none}
       .pills::-webkit-scrollbar{display:none}
       .pill{flex:0 0 auto;min-height:44px;min-width:52px;border-radius:999px;border:0;background:transparent;color:${p.muted};
         display:flex;align-items:center;justify-content:center;gap:8px;padding:0 14px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
-      .pill.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -12px ${g[2]}}
+      ${c.active_style === "soft" ? `.pill.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]}}`
+    : c.active_style === "line" ? `.pill{position:relative}.pill.on{color:${g[this.dark ? 1 : 0]}}.pill.on::after{content:"";position:absolute;bottom:4px;left:28%;right:28%;height:3px;border-radius:3px;background:linear-gradient(90deg,${g[0]},${g[1]})}`
+      : `.pill.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -12px ${g[2]}}`}
       .pill:active{transform:scale(.95)}
       .pill ha-icon{--mdc-icon-size:22px}
       .room{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:12px}

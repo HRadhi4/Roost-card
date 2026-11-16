@@ -41,6 +41,8 @@ Every card has these colour and look settings:
 - **Colour**: Blue, Purple, Coral, Green, Amber, Teal, Pink, Slate, or **My own colours** (pick two colours for the gradient).
 - **Light or dark**: follow Home Assistant, always dark, or always light.
 - **Size** and **corner roundness** (on tiles, scenes and the thermostat).
+- **Look when on** (tiles and scenes): colour fade, one colour, see-through glass, or a coloured outline only. **Glow**: soft, strong or none.
+- **Icon box** (tiles): rounded square, circle, square, or no box. Icon size and name size are sliders.
 
 ### Roost Tile
 ```yaml
@@ -51,7 +53,16 @@ icon: mdi:ceiling-light # optional
 color: amber           # or "custom" with color_start / color_end
 size: large            # small, medium or large
 radius: 22             # corner roundness in px
-animation: glow        # none, glow or spin
+animation: auto        # auto, none, glow, spin, pulse, bounce, wiggle or bars
+fill: gradient         # gradient, solid, glass or outline
+glow: soft             # soft, strong or none
+icon_shape: rounded    # rounded, circle, square or none
+icon_size: 24          # px
+name_size: 17          # px
+align: left            # left or center
+off_tint: true         # a hint of the colour when off
+show_state: true       # "On · 78%"
+problem: ""            # e.g. "Not working · battery" greys the tile out
 show_switch: true
 show_since: true       # "for 5 min"
 power_entity: sensor.kitchen_power   # optional
@@ -74,6 +85,8 @@ entities:
   - person.ali
 size: medium             # small, medium or large
 align: stretch           # stretch (one row, equal sizes; default), center or start
+chip_shape: pill      # pill, rounded or square
+background: solid     # solid, glass or none
 ```
 
 ### Roost Thermostat
@@ -96,6 +109,10 @@ entity: scene.movie_night
 color: purple
 style: card              # card, or round (round button with the name under it)
 size: large
+shape: rounded        # round style: rounded, circle or square
+button_size: 70       # round style, px
+fill: gradient        # gradient, solid, glass or outline
+show_name: true
 ```
 
 ### Roost Hero
@@ -110,6 +127,10 @@ upcoming_title: Next prayer
 upcoming:                # the soonest of these times is counted down
   - { name: Fajr, entity: sensor.fajr_prayer }
   - { name: Maghrib, entity: sensor.maghrib_prayer }
+show_orb: true
+show_stars: true
+show_sheen: true
+min_height: 180
 ```
 
 ### Roost Row
@@ -121,6 +142,8 @@ color: blue              # ring colour
 min: 16                  # for sensors: where the ring starts and is full
 max: 30
 tap_action: { action: navigate, navigation_path: "#living" }
+ring_size: 64
+ring_width: 6
 ```
 
 ### Roost Nav
@@ -133,6 +156,11 @@ items:
   - { icon: mdi:home, path: "#home", name: Home }
   - { icon: mdi:view-grid, path: "#rooms", name: Rooms }
   - { icon: mdi:shield-home, path: /lovelace/security, name: Security }
+show_labels: true     # names under the icons
+active_style: filled  # filled, soft, pill, line, dot or icon
+background: glass     # glass, solid or none
+bar_height: 54
+icon_size: 22
 ```
 
 ### Roost Rooms
@@ -152,6 +180,8 @@ rooms:
     icon: mdi:bed
     cards:
       - { type: custom:roost-tile, entity: light.bedroom }
+active_style: filled  # filled, soft or line
+background: solid     # solid, glass or none
 ```
 
 ## Keep your Home Assistant up to date automatically

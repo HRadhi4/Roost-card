@@ -2,6 +2,16 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.6.0 — 2026-11-16
+**Many more ways to style every card**
+- **Tiles**: choose how a tile looks when on (colour fade, one colour, see-through glass, or a coloured outline), how strong the glow is, the icon box (rounded, circle, square or none), the icon size, the name size, left or centred text, and whether it shows a hint of colour when off. New animations: pulse, bounce and wiggle. The state line can be hidden.
+- **Scene buttons**: the same looks and glow, plus the round button's shape (circle, rounded, square) and size, and the name can be hidden.
+- **Bottom bar (Roost Nav)**: names under the icons are back by default. Choose how the chosen button looks (filled with glow, soft tint, pill, a line or a dot under it, or a coloured icon), the background (glass, solid or none), the bar height, the icon size and the roundness.
+- **Chips**: pill, rounded or square chips, on a solid, glass or no background.
+- **Rooms bar**: the chosen room can be filled, softly tinted or underlined, on a solid, glass or no bar.
+- **Rows**: ring size and thickness.
+- **Hero**: turn the sun or moon, the stars and the light sweep on or off, and set the height.
+
 ## 0.5.3 — 2026-11-16
 - **Roost Nav**: when the bar is pinned to the bottom of a phone, it keeps space free under the last card, so nothing hides behind it.
 
