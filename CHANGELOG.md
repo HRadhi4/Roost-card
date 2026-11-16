@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.1.2 — 2026-11-16
+- **Tutorials**: eight short step-by-step guides with pictures and GIFs, from installing to a full phone home screen.
+- New README with screenshots, GIFs of the cards in use, and a one-tap "Open in HACS" button.
+- Forms for reporting a problem or suggesting an idea.
+
 ## 1.1.1 — 2026-11-16
 - **Roost Curtain** now sits on a card background like the other cards (can be turned off with "Card background").
 - Fan, light, lock and media cards stack the icon above the name in narrow columns, so names never break inside a word.

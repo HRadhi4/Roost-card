@@ -1,0 +1,30 @@
+name: Something is wrong
+description: A card looks wrong, does not work, or shows an error.
+labels: [bug]
+body:
+  - type: input
+    id: card
+    attributes:
+      label: Which card?
+      placeholder: Roost Tile
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens, and what did you expect?
+      description: A screenshot helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: The card's settings
+      description: Edit the card → three dots → "Show code editor", and paste it here.
+      render: yaml
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Roost Cards version (HACS shows it), Home Assistant version, phone or browser.
+      placeholder: Roost 1.1.1 · Home Assistant 2026.11 · iPhone app

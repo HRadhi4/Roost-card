@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Tutorials
+    url: https://github.com/HRadhi4/Roost-card/tree/main/docs/tutorials
+    about: Short step-by-step guides with pictures.
