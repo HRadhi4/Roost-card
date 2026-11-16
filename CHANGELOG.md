@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.2.8 — 2026-11-17
+- **Watts, lux and ppm** show whole numbers everywhere ("43 W", not "43.0 W").
+- **Roost Energy** compares today with yesterday up to the same time of day, so the morning no longer shows a big drop. Small totals show two decimals ("0.04 kWh"). Devices can have short names.
+- **Roost Clock**: the date is written like the hero ("Tuesday 17 November"), and the labels of times that are close together no longer touch.
+- **Roost Light/Dark** and the **Full screen** button can stretch to the width of their card.
+
 ## 1.2.7 — 2026-11-17
 - **Bottom bar**: it no longer jumps sideways when you open a page that is shorter than the screen (on computers the scroll bar used to push it).
 

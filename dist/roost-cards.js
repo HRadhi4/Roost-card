@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.2.7";
+const ROOST_VERSION = "1.2.8";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1813,7 +1813,8 @@ function ago(iso) {
 const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
 const fmt = (v, dec) => (v == null ? "" : Number(v).toFixed(dec == null ? (Math.abs(v) >= 100 ? 0 : 1) : dec));
 // as many decimals as the sensor itself gives (52 stays 52, 26.4 stays 26.4), at most two
-const decOf = (state) => Math.min(2, (String(state).split(".")[1] || "").length);
+// whole numbers for watts, lux and ppm (a "0.0 W" reading reads as "0 W"); otherwise as many decimals as the sensor gives, at most 2
+const decOf = (state, unit) => (/^(W|Wh|lx|ppm|rpm|mA)$/.test(String(unit || "")) ? 0 : Math.min(2, (String(state).split(".")[1] || "").length));
 // "26°" and "52%" sit next to the number; "1460 W" and "612 ppm" get a space
 const unitGap = (u) => (!u ? "" : /^(°|°C|°F|%)$/.test(u) ? u : ` ${u}`);
 const panelCss = (p, radius = 22) => `background:${p.panel};border:1px solid ${p.border};border-radius:${radius}px;color:${p.text}`;
@@ -1879,7 +1880,7 @@ class RoostGauge extends RoostBase {
     const unit = c.unit != null && c.unit !== "" ? c.unit : s?.attributes.unit_of_measurement || "";
     const u2 = unitGap(unit);
     const sub = c.second ? this.st(c.second) : null, sv = sub ? num(sub.state) : null;
-    const line = !s ? "Device not found" : !ok ? "Offline" : hot ? (c.warn_below != null && v <= c.warn_below ? "Too low" : "Too high") : sub ? `${c.second_name || sub.attributes.friendly_name || "Also"} ${sv != null ? fmt(sv, decOf(sub.state)) : sub.state}${sv != null ? unitGap(sub.attributes.unit_of_measurement || "") : ""}` : "";
+    const line = !s ? "Device not found" : !ok ? "Offline" : hot ? (c.warn_below != null && v <= c.warn_below ? "Too low" : "Too high") : sub ? `${c.second_name || sub.attributes.friendly_name || "Also"} ${sv != null ? fmt(sv, decOf(sub.state, sub.attributes.unit_of_measurement)) : sub.state}${sv != null ? unitGap(sub.attributes.unit_of_measurement || "") : ""}` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${c.frame ? panelCss(p, c.radius) : `color:${p.text}`};padding:${c.frame ? "16px 14px" : 0};display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
       .ring{position:relative;width:100%;max-width:${c.size}px;container-type:inline-size}
@@ -1893,7 +1894,7 @@ class RoostGauge extends RoostBase {
     </style>
     <div class="card" role="button" tabindex="0">
       <div class="ring">${ringSvg({ f, track: p.track, from: g[0], to: g[1], id: "gg", inner: 58, innerFill: p.dial })}
-        <div class="in">${c.title ? `<span class="ti t">${esc(c.title)}</span>` : ""}<span class="v num" ${ok ? 'data-tw="v"' : ""}>${ok ? esc(fmt(v, c.decimals ?? decOf(s.state)) + u2) : '<ha-icon icon="mdi:help-circle-outline"></ha-icon>'}</span>${line ? `<span class="ln t">${esc(line)}</span>` : ""}</div></div>
+        <div class="in">${c.title ? `<span class="ti t">${esc(c.title)}</span>` : ""}<span class="v num" ${ok ? 'data-tw="v"' : ""}>${ok ? esc(fmt(v, c.decimals ?? decOf(s.state, unit)) + u2) : '<ha-icon icon="mdi:help-circle-outline"></ha-icon>'}</span>${line ? `<span class="ln t">${esc(line)}</span>` : ""}</div></div>
       ${c.show_name ? `<div class="nm t">${esc(this.name(c.entity))}</div>` : ""}
     </div>`;
     // the arc grows to its new value instead of jumping
@@ -2067,7 +2068,7 @@ class RoostClock extends ticking(RoostBase, 15000) {
     const c = this._config, p = this.p, g = this.colour(), now = new Date();
     const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: c.seconds ? "2-digit" : undefined, hour12: !c.hour24 });
     const [hm, ap] = c.hour24 ? [time, ""] : [time.replace(/\s?[AaPp]\.?[Mm]\.?$/, ""), (time.match(/[AaPp]\.?[Mm]\.?$/) || [""])[0]];
-    const date = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+    const date = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
     const times = (c.times || []).map((t) => ({ ...t, at: this.when(t.entity) })).filter((t) => t.at);
     const mins = (d) => d.getHours() * 60 + d.getMinutes();
     let next = times.filter((t) => t.countdown !== false && mins(t.at) > mins(now)).sort((a, b) => mins(a.at) - mins(b.at))[0];
@@ -2090,7 +2091,7 @@ class RoostClock extends ticking(RoostBase, 15000) {
       .nx .w{font-size:12px;color:${p.muted}}
       .nx .n{font-size:16px;font-weight:700}
       .nx .c{font-size:13px;font-weight:600;color:${g[1]}}
-      .line{position:relative;height:42px;margin:0 8px}
+      .line{position:relative;height:52px;margin:0 8px}
       .bar{position:absolute;left:0;right:0;top:10px;height:4px;border-radius:4px;background:${p.track}}
       .fill{position:absolute;left:0;top:10px;height:4px;border-radius:4px;background:linear-gradient(90deg,${g[0]},${g[1]})}
       .dot{position:absolute;top:6px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -2104,7 +2105,7 @@ class RoostClock extends ticking(RoostBase, 15000) {
       <div class="top"><div><div class="clk"><span class="hm num">${esc(hm)}</span>${ap ? `<span class="ap">${esc(ap)}</span>` : ""}</div>${c.show_date ? `<div class="dt t">${esc(date)}</div>` : ""}</div>
         ${next ? `<div class="nx"><span class="w t">${esc(c.countdown_title)}</span><span class="n t">${esc(next.name)} · ${esc(fmtT(nextAt))}</span><span class="c">in ${esc(cd)}</span></div>` : ""}</div>
       ${c.show_timeline && times.length ? `<div class="line"><span class="bar"></span><span class="fill" style="width:${(mins(now) / 1440 * 100).toFixed(2)}%"></span>
-        ${times.map((t) => `<span class="dot ${next && t.name === next.name ? "nx2" : ""}" style="left:${(mins(t.at) / 1440 * 100).toFixed(2)}%"><i></i><span>${esc(t.short || t.name.slice(0, 2))}</span></span>`).join("")}
+        ${times.slice().sort((a, b) => mins(a.at) - mins(b.at)).map((t, k, arr) => { const close = k > 0 && (mins(t.at) - mins(arr[k - 1].at)) / 1440 < 0.07 && !(k > 1 && (mins(arr[k - 1].at) - mins(arr[k - 2].at)) / 1440 < 0.07); return `<span class="dot ${next && t.name === next.name ? "nx2" : ""}" style="left:${(mins(t.at) / 1440 * 100).toFixed(2)}%"><i></i><span${close ? ' style="margin-top:12px"' : ""}>${esc(t.short || t.name.slice(0, 2))}</span></span>`; }).join("")}
         <span class="now" style="left:${(mins(now) / 1440 * 100).toFixed(2)}%"></span></div>` : ""}
     </div>`;
   }
@@ -2196,6 +2197,7 @@ class RoostTheme extends RoostBase {
       schema: [
         { name: "include_auto", label: "Also “Automatic” (follow the phone's own setting)", selector: { boolean: {} } },
         { name: "show_label", label: "Show the word (Light / Dark)", selector: { boolean: {} } },
+        { name: "full_width", label: "As wide as the card", selector: { boolean: {} } },
         { type: "grid", name: "", schema: [{ name: "shape", selector: pick([["rounded", "Rounded square"], ["circle", "Circle"], ["pill", "Pill"]]) }, { name: "size", selector: slider(32, 64, 2) }] },
       ],
       computeLabel,
@@ -2216,7 +2218,7 @@ class RoostTheme extends RoostBase {
     const icon = mode === "auto" ? "mdi:theme-light-dark" : d ? "mdi:weather-night" : "mdi:white-balance-sunny";
     const word = mode === "auto" ? "Automatic" : d ? "Dark" : "Light";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      button{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 auto;height:${c.size}px;min-width:${c.size}px;padding:${c.show_label || c.shape === "pill" ? "0 14px" : 0};
+      button{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 auto;${c.full_width ? "width:100%;" : ""}height:${c.size}px;min-width:${c.size}px;padding:${c.show_label || c.shape === "pill" ? "0 14px" : 0};
         border-radius:${c.shape === "circle" || c.shape === "pill" ? 999 : Math.round(c.size / 3)}px;border:1px solid ${p.border};background:${d ? "#1D2244" : "#FFFFFF"};
         color:${d ? "#FCD34D" : "#6D4BFF"};cursor:pointer;font:inherit;font-size:13px;font-weight:600;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       button:active{transform:scale(.92)}
@@ -2861,7 +2863,7 @@ class RoostGraph extends RoostBase {
       .wait{height:${H}px;display:flex;align-items:center;justify-content:center;color:${p.muted};font-size:13px}
     </style>
     <div class="card" role="button" tabindex="0">
-      <div class="top"><span class="n t">${esc(this.name(c.entity))}</span><span class="v num" ${now != null ? 'data-tw="now"' : ""}>${now != null ? esc(fmt(now, c.decimals ?? decOf(s.state)) + u2) : s ? esc(s.state) : "Not found"}</span></div>
+      <div class="top"><span class="n t">${esc(this.name(c.entity))}</span><span class="v num" ${now != null ? 'data-tw="now"' : ""}>${now != null ? esc(fmt(now, c.decimals ?? decOf(s.state, unit)) + u2) : s ? esc(s.state) : "Not found"}</span></div>
       ${path ? `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs>
           <linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/></linearGradient>
           <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g[1]}" stop-opacity=".35"/><stop offset="1" stop-color="${g[1]}" stop-opacity="0"/></linearGradient></defs>
@@ -3340,7 +3342,7 @@ class RoostEnergy extends ticking(RoostBase, 300000) {
 
   validate(c) { if (!c.energy && !(c.devices || []).length) throw new Error("Choose a daily energy reading or some power readings"); }
 
-  watched() { return [this._config.energy, ...(this._config.devices || [])].filter(Boolean); }
+  watched() { return [this._config.energy, ...(this._config.devices || []).map((e) => (typeof e === "string" ? e : e?.entity))].filter(Boolean); }
 
   static getConfigForm() {
     return {
@@ -3370,8 +3372,10 @@ class RoostEnergy extends ticking(RoostBase, 300000) {
     if (this._loadedAt && Date.now() - this._loadedAt < 290000 && this._loadedFor === c.energy) return;
     this._loading = true;
     try {
-      const get = (offset) => h.callWS({ type: "recorder/statistic_during_period", statistic_id: c.energy, calendar: { period: "day", offset }, types: ["change"] });
-      const [t, y] = await Promise.all([get(0), get(-1)]);
+      // today so far, against yesterday up to the same time (a fair comparison all day long)
+      const get = (start, end) => h.callWS({ type: "recorder/statistic_during_period", statistic_id: c.energy, fixed_period: { start: start.toISOString(), end: end.toISOString() }, types: ["change"] });
+      const now = new Date(), midnight = new Date(now); midnight.setHours(0, 0, 0, 0);
+      const [t, y] = await Promise.all([get(midnight, now), get(new Date(midnight.getTime() - 86400e3), new Date(now.getTime() - 86400e3))]);
       this._days = { today: t?.change, yesterday: y?.change };
     } catch (e) { this._days = {}; }
     this._loading = false; this._loadedAt = Date.now(); this._loadedFor = c.energy;
@@ -3382,7 +3386,7 @@ class RoostEnergy extends ticking(RoostBase, 300000) {
     if (!this._hass || !this._config) return;
     const c = this._config, p = this.p, g = this.colour();
     this.loadDays();
-    const devs = (c.devices || []).map((id) => ({ id, s: this.st(id) })).filter((d) => d.s).map((d) => ({ ...d, w: num(d.s.state) ?? 0 }));
+    const devs = (c.devices || []).map((e) => (typeof e === "string" ? { id: e } : { id: e?.entity, nm: e?.name })).map((d) => ({ ...d, s: this.st(d.id) })).filter((d) => d.s).map((d) => ({ ...d, w: num(d.s.state) ?? 0 }));
     const total = devs.reduce((a, d) => a + d.w, 0);
     const top = [...devs].sort((a, b) => b.w - a.w).slice(0, c.count);
     const max = Math.max(1, ...top.map((d) => d.w));
@@ -3407,9 +3411,9 @@ class RoostEnergy extends ticking(RoostBase, 300000) {
     <div class="card">
       <div class="top">
         ${devs.length ? `<div class="box"><small>Using now</small><b class="num"><ha-icon class="bolt" icon="mdi:flash"></ha-icon> <span data-tw="tot">${kw(total)}</span></b></div>` : ""}
-        ${c.energy ? `<div class="box"><small>Today</small><b class="num">${today != null ? `${today.toFixed(1)} kWh` : "Loading"}</b>${diff != null ? `<em style="color:${diff > 0 ? "#FF9F6B" : "#3DD68C"}">${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)}% vs yesterday</em>` : yesterday != null ? `<em style="color:${p.muted}">Yesterday ${yesterday.toFixed(1)} kWh</em>` : ""}</div>` : ""}
+        ${c.energy ? `<div class="box"><small>Today</small><b class="num">${today != null ? `${today.toFixed(today < 1 ? 2 : 1)} kWh` : "Loading"}</b>${diff != null ? `<em style="color:${diff > 0 ? "#FF9F6B" : "#3DD68C"}">${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)}% vs this time yesterday</em>` : yesterday != null ? `<em style="color:${p.muted}">Yesterday ${yesterday.toFixed(1)} kWh</em>` : ""}</div>` : ""}
       </div>
-      ${top.length ? `<div class="dv">${top.map((d) => `<div class="row" data-e="${esc(d.id)}"><span class="t">${esc(d.s.attributes.friendly_name || d.id)}</span><b class="num" data-tw="${esc(d.id)}">${kw(d.w)}</b><span class="bar"><i data-bar="${esc(d.id)}" style="width:${((d.w / max) * 100).toFixed(0)}%"></i></span></div>`).join("")}</div>` : ""}
+      ${top.length ? `<div class="dv">${top.map((d) => `<div class="row" data-e="${esc(d.id)}"><span class="t">${esc(d.nm || d.s.attributes.friendly_name || d.id)}</span><b class="num" data-tw="${esc(d.id)}">${kw(d.w)}</b><span class="bar"><i data-bar="${esc(d.id)}" style="width:${((d.w / max) * 100).toFixed(0)}%"></i></span></div>`).join("")}</div>` : ""}
     </div>`;
     this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
   }
@@ -3938,7 +3942,7 @@ class RoostSensors extends RoostBase {
       const unit = s?.attributes.unit_of_measurement || "";
       return `<div class="sq ${warn ? "warn" : ""}" data-e="${esc(it.entity)}" role="button" tabindex="0">
         <ha-icon icon="${esc(it.icon || s?.attributes.icon || icons[dc] || "mdi:information-outline")}" style="color:${g[this.dark ? 1 : 0]}"></ha-icon>
-        <span class="v num">${!s ? "?" : v != null ? `<span data-tw="${esc(it.entity)}">${esc(fmt(v, it.decimals ?? decOf(s.state)))}</span><small>${esc(unitGap(unit))}</small>` : esc(UNAVAILABLE.includes(s.state) ? "Offline" : s.state)}</span>
+        <span class="v num">${!s ? "?" : v != null ? `<span data-tw="${esc(it.entity)}">${esc(fmt(v, it.decimals ?? decOf(s.state, unit)))}</span><small>${esc(unitGap(unit))}</small>` : esc(UNAVAILABLE.includes(s.state) ? "Offline" : s.state)}</span>
         <span class="n t">${esc(it.name || s?.attributes.friendly_name || it.entity)}</span></div>`;
     }).join("")}</div>`;
     this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
@@ -4214,7 +4218,8 @@ class RoostFullscreen extends RoostBase {
         { type: "expandable", name: "", title: "Look (button mode)", icon: "mdi:palette", schema: [
           { name: "show_label", label: "Show the words", selector: { boolean: {} } },
           ...colourFields("color", "Colour when full screen"),
-          THEME_FIELD,
+          { name: "full_width", label: "As wide as the card", selector: { boolean: {} } },
+        THEME_FIELD,
         ] },
       ],
       computeLabel,
@@ -4278,7 +4283,7 @@ class RoostFullscreen extends RoostBase {
     this.style.display = "";
     const word = on ? "Exit full screen" : "Full screen";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      button{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 auto;min-height:44px;min-width:44px;padding:0 ${c.show_label ? 16 : 0}px;border-radius:999px;cursor:pointer;
+      button{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 auto;${c.full_width ? "width:100%;" : ""}min-height:44px;min-width:44px;padding:0 ${c.show_label ? 16 : 0}px;border-radius:999px;cursor:pointer;
         border:1px solid ${on ? "transparent" : p.border};background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.panel};color:${on ? g[3] : p.text};font:inherit;font-size:13.5px;font-weight:600;
         box-shadow:${on ? `0 10px 22px -10px ${g[2]}` : "none"};-webkit-tap-highlight-color:transparent;transition:transform .12s}
       button:active{transform:scale(.93)}
@@ -4334,7 +4339,7 @@ class RoostPanel extends RoostPage {
       if (d === "alarm_control_panel") { const arm = s.state !== "disarmed"; icon = icon || (arm ? "mdi:shield-lock" : "mdi:shield-off-outline"); col = arm ? "#F43F6B" : "#38BDF8"; word = arm ? s.state.replace("armed_", "Armed ").replace("_", " ") : "Off"; wc = arm ? "#F43F6B" : p.muted; }
       else if (d === "binary_sensor" && ["door", "window", "garage_door", "opening"].includes(cls)) { const o = s.state === "on"; icon = icon || (o ? "mdi:door-open" : "mdi:door-closed"); col = wc = o ? "#FF9F6B" : "#34D399"; word = o ? "Open" : "Closed"; }
       else if (d === "binary_sensor" && ["occupancy", "presence", "motion"].includes(cls)) { const o = s.state === "on"; icon = icon || (o ? "mdi:motion-sensor" : "mdi:motion-sensor-off"); col = wc = o ? "#B794FF" : p.muted; word = o ? "Yes" : "No"; }
-      else if (d === "sensor") { icon = icon || (cls === "illuminance" ? "mdi:brightness-6" : null); col = cls === "illuminance" ? "#FCD34D" : p.muted; const v = num(s.state); word = v == null ? s.state : `${fmt(v, cls === "illuminance" ? 0 : decOf(s.state))}${unitGap(s.attributes.unit_of_measurement || "")}`; }
+      else if (d === "sensor") { icon = icon || (cls === "illuminance" ? "mdi:brightness-6" : null); col = cls === "illuminance" ? "#FCD34D" : p.muted; const v = num(s.state); word = v == null ? s.state : `${fmt(v, decOf(s.state, s.attributes.unit_of_measurement))}${unitGap(s.attributes.unit_of_measurement || "")}`; }
       else { const o = !OFF_STATES.includes(s.state); col = wc = o ? "#B794FF" : p.muted; word = o ? "On" : "Off"; }
     }
     return `<div class="rw" data-e="${esc(id)}"><span class="ri" style="color:${col}">${icon ? `<ha-icon icon="${esc(icon)}"></ha-icon>` : `<span class="si" data-icon="${esc(id)}"></span>`}</span><span class="rn t">${esc(name)}</span><span class="rv" style="color:${wc}">${esc(word)}</span></div>`;

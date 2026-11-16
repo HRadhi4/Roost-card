@@ -38,7 +38,7 @@ const calls = [];
 const entities = Object.fromEntries(Object.keys(states).filter((id) => id.startsWith("sensor.radar_")).map((id) => [id, { entity_id: id, device_id: "dev-radar" }]));
 const hass = (dark) => ({ states, entities, devices: { "dev-radar": { name: "Presence sensor" } }, themes: { darkMode: dark }, user: { name: "Sam Smith" }, callService: async (...a) => { calls.push(a); },
   callApi: async () => [{ summary: "Bin day", start: { date: new Date().toISOString().slice(0, 10) } }, { summary: "Dentist", start: { dateTime: new Date(Date.now() + 3600e3).toISOString() }, location: "Clinic" }],
-  callWS: async (m) => (m.type === "recorder/statistic_during_period" ? { change: m.calendar.offset ? 10 : 12.4 } : {}),
+  callWS: async (m) => (m.type === "recorder/statistic_during_period" ? { change: new Date(m.fixed_period.end) < Date.now() - 3600e3 ? 10 : 12.4 } : {}),
   connection: { subscribeMessage: async (cb, m) => { setTimeout(() => cb(m.type === "todo/item/subscribe" ? { items: [{ uid: "1", summary: "Milk", status: "needs_action" }, { uid: "2", summary: "Bread", status: "completed" }] } : { forecast: [{ datetime: new Date().toISOString(), condition: "sunny", temperature: 30, templow: 22 }] }), 0); return () => {}; } } });
 
 const cases = [
@@ -227,7 +227,7 @@ if (!/Milk/.test(td.shadowRoot.innerHTML) || !/1 to do/.test(td.shadowRoot.inner
 // Energy: today against yesterday.
 const en = document.createElement("roost-energy"); en.setConfig({ energy: "sensor.energy_today", devices: ["sensor.plug_a", "sensor.plug_b"] }); document.body.appendChild(en); en.hass = hass(true);
 await new Promise((r) => setTimeout(r, 30));
-if (!/12.4 kWh/.test(en.shadowRoot.innerHTML) || !/24% vs yesterday/.test(en.shadowRoot.innerHTML) || !/1.6 kW/.test(en.shadowRoot.innerHTML)) { fails++; console.error("FAIL energy", en.shadowRoot.querySelector(".top")?.textContent); }
+if (!/12.4 kWh/.test(en.shadowRoot.innerHTML) || !/24% vs this time yesterday/.test(en.shadowRoot.innerHTML) || !/1.6 kW/.test(en.shadowRoot.innerHTML)) { fails++; console.error("FAIL energy", en.shadowRoot.querySelector(".top")?.textContent); }
 // Doors say Closed, not Off.
 const dt = document.createElement("roost-tile"); dt.setConfig({ entity: "binary_sensor.front_door" }); document.body.appendChild(dt); dt.hass = hass(true);
 if (!/Closed/.test(dt.shadowRoot.innerHTML)) { fails++; console.error("FAIL door tile word"); }
