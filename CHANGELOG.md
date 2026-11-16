@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.2.0 — 2026-11-16
+**New: Roost Rooms**
+- A room switcher: a row of room pills, and the chosen room's cards below. Switching is instant.
+- Room names show only on the chosen room (or on all, or icons only), and the pills scroll sideways when there are many rooms.
+- Put any cards in a room, including other Roost cards; add `wide: true` to a card to give it the full width.
+
 ## 0.1.0 — 2026-11-16
 **First version: six cards, each with its own visual editor**
 - **Roost Tile**: a big tile with a switch, colour, icon, size, corner roundness, a power reading and how long it has been on. Glow or spin when on.

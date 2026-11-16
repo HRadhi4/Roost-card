@@ -2,11 +2,11 @@
  * Roost Cards — beautiful, fully customisable dashboard cards for Home Assistant.
  * Phones and tablets, light and dark. One file, no build step.
  *
- * Cards: roost-tile, roost-chips, roost-thermostat, roost-scene, roost-hero, roost-nav
+ * Cards: roost-tile, roost-chips, roost-thermostat, roost-scene, roost-hero, roost-nav, roost-rooms
  * Every card has a visual editor (colours, size, icon, shape…).
  */
 
-const ROOST_VERSION = "0.1.0";
+const ROOST_VERSION = "0.2.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -843,6 +843,121 @@ class RoostNav extends RoostBase {
   getCardSize() { return this._config?.fixed ? 0 : 1; }
 }
 
+// ------------------------------------------------------------------ Roost Rooms
+// A row of room pills; the chosen room's cards show below. Switching is instant (all rooms are built once).
+class RoostRooms extends RoostBase {
+  static get defaults() { return { rooms: [], columns: 2, color: "purple", show_names: "active", theme: "auto" }; }
+
+  validate(c) { if (!Array.isArray(c.rooms) || !c.rooms.length) throw new Error("Add at least one room"); }
+
+  setConfig(config) {
+    super.setConfig(config);
+    this._built = null;
+    if (this._active == null || this._active >= this._config.rooms.length) this._active = 0;
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    (this._cards || []).flat().forEach((el) => { el.hass = hass; });
+    const sig = `${this.dark ? 1 : 0}|${this._active}`;
+    if (sig === this._sig) return;
+    this._sig = sig;
+    this.render();
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "rooms", selector: { object: { multiple: true, label_field: "name", fields: {
+          name: { label: "Room name", required: true, selector: { text: {} } },
+          icon: { label: "Icon", selector: { icon: {} } },
+          cards: { label: "Cards in this room (YAML list)", selector: { object: {} } },
+        } } } },
+        { type: "grid", name: "", schema: [
+          { name: "columns", label: "Cards per row", selector: { number: { min: 1, max: 6, mode: "box" } } },
+          { name: "show_names", label: "Room names on the pills", selector: { select: { mode: "dropdown", options: [
+            { value: "active", label: "Only on the chosen room" }, { value: "all", label: "On every room" }, { value: "none", label: "Icons only" }] } } },
+        ] },
+        ...colourFields("color", "Colour of the chosen room"),
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) {
+    const lights = Object.keys(hass.states).filter((id) => id.startsWith("light.")).slice(0, 4);
+    return { rooms: [
+      { name: "Living", icon: "mdi:sofa", cards: lights.slice(0, 2).map((entity) => ({ type: "custom:roost-tile", entity })) },
+      { name: "Bedroom", icon: "mdi:bed", cards: lights.slice(2, 4).map((entity) => ({ type: "custom:roost-tile", entity })) },
+    ] };
+  }
+
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
+
+  async build() {
+    const token = (this._buildToken = {});
+    const helpers = window.loadCardHelpers ? await window.loadCardHelpers() : null;
+    if (token !== this._buildToken) return;
+    const make = (cfg) => {
+      let el;
+      try {
+        el = helpers ? helpers.createCardElement(cfg) : document.createElement(String(cfg.type || "").replace(/^custom:/, ""));
+        if (!helpers) el.setConfig?.(cfg);
+      } catch (e) {
+        el = document.createElement("div");
+        el.textContent = `Card problem: ${e.message}`;
+      }
+      if (this._hass) el.hass = this._hass;
+      return el;
+    };
+    this._cards = this._config.rooms.map((room) => (Array.isArray(room.cards) ? room.cards : []).map(make));
+    this._built = true;
+    this._sig = null;
+    this.render();
+  }
+
+  render() {
+    if (!this._config) return;
+    if (!this._built) { if (!this._building) { this._building = true; this.build().finally(() => { this._building = false; }); } return; }
+    const c = this._config, p = this.p, g = this.colour();
+    const showName = (i) => c.show_names === "all" || (c.show_names === "active" && i === this._active);
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .pills{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 12px}
+      .pills::-webkit-scrollbar{display:none}
+      .pill{flex:1 0 auto;min-height:48px;min-width:48px;border-radius:999px;border:1px solid ${p.border};background:${p.panel};color:${p.muted};
+        display:flex;align-items:center;justify-content:center;gap:8px;padding:0 14px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+      .pill.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 10px 24px -12px ${g[2]}}
+      .pill:active{transform:scale(.95)}
+      .pill ha-icon{--mdc-icon-size:22px}
+      .room{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:12px}
+      .room[hidden]{display:none}
+      .room > *{min-width:0}
+      .room > .wide{grid-column:1/-1}
+    </style>
+    <div class="pills" role="tablist">${c.rooms.map((r, i) => `<button class="pill ${i === this._active ? "on" : ""}" role="tab" aria-selected="${i === this._active}" data-i="${i}" aria-label="${esc(r.name)}">
+      ${r.icon ? `<ha-icon icon="${esc(r.icon)}"></ha-icon>` : ""}${showName(i) || !r.icon ? `<span>${esc(r.name)}</span>` : ""}</button>`).join("")}</div>
+    ${c.rooms.map((r, i) => `<div class="room" data-room="${i}" ${i === this._active ? "" : "hidden"}></div>`).join("")}`;
+    this.shadowRoot.querySelectorAll(".room").forEach((box) => {
+      const i = +box.dataset.room;
+      (this._cards[i] || []).forEach((el, k) => {
+        const cfg = c.rooms[i].cards[k] || {};
+        const wrap = document.createElement("div");
+        if (cfg.wide || cfg.grid_options?.columns === "full" || cfg.grid_options?.columns === 12) wrap.className = "wide";
+        wrap.appendChild(el);
+        box.appendChild(wrap);
+      });
+    });
+    this.shadowRoot.querySelectorAll(".pill").forEach((b) => b.addEventListener("click", () => {
+      this._active = +b.dataset.i;
+      this.vibrate();
+      this.hass = this._hass || {};
+    }));
+  }
+
+  getCardSize() { return 6; }
+}
+
 // ------------------------------------------------------------------ register
 const CARDS = [
   ["roost-tile", RoostTile, "Roost Tile", "A big tile with a switch, colour, icon and how long it has been on."],
@@ -851,6 +966,7 @@ const CARDS = [
   ["roost-scene", RoostScene, "Roost Scene", "A coloured button that runs a scene, script or action."],
   ["roost-hero", RoostHero, "Roost Hero", "A greeting with the time, date and weather."],
   ["roost-nav", RoostNav, "Roost Nav", "Icon navigation: a bar on phones and a side rail on tablets."],
+  ["roost-rooms", RoostRooms, "Roost Rooms", "A room switcher: tap a room pill to show that room's cards. Switching is instant."],
 ];
 window.customCards = window.customCards || [];
 for (const [tag, cls, name, description] of CARDS) {

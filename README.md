@@ -11,6 +11,7 @@ Every card has a **visual editor**: pick the device, colours, size, icon and sha
 | **Roost Scene** | A coloured card or round button that runs a scene or script. A tick shows when it is done. |
 | **Roost Hero** | A greeting with the time, date and weather. |
 | **Roost Nav** | Icon navigation: a bar at the bottom on phones, a rail at the side on tablets. |
+| **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. |
 
 All cards follow Home Assistant's light or dark mode (or stay always light or always dark), and their text is never cut off: it moves to the next line instead.
 
@@ -114,6 +115,41 @@ items:
   - { icon: mdi:view-grid, path: "#rooms", name: Rooms }
   - { icon: mdi:shield-home, path: /lovelace/security, name: Security }
 ```
+
+### Roost Rooms
+```yaml
+type: custom:roost-rooms
+columns: 2               # cards per row
+show_names: active       # active (only the chosen room), all, or none (icons only)
+color: purple
+rooms:
+  - name: Living
+    icon: mdi:sofa
+    cards:
+      - { type: custom:roost-tile, entity: light.living_room }
+      - { type: custom:roost-tile, entity: switch.tv }
+      - { type: custom:roost-thermostat, entity: climate.living_room, wide: true }
+  - name: Bedroom
+    icon: mdi:bed
+    cards:
+      - { type: custom:roost-tile, entity: light.bedroom }
+```
+
+## Keep your Home Assistant up to date automatically
+
+Install Roost Cards through HACS (see *Install*). Then this automation installs every new version by itself, as soon as it is released:
+```yaml
+alias: Keep Roost Cards up to date
+triggers:
+  - trigger: state
+    entity_id: update.roost_cards_update
+    to: "on"
+actions:
+  - action: update.install
+    target:
+      entity_id: update.roost_cards_update
+```
+After an update, pull down on your phone (or reload the page) to see it.
 
 ## Problems?
 

@@ -57,9 +57,21 @@ document.body.appendChild(chips); chips.hass = hass(true);
 if (!/mdi:lightbulb-on/.test(chips.shadowRoot.innerHTML) || !/<span>1<\/span>/.test(chips.shadowRoot.innerHTML)) { fails++; console.error("FAIL chips light count"); }
 chips._open = "lights"; chips.render();
 if ((chips.shadowRoot.innerHTML.match(/class="tog/g) || []).length !== 2) { fails++; console.error("FAIL chips list"); }
+// Rooms: pills switch the room instantly, and the room's cards get Home Assistant.
+const rooms = document.createElement("roost-rooms");
+rooms.setConfig({ rooms: [{ name: "Living", icon: "mdi:sofa", cards: [{ type: "custom:roost-tile", entity: "light.kitchen" }] },
+  { name: "Bedroom", icon: "mdi:bed", cards: [{ type: "custom:roost-tile", entity: "light.hall" }, { type: "custom:roost-scene", entity: "scene.movie" }] }] });
+document.body.appendChild(rooms); rooms.hass = hass(true);
+await new Promise((r) => setTimeout(r, 20));
+const visible = () => [...rooms.shadowRoot.querySelectorAll(".room")].filter((x) => !x.hidden).map((x) => x.querySelectorAll("roost-tile,roost-scene").length);
+if (visible().join() !== "1") { fails++; console.error("FAIL rooms first room", visible()); }
+rooms.shadowRoot.querySelectorAll(".pill")[1].dispatchEvent(new window.Event("click"));
+if (visible().join() !== "2") { fails++; console.error("FAIL rooms switch", visible()); }
+if (!/Bedroom/.test(rooms.shadowRoot.querySelector(".pill.on").textContent) || /Living/.test(rooms.shadowRoot.querySelectorAll(".pill")[0].textContent)) { fails++; console.error("FAIL rooms names only on the chosen room"); }
+if (!rooms.shadowRoot.querySelector("roost-tile").shadowRoot.innerHTML.includes("Kitchen") && !rooms.shadowRoot.querySelectorAll("roost-tile")[1].shadowRoot.innerHTML) { fails++; console.error("FAIL rooms cards not drawn"); }
 // Errors for missing settings
-for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }]]) {
+for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }], ["roost-rooms", { rooms: [] }]]) {
   try { document.createElement(tag).setConfig(cfg); fails++; console.error(`FAIL ${tag} accepted an empty config`); } catch { /* expected */ }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 4} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 8} checks passed`);
 process.exit(fails ? 1 : 0);
