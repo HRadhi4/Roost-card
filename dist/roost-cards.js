@@ -320,7 +320,7 @@ class RoostTile extends RoostBase {
 // Status chips in one centred row. Lights are grouped into one bulb with a count,
 // people into one row of bubbles (colour = home, grey = away). Tap a group to see its list.
 class RoostChips extends RoostBase {
-  static get defaults() { return { entities: [], theme: "auto", align: "center", size: "medium" }; }
+  static get defaults() { return { entities: [], theme: "auto", align: "stretch", size: "medium" }; }
 
   validate(c) { if (!Array.isArray(c.entities) || !c.entities.length) throw new Error("Choose at least one device"); }
 
@@ -334,7 +334,7 @@ class RoostChips extends RoostBase {
         { name: "entities", required: true, selector: { entity: { multiple: true } } },
         { type: "grid", name: "", schema: [
           { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
-          { name: "align", label: "Line up", selector: { select: { mode: "dropdown", options: [{ value: "center", label: "Centre" }, { value: "stretch", label: "Fill the width" }, { value: "start", label: "Left" }] } } },
+          { name: "align", label: "Line up", selector: { select: { mode: "dropdown", options: [{ value: "stretch", label: "One row, equal sizes" }, { value: "center", label: "Centre (may use two rows)" }, { value: "start", label: "Left (may use two rows)" }] } } },
         ] },
         THEME_FIELD,
       ],
@@ -404,8 +404,8 @@ class RoostChips extends RoostBase {
     };
     const list = open === "lights" ? lights : open === "people" ? people : [];
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .row{display:flex;flex-wrap:wrap;gap:8px;justify-content:${c.align === "start" ? "flex-start" : "center"}}
-      .chip{flex:${c.align === "stretch" ? "1 1 0" : "0 0 auto"};min-width:${h + 8}px;height:${h}px;padding:0 14px;border-radius:999px;border:1px solid ${p.border};background:${p.panel};
+      .row{display:flex;flex-wrap:${c.align === "stretch" ? "nowrap" : "wrap"};gap:${c.align === "stretch" ? 6 : 8}px;justify-content:${c.align === "start" ? "flex-start" : "center"}}
+      .chip{flex:${c.align === "stretch" ? "1 1 auto" : "0 0 auto"};min-width:max-content;white-space:nowrap;height:${h}px;padding:0 ${c.align === "stretch" ? 6 : 14}px;border-radius:999px;border:1px solid ${p.border};background:${p.panel};
         color:${p.text};display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font:inherit;font-size:14px;font-weight:600;-webkit-tap-highlight-color:transparent}
       .chip:active{transform:scale(.95)}
       .chip.on{outline:2px solid #8B6CFF}
@@ -821,7 +821,7 @@ class RoostNav extends RoostBase {
       :host{${c.fixed ? "height:0;" : ""}}
       nav{${pos};display:flex;flex-direction:${rail ? "column" : "row"};gap:${rail ? 12 : 6}px;padding:${rail ? "14px 10px" : "8px"};border-radius:${rail ? 28 : 26}px;
         background:${p.panel};border:1px solid ${p.border};backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 18px 40px -16px rgba(0,0,0,.5);
-        ${rail ? "" : "width:max-content;max-width:calc(100vw - 24px)"}}
+        width:max-content;max-width:calc(100vw - 24px);${c.fixed ? "" : "margin:0 auto"}}
       a{min-width:${c.show_labels ? 64 : 56}px;min-height:${c.show_labels ? 60 : 52}px;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
         color:${p.muted};text-decoration:none;font-size:11px;font-weight:600;-webkit-tap-highlight-color:transparent;padding:4px 8px;transition:background .15s}
       a.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -10px ${g[2]}}

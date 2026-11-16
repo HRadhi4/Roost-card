@@ -68,7 +68,7 @@ entities:
   - person.sam           # all people become bubbles
   - person.ali
 size: medium             # small, medium or large
-align: center            # center, stretch (fill the width) or start
+align: stretch           # stretch (one row, equal sizes), center or start
 ```
 
 ### Roost Thermostat
