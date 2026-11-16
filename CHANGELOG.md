@@ -2,6 +2,16 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.2.0 — 2026-11-16
+**New: Roost Full Screen**
+- Hides Home Assistant's top bar and sidebar so a dashboard feels like an app. Three ways: **invisible** (the dashboard opens full screen by itself, for everyone or only the people you choose, with a small exit button for the people you choose), a **button** that maximizes and minimizes, or the **tap action of any card** (`fire-dom-event` with `roost_fullscreen: toggle | on | off`).
+- Everything comes back while you edit the dashboard, and on other dashboards. `?roost_full=off` in the address turns it off on that screen.
+
+**Every card checked and polished**
+- Every card now rearranges itself when it sits in a narrow column (half a phone screen): words no longer break letter by letter, nothing sticks out past the card, buttons shrink, rows stack and names step aside when there is no room.
+- **Meaningful movement**: numbers count to their new value instead of jumping (gauge, graph, room temperature, light, volume, weather, energy, sensors, the AC row's ring), bars and rings grow and shrink smoothly, tiles, lights, fans, locks, the alarm, people and buttons give a gentle bounce when their state changes, an automation's row glows when it runs, and people glide across the presence map. Nothing moves when the phone asks for reduced motion.
+- Fixed: on very narrow screens the bottom bar's buttons could stick out of the bar.
+
 ## 1.1.2 — 2026-11-16
 - **Tutorials**: eight short step-by-step guides with pictures and GIFs, from installing to a full phone home screen.
 - New README with screenshots, GIFs of the cards in use, and a one-tap "Open in HACS" button.

@@ -1,7 +1,7 @@
 <h1 align="center">Roost Cards</h1>
 
 <p align="center"><b>Beautiful, animated dashboard cards for Home Assistant. Made for phones and tablets.</b><br>
-33 cards · a visual editor for every setting · light and dark · no code needed</p>
+34 cards · a visual editor for every setting · light and dark · no code needed</p>
 
 <p align="center">
 <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
@@ -23,7 +23,8 @@
 - **No code.** Every card has a visual editor: device, colours, looks, size, icon, shape, what a tap does.
 - **Never cut off.** Text never ends in "…"; long names wrap. Checked automatically before every release.
 - **Light and dark.** Follows your phone, or stays the way you choose. Stops moving when *Reduce motion* is on.
-- **Phone and tablet.** The bottom bar becomes a side rail on tablets.
+- **Phone and tablet.** The bottom bar becomes a side rail on tablets, and every card rearranges itself when it sits in a narrow column.
+- **Full screen built in.** No top bar or sidebar, like an app, without a separate add-on.
 
 | | | |
 |:-:|:-:|:-:|
@@ -51,9 +52,10 @@ Short, written, with pictures:
 5. [Air conditioners, curtains and lights](docs/tutorials/05-climate-and-curtains.md)
 6. [Security: alarm, lock, alerts and people](docs/tutorials/06-security.md)
 7. [Use it with Athom Hub (remote and presence map)](docs/tutorials/07-with-athom-hub.md)
-8. [Looks, light and dark, tablets](docs/tutorials/08-looks.md)
+8. [Full screen, like an app](docs/tutorials/09-full-screen.md)
+9. [Looks, light and dark, tablets](docs/tutorials/08-looks.md)
 
-## All 33 cards
+## All 34 cards
 
 | Card | What it is |
 |---|---|
@@ -89,6 +91,7 @@ Short, written, with pictures:
 | **Roost Camera** | A camera picture or live video, with a banner when someone rings the doorbell. |
 | **Roost Sensors** | Many small readings in neat squares, orange when out of the range you set. |
 | **Roost Buttons** | Several small actions in one rounded bar; a button lights up when its device is on. |
+| **Roost Full Screen** | Hides Home Assistant's top bar and sidebar so your dashboard feels like an app: by itself (invisible), as a button that maximizes and minimizes, or as the tap action of any card. Comes back while editing. |
 | **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. |
 
 

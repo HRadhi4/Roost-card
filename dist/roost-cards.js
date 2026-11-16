@@ -4,11 +4,12 @@
  *
  * Cards: roost-tile, roost-chips, roost-thermostat, roost-scene, roost-hero, roost-nav, roost-rooms, roost-row, roost-curtain,
  *        roost-gauge, roost-automations, roost-clock, roost-title, roost-theme, roost-media, roost-room, roost-alarm, roost-light, roost-graph, roost-people, roost-alerts,
- *        roost-remote, roost-presence, roost-weather, roost-energy, roost-timer, roost-fan, roost-lock, roost-agenda, roost-todo, roost-camera, roost-sensors, roost-buttons
+ *        roost-remote, roost-presence, roost-weather, roost-energy, roost-timer, roost-fan, roost-lock, roost-agenda, roost-todo, roost-camera, roost-sensors, roost-buttons,
+ *        roost-fullscreen
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.1.2";
+const ROOST_VERSION = "1.2.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -133,9 +134,63 @@ class RoostBase extends HTMLElement {
     if (sig === this._sig) return;
     this._sig = sig;
     this.render();
+    this.motion();
   }
 
   get hass() { return this._hass; }
+
+  /**
+   * Meaningful movement after a redraw, so changes are seen instead of jumping:
+   *  data-tw="key"   a number counts from its old value to its new one
+   *  data-bar="key"  a bar grows or shrinks from its old width
+   *  data-pop="v" data-popkey="key"  a gentle bounce when its state changes (on/off, armed, locked)
+   *  data-glide="key"  slides from its old place to its new one (people on the presence map)
+   *  data-flash="v" data-flashkey="key"  a soft glow when something happened (an automation ran)
+   * Nothing moves when the phone asks for reduced motion.
+   */
+  motion() {
+    const root = this.shadowRoot;
+    if (!root) return;
+    const mem = this._mem || (this._mem = {});
+    let still = false;
+    try { still = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { /* old browser */ }
+    const run = (el, frames, opts) => { if (still) return; try { el.animate(frames, opts); } catch (e) { /* old browser: no movement */ } };
+    const raf = window.requestAnimationFrame ? (f) => window.requestAnimationFrame(f) : (f) => setTimeout(() => f(performance.now()), 16);
+    root.querySelectorAll("[data-tw]").forEach((el) => {
+      const txt = el.textContent, m = txt.match(/-?\d+(?:\.\d+)?/);
+      if (!m) return;
+      const key = `n${el.dataset.tw}`, to = parseFloat(m[0]), dec = (m[0].split(".")[1] || "").length, from = mem[key];
+      mem[key] = to;
+      if (still || from == null || from === to) return;
+      const pre = txt.slice(0, m.index), post = txt.slice(m.index + m[0].length), t0 = performance.now(), D = 650;
+      const step = (t) => {
+        const k = Math.min(1, (t - t0) / D), e = 1 - (1 - k) ** 3;
+        el.textContent = pre + (from + (to - from) * e).toFixed(dec) + post;
+        if (k < 1 && el.isConnected) raf(step);
+      };
+      raf(step);
+    });
+    root.querySelectorAll("[data-bar]").forEach((el) => {
+      const key = `b${el.dataset.bar}`, w = el.style.width, old = mem[key];
+      mem[key] = w;
+      if (old && old !== w) run(el, [{ width: old }, { width: w }], { duration: 650, easing: "cubic-bezier(.3,1,.4,1)" });
+    });
+    root.querySelectorAll("[data-pop]").forEach((el) => {
+      const key = `p${el.dataset.popkey || ""}`, v = el.dataset.pop, old = mem[key];
+      mem[key] = v;
+      if (old != null && old !== v) run(el, [{ transform: "scale(1)" }, { transform: "scale(1.16)" }, { transform: "scale(.97)" }, { transform: "scale(1)" }], { duration: 480, easing: "ease-out" });
+    });
+    root.querySelectorAll("[data-glide]").forEach((el) => {
+      const key = `g${el.dataset.glide}`, tr = el.style.transform, old = mem[key];
+      mem[key] = tr;
+      if (old && old !== tr) run(el, [{ transform: old }, { transform: tr }], { duration: 900, easing: "cubic-bezier(.3,.8,.4,1)" });
+    });
+    root.querySelectorAll("[data-flash]").forEach((el) => {
+      const key = `f${el.dataset.flashkey || ""}`, v = el.dataset.flash, old = mem[key];
+      mem[key] = v;
+      if (old != null && old !== v) run(el, [{ boxShadow: "0 0 0 0 rgba(139,108,255,.0)" }, { boxShadow: "0 0 0 6px rgba(139,108,255,.45)" }, { boxShadow: "0 0 0 0 rgba(139,108,255,0)" }], { duration: 1100, easing: "ease-out" });
+    });
+  }
 
   /** Entities whose changes redraw the card. */
   watched() { return [this._config.entity].filter(Boolean); }
@@ -217,6 +272,7 @@ class RoostBase extends HTMLElement {
         if (a.navigation_path) { history.pushState(null, "", a.navigation_path); this.fire("location-changed", { replace: false }); }
         return undefined;
       case "url": if (a.url_path) window.open(a.url_path, "_blank"); return undefined;
+      case "fire-dom-event": this.fire("ll-custom", a); return undefined;
       case "perform-action": case "call-service": {
         const [d, s] = String(a.perform_action || a.service || "").split(".");
         if (d && s) return this.call(d, s, { ...(a.data || a.service_data || {}), ...(a.target || {}) });
@@ -257,7 +313,7 @@ class RoostBase extends HTMLElement {
 
   baseCss() {
     const p = this.p;
-    return `:host{display:block;--roost-text:${p.text};--roost-muted:${p.muted};font-family:${FONT_TEXT}}
+    return `:host{display:block;container-type:inline-size;--roost-text:${p.text};--roost-muted:${p.muted};font-family:${FONT_TEXT}}
       .num,svg text{font-family:${FONT_NUM}}
       *{box-sizing:border-box}
       .t{white-space:normal;overflow-wrap:break-word;word-break:normal;overflow:visible;text-overflow:clip}
@@ -467,7 +523,7 @@ class RoostTile extends RoostBase {
       .ago{font-size:11px;opacity:.65;margin-top:4px;color:${on ? "inherit" : p.muted}}
     </style>
     <div class="card" role="button" tabindex="0" aria-label="${esc(this.name(c.entity))}">
-      <div class="ic"></div>
+      <div class="ic" data-pop="${on ? 1 : 0}" data-popkey="ic"></div>
       ${showSwitch ? '<span class="sw" aria-hidden="true"></span>' : ""}
       ${c.locked ? '<ha-icon class="lk" icon="mdi:lock" aria-label="Locked"></ha-icon>' : ""}${broken ? '<ha-icon class="lk" icon="mdi:battery-alert-variant-outline" style="color:#FF9F6B;--mdc-icon-size:20px" aria-label="Not working"></ha-icon>' : ""}${bars}
       <div><div class="nm t">${esc(this.name(c.entity))}</div>
@@ -603,7 +659,8 @@ class RoostChips extends RoostBase {
         color:${p.text};display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font:inherit;font-size:14px;font-weight:600;-webkit-tap-highlight-color:transparent}
       .chip:active{transform:scale(.95)}
       :host{container-type:inline-size}
-      @container (max-width: 340px){.row{gap:4px}.chip{padding:0 6px;gap:4px}.chip .word{display:none}.av{width:${h - 20}px;height:${h - 20}px}}
+      @container (max-width: 340px){:host .row{gap:4px}:host .chip{padding:0 6px;gap:4px}:host .chip .word{display:none}:host .av{width:${h - 20}px;height:${h - 20}px}}
+      @container (max-width: 260px){:host .row{overflow-x:auto;scrollbar-width:none;justify-content:start}:host .row::-webkit-scrollbar{display:none}}
       .chip.on{outline:2px solid #8B6CFF}
       .chip ha-icon{--mdc-icon-size:${h > 48 ? 24 : 20}px}
       .av{width:${h - 16}px;height:${h - 16}px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;border:2px solid ${p.panel};overflow:hidden;position:relative}
@@ -619,7 +676,7 @@ class RoostChips extends RoostBase {
     </style>
     <div class="row">${chips.map((ch) => ch.people
       ? `<button class="chip ${open === "people" ? "on" : ""}" data-g="people" aria-label="People">${people.map(avatar).join("")}</button>`
-      : `<button class="chip ${open && open === ch.group ? "on" : ""}" ${ch.group ? `data-g="${ch.group}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(ch.entity ? this.name(ch.entity) : ch.label || "Lights")}">
+      : `<button class="chip ${open && open === ch.group ? "on" : ""}" data-pop="${esc(`${ch.text || ""}${ch.colour || ""}${ch.icon || ""}`)}" data-popkey="${esc(ch.key || ch.entity || ch.group || "")}" ${ch.group ? `data-g="${ch.group}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(ch.entity ? this.name(ch.entity) : ch.label || "Lights")}">
           ${ch.icon ? `<ha-icon icon="${ch.icon}" style="color:${ch.colour}"></ha-icon>` : `<span class="ent" data-icon="${esc(ch.entity)}" style="color:${ch.colour};display:flex"></span>`}
           ${ch.text ? `<span class="${ch.word ? "word" : "num"}">${esc(ch.text)}</span>` : ""}</button>`).join("")}</div>
     ${list.length ? `<div class="list">${list.map((id) => {
@@ -706,17 +763,19 @@ class RoostThermostat extends RoostBase {
     const status = un ? "Offline" : on ? `${modeName[s.state] || s.state} · running` : "Off";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{border-radius:${c.radius}px;padding:18px;background:${p.panel};border:1px solid ${p.border};color:${p.text}}
-      .hd{display:flex;align-items:center;justify-content:space-between;gap:10px}
+      .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
       .hd .n{font-size:15px;font-weight:600}
       .pill{font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;background:${on ? `${g[0]}33` : p.inset};color:${on ? g[1] : p.muted}}
       svg{width:100%;max-width:${c.max_width}px;display:block;margin:4px auto;touch-action:none;user-select:none;-webkit-user-select:none;cursor:${noTemp || un ? "default" : "pointer"}}
       svg.on{animation:roost-arc 3s ease-in-out infinite}
       .ctl{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-top:6px}
-      .rb{width:52px;height:52px;border-radius:50%;border:0;background:${p.inset};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer}
-      .rb.pw{width:64px;height:64px;background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? "#fff" : p.text};box-shadow:${on ? `0 12px 28px -10px ${g[2]}` : "none"}}
+      @container (max-width: 260px){:host .ctl{gap:8px}}
+      .rb{width:min(52px,24cqw);height:min(52px,24cqw);border-radius:50%;border:0;background:${p.inset};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer}
+      .rb.pw{width:min(64px,30cqw);height:min(64px,30cqw);background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? "#fff" : p.text};box-shadow:${on ? `0 12px 28px -10px ${g[2]}` : "none"}}
       .rb:active{transform:scale(.94)}
       .mi{justify-self:end}.pl{justify-self:start}
       .modes{display:grid;grid-template-columns:repeat(${Math.max(1, modes.length)},minmax(0,1fr));gap:8px;margin-top:14px}
+      @container (max-width: 300px){:host .modes{grid-template-columns:repeat(2,minmax(0,1fr))}}
       .md{min-height:42px;border-radius:14px;border:0;background:${p.inset};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:6px 4px}
       .md.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]}}
     </style>
@@ -1012,6 +1071,7 @@ class RoostHero extends RoostBase {
       .card{position:relative;overflow:hidden;border-radius:${c.radius}px;padding:20px;min-height:${Number(c.min_height) || 180}px;color:#fff;background:${sky}}
       .star{position:absolute;border-radius:50%;background:#fff;animation:roost-twinkle 3s ease-in-out infinite}
       .sheen{position:absolute;top:0;bottom:0;left:0;width:70px;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.12),rgba(255,255,255,0));animation:roost-sheen 8s ease-in-out 1s infinite;pointer-events:none}
+      @container (max-width: 300px){:host .orb{width:34px;height:34px;right:14px;top:14px}:host .hi{padding:0;font-size:min(${Number(c.greeting_size) || 27}px,13cqw)}:host .top{padding:0 44px 0 0}:host .card{padding:16px}}
       .orb{position:absolute;right:24px;top:22px;width:${os}px;height:${os}px;border-radius:50%;${orb};animation:roost-float 6s ease-in-out infinite}
       .body{position:relative;display:flex;flex-direction:column;gap:8px;${c.align === "center" ? "align-items:center;text-align:center;" : ""}}
       .infos{display:flex;flex-wrap:wrap;gap:6px;${c.align === "center" ? "justify-content:center;" : ""}}
@@ -1022,6 +1082,7 @@ class RoostHero extends RoostBase {
       .wx{font-size:14px;line-height:1.5;opacity:.9;cursor:${w ? "pointer" : "default"}}
       .pill{display:flex;align-items:center;gap:10px;background:${c.pill_style === "none" ? "transparent" : c.pill_style === "light" ? "rgba(255,255,255,.22)" : "rgba(10,8,40,.3)"};${c.align === "center" ? "align-self:stretch;" : ""}border-radius:16px;padding:10px 12px;margin-top:6px;font-size:13px;line-height:1.35}
       .pill b.num{font-size:14px;flex:none}
+      @container (max-width: 260px){:host .pill{flex-wrap:wrap}:host .pill b.num{flex-basis:100%;padding-left:22px}}
       .dot{position:relative;width:10px;height:10px;border-radius:50%;background:#E9E2FF;flex:none}
       .dot span{position:absolute;inset:0;border-radius:50%;background:#E9E2FF;animation:roost-ping 1.8s ease-out infinite}
     </style>
@@ -1145,7 +1206,9 @@ class RoostNav extends RoostBase {
   }[c.active_style] || ""}
       a:active{transform:scale(.94)}
       a ha-icon{--mdc-icon-size:${Number(c.icon_size) || 22}px}
-      @media (max-width: 360px){nav{gap:2px;padding:6px}a{min-width:48px;padding:4px 2px}}
+      a{min-width:0}
+      @container (max-width: ${c.items.length * 64}px){:host a span{display:none}:host a{padding:4px 2px}:host nav{padding:5px;gap:2px}}
+      @media (max-width: 360px){nav{gap:2px;padding:6px}a{padding:4px 2px}}
     </style>
     ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${c.items.map((it, i) => `<a href="${esc(it.path)}" data-i="${i}" class="${this.active(it.path) ? "on" : ""}" aria-label="${esc(it.name || it.path)}">
       <ha-icon icon="${esc(it.icon || "mdi:circle")}"></ha-icon>${c.show_labels && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</a>`).join("")}</nav>`;
@@ -1217,6 +1280,8 @@ class RoostRow extends RoostBase {
     const R = 32 - rw / 2 - 3, C = 2 * Math.PI * R, L = C * 0.75;
     const on = s && !un && !OFF_STATES.includes(s.state);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      @container (max-width: 280px){:host .row{gap:10px;padding:12px}:host .ring{width:min(${Math.max(40, Number(c.ring_size) || 64)}px,30cqw);height:min(${Math.max(40, Number(c.ring_size) || 64)}px,30cqw)}:host .ring .v{font-size:min(${Math.round(Math.max(40, Number(c.ring_size) || 64) * 0.3)}px,9cqw)}:host .ch{display:none}:host .n{font-size:15px}}
+      @container (max-width: 220px){:host .row{flex-wrap:wrap}:host .tx{flex:1 1 100%}}
       .row{display:flex;align-items:center;gap:16px;padding:14px 18px 14px 14px;border-radius:${c.radius}px;background:${p.panel};border:1px solid ${p.border};color:${p.text};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s;opacity:${un ? 0.55 : 1}}
       .row:active{transform:scale(.98)}
       .ring{position:relative;width:${rs}px;height:${rs}px;flex:none;display:flex;align-items:center;justify-content:center}
@@ -1231,11 +1296,16 @@ class RoostRow extends RoostBase {
     <div class="row" role="button" tabindex="0" aria-label="${esc(this.name(c.entity))}">
       <span class="ring"><svg viewBox="0 0 64 64"><defs><linearGradient id="rg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/></linearGradient></defs>
         <circle cx="32" cy="32" r="${R}" fill="none" stroke="${p.track}" stroke-width="${rw}" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 32 32)"/>
-        ${f > 0 ? `<circle cx="32" cy="32" r="${R}" fill="none" stroke="${on ? "url(#rg)" : p.tick}" stroke-width="${rw}" stroke-linecap="round" stroke-dasharray="${(L * f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 32 32)"/>` : ""}</svg>
-        ${c.icon || r.text == null ? `<ha-icon icon="${esc(c.icon || "mdi:information-outline")}"></ha-icon>` : `<span class="v">${esc(r.text)}</span>`}</span>
+        ${f > 0 ? `<circle class="arc" cx="32" cy="32" r="${R}" fill="none" stroke="${on ? "url(#rg)" : p.tick}" stroke-width="${rw}" stroke-linecap="round" stroke-dasharray="${(L * f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 32 32)"/>` : ""}</svg>
+        ${c.icon || r.text == null ? `<ha-icon icon="${esc(c.icon || "mdi:information-outline")}"></ha-icon>` : `<span class="v" data-tw="v">${esc(r.text)}</span>`}</span>
       <span class="tx"><div class="n t">${esc(this.name(c.entity))}</div>${r.line ? `<div class="l t">${esc(r.line)}</div>` : ""}</span>
       <ha-icon class="ch" icon="mdi:chevron-right"></ha-icon>
     </div>`;
+    const arc = this.shadowRoot.querySelector(".arc");
+    if (arc && this._lastF != null && this._lastF !== f) {
+      try { arc.animate([{ strokeDasharray: `${(L * this._lastF).toFixed(1)} ${C.toFixed(1)}` }, { strokeDasharray: `${(L * f).toFixed(1)} ${C.toFixed(1)}` }], { duration: 650, easing: "cubic-bezier(.3,1,.4,1)" }); } catch (e) { /* jumps */ }
+    }
+    this._lastF = f;
     this.press(this.shadowRoot.querySelector(".row"), () => this.run(c.tap_action, c.entity), () => this.moreInfo(c.entity));
   }
 }
@@ -1407,6 +1477,7 @@ class RoostRooms extends RoostBase {
       .pill ha-icon{--mdc-icon-size:${Number(c.pill_icon_size) || 22}px}
       .cnt{position:absolute;top:3px;right:4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#FCD34D;color:#2A1800;font-size:10px;font-weight:700;line-height:16px;text-align:center}
       .room{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:${Number(c.gap) || 12}px;touch-action:pan-y}
+      @container (max-width: 300px){:host .room{grid-template-columns:minmax(0,1fr)}}
       .room[hidden]{display:none}
       .room > *{min-width:0}
       .room > .wide{grid-column:1/-1}
@@ -1781,7 +1852,7 @@ class RoostGauge extends RoostBase {
     </style>
     <div class="card" role="button" tabindex="0">
       <div class="ring">${ringSvg({ f, track: p.track, from: g[0], to: g[1], id: "gg", inner: 58, innerFill: p.dial })}
-        <div class="in">${c.title ? `<span class="ti t">${esc(c.title)}</span>` : ""}<span class="v num">${ok ? esc(fmt(v, c.decimals) + u2) : '<ha-icon icon="mdi:help-circle-outline"></ha-icon>'}</span>${line ? `<span class="ln t">${esc(line)}</span>` : ""}</div></div>
+        <div class="in">${c.title ? `<span class="ti t">${esc(c.title)}</span>` : ""}<span class="v num" ${ok ? 'data-tw="v"' : ""}>${ok ? esc(fmt(v, c.decimals) + u2) : '<ha-icon icon="mdi:help-circle-outline"></ha-icon>'}</span>${line ? `<span class="ln t">${esc(line)}</span>` : ""}</div></div>
       ${c.show_name ? `<div class="nm t">${esc(this.name(c.entity))}</div>` : ""}
     </div>`;
     // the arc grows to its new value instead of jumping
@@ -1851,6 +1922,8 @@ class RoostAutomations extends ticking(RoostBase, 60000) {
       .row:active{transform:scale(.98)}
       .ic{width:38px;height:38px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;background:${p.inset};color:${p.muted}}
       .row.on .ic{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 8px 18px -8px ${g[2]}}
+      @container (max-width: 300px){:host .row{padding:10px 12px;gap:10px}:host .ic{display:none}}
+      @container (max-width: 240px){:host .run{display:none}}
       .ic ha-icon{--mdc-icon-size:20px}
       .tx{flex:1;min-width:0}
       .n{font-size:14px;font-weight:600;line-height:1.25}
@@ -1865,8 +1938,8 @@ class RoostAutomations extends ticking(RoostBase, 60000) {
       const s = this.st(id), on = s?.state === "on", un = !s || UNAVAILABLE.includes(s.state);
       const line = un ? (s ? "Offline" : "Not found") : c.show_last_run ? (s.attributes.last_triggered ? `Last ran ${ago(s.attributes.last_triggered)}` : "Never ran") : on ? "On" : "Off";
       const ent = (c.entities || []).find((x) => typeof x === "object" && x.entity === id);
-      return `<div class="row ${on ? "on" : ""}" data-id="${esc(id)}" role="button" tabindex="0" aria-label="${esc(this.name(id))}">
-        <span class="ic"><ha-icon icon="${esc(ent?.icon || (on ? "mdi:robot" : "mdi:robot-outline"))}"></ha-icon></span>
+      return `<div class="row ${on ? "on" : ""}" data-id="${esc(id)}" data-flash="${esc(s?.attributes.last_triggered || "")}" data-flashkey="${esc(id)}" role="button" tabindex="0" aria-label="${esc(this.name(id))}">
+        <span class="ic" data-pop="${on ? 1 : 0}" data-popkey="${esc(id)}"><ha-icon icon="${esc(ent?.icon || (on ? "mdi:robot" : "mdi:robot-outline"))}"></ha-icon></span>
         <span class="tx"><div class="n t">${esc(this.name(id))}</div><div class="l t">${esc(line)}</div></span>
         ${c.show_run ? `<button class="run" data-run="${esc(id)}" aria-label="Run now"><ha-icon icon="mdi:play"></ha-icon></button>` : ""}
         <span class="sw ${on ? "on" : ""}" data-sw="${esc(id)}" role="switch" aria-checked="${on}"></span></div>`;
@@ -1969,7 +2042,7 @@ class RoostClock extends ticking(RoostBase, 15000) {
       .card{${c.frame ? panelCss(p, c.radius) : `color:${p.text}`};padding:${c.frame ? 20 : 0}px;display:flex;flex-direction:column;gap:14px}
       .top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
       .clk{display:flex;align-items:baseline;gap:6px}
-      .hm{font-size:56px;font-weight:700;letter-spacing:-1.5px;line-height:1}
+      .hm{font-size:clamp(30px,17cqw,56px);font-weight:700;letter-spacing:-1.5px;line-height:1}
       .ap{font-size:18px;font-weight:600;color:${p.muted}}
       .dt{font-size:14px;color:${p.muted};margin-top:6px}
       .nx{display:flex;flex-direction:column;align-items:flex-end;text-align:right}
@@ -2145,7 +2218,7 @@ class RoostMedia extends RoostBase {
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px;opacity:${un ? 0.6 : 1}}
       .top{display:flex;align-items:center;gap:12px}
       :host{container-type:inline-size}
-      @container (max-width: 240px){.top{flex-wrap:wrap}}
+      @container (max-width: 240px){:host .top{flex-wrap:wrap}:host .tx{flex:1 1 100%}}
       .ic{position:relative;width:48px;height:48px;border-radius:16px;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden;
         background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? g[3] : p.muted};box-shadow:${on ? `0 10px 22px -10px ${g[2]}` : "none"};cursor:pointer}
       .ic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -2164,6 +2237,7 @@ class RoostMedia extends RoostBase {
       .b:active{transform:scale(.9)}
       .b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent}
       .b ha-icon{--mdc-icon-size:20px}
+      @container (max-width: 300px){:host .row{flex-wrap:wrap;justify-content:center;gap:8px}:host .vol{flex-basis:100%;order:-1}:host .b{width:36px;height:36px}:host .ctl{gap:8px}}
       .vol{flex:1;position:relative;height:42px;border-radius:999px;background:${p.inset};overflow:hidden;cursor:pointer;touch-action:none}
       .vol .f{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,${g[0]},${g[1]});opacity:${muted ? 0.4 : 1}}
       .vol .v{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${p.text};mix-blend-mode:${this.dark ? "normal" : "multiply"}}
@@ -2173,12 +2247,12 @@ class RoostMedia extends RoostBase {
       .src button.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]};border-color:transparent}
     </style>
     <div class="card">
-      <div class="top"><span class="ic" data-more>${art ? `<img src="${esc(art)}" alt="">` : `<ha-icon icon="${esc(c.icon || "mdi:television")}"></ha-icon>`}</span>
+      <div class="top"><span class="ic" data-more data-pop="${on ? 1 : 0}" data-popkey="ic">${art ? `<img src="${esc(art)}" alt="">` : `<ha-icon icon="${esc(c.icon || "mdi:television")}"></ha-icon>`}</span>
         <span class="tx"><div class="n t">${esc(this.name(c.entity))}</div><div class="l t">${playing ? '<span class="eq"><i></i><i></i><i></i></span>' : ""}${esc(line)}</div></span>
         <button class="pw" data-a="power" aria-label="Power"><ha-icon icon="mdi:power"></ha-icon></button></div>
       ${on && now ? `<div class="now t">${esc(now)}</div>` : ""}
       ${on && c.show_volume && vs ? `<div class="row"><button class="b" data-a="down" aria-label="Volume down"><ha-icon icon="mdi:volume-minus"></ha-icon></button>
-        ${vol != null ? `<div class="vol" role="slider" aria-valuenow="${Math.round(vol * 100)}"><span class="f" style="width:${(vol * 100).toFixed(0)}%"></span><span class="v num">${muted ? "Muted" : `${Math.round(vol * 100)}%`}</span></div>` : '<span style="flex:1"></span>'}
+        ${vol != null ? `<div class="vol" role="slider" aria-valuenow="${Math.round(vol * 100)}"><span class="f" data-bar="vol" style="width:${(vol * 100).toFixed(0)}%"></span><span class="v num" ${muted ? "" : 'data-tw="vol"'}>${muted ? "Muted" : `${Math.round(vol * 100)}%`}</span></div>` : '<span style="flex:1"></span>'}
         <button class="b ${muted ? "on" : ""}" data-a="mute" aria-label="Mute"><ha-icon icon="${muted ? "mdi:volume-off" : "mdi:volume-mute"}"></ha-icon></button>
         <button class="b" data-a="up" aria-label="Volume up"><ha-icon icon="mdi:volume-plus"></ha-icon></button></div>` : ""}
       ${on && c.show_controls ? `<div class="ctl"><button class="b" data-a="prev" aria-label="Previous"><ha-icon icon="mdi:skip-previous"></ha-icon></button>
@@ -2277,21 +2351,22 @@ class RoostRoom extends RoostBase {
     const bar = hot ? "linear-gradient(90deg,#FF9F6B,#F43F6B)" : `linear-gradient(90deg,${g[0]},${g[1]})`;
     const card = c.style === "card";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .r{${panelCss(p, c.radius)};padding:${card ? 16 : 12}px ${card ? 16 : 14}px;display:grid;grid-template-columns:${card ? "48px 1fr auto" : "14px 1fr auto"};column-gap:${card ? 14 : 10}px;row-gap:6px;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .r{${panelCss(p, c.radius)};padding:${card ? 16 : 12}px ${card ? 16 : 14}px;display:grid;grid-template-columns:${card ? "48px" : "14px"} minmax(0,1fr) minmax(0,max-content);column-gap:${card ? 14 : 10}px;row-gap:6px;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .r:active{transform:scale(.98)}
       .dot{grid-row:1/4;width:10px;height:10px;border-radius:50%;background:${hot ? "#FF9F6B" : t != null ? g[0] : p.knob};box-shadow:0 0 0 4px ${hot ? "rgba(255,159,107,.22)" : t != null ? `${g[0]}2E` : "transparent"};${hot ? "animation:roost-breathe 1.6s ease-in-out infinite" : ""}}
       .ic{grid-row:1/4;width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:${g[0]}24;color:${g[this.dark ? 1 : 0]}}
       .ic ha-icon{--mdc-icon-size:24px}
       .n{font-size:${card ? 16 : 14}px;font-weight:600;text-align:left}
-      .tp{font-size:${card ? 16 : 14}px;font-weight:600;text-align:right;white-space:nowrap;color:${hot ? "#FF9F6B" : p.text}}
+      .tp{font-size:${card ? 16 : 14}px;font-weight:600;text-align:right;color:${hot ? "#FF9F6B" : p.text}}
+      @container (max-width: 260px){:host .r{grid-template-columns:minmax(0,1fr)}:host .dot,:host .ic{display:none}:host .bar,:host .l,:host .n,:host .tp{grid-column:1/-1}:host .tp{text-align:left}}
       .bar{grid-column:2/4;height:4px;border-radius:999px;background:${p.track};overflow:hidden}
-      .bar i{display:block;height:100%;width:${(f * 100).toFixed(0)}%;border-radius:999px;background:${bar}}
+      .bar i{display:block;height:100%;border-radius:999px;background:${bar}}
       .l{grid-column:2/4;font-size:12px;color:${p.muted};line-height:1.35}
     </style>
     <div class="r" role="button" tabindex="0" aria-label="${esc(c.name)}">
       ${card ? `<span class="ic"><ha-icon icon="${esc(c.icon || "mdi:home-outline")}"></ha-icon></span>` : '<span class="dot"></span>'}
-      <span class="n t">${esc(c.name)}</span><span class="tp num">${t != null ? `${fmt(t, 1)}°` : c.temperature ? "No reading" : ""}${h != null ? `<span style="color:${p.muted};font-weight:500"> · ${Math.round(h)}%</span>` : ""}</span>
-      ${c.temperature ? `<span class="bar"><i></i></span>` : ""}
+      <span class="n t">${esc(c.name)}</span><span class="tp num">${t != null ? `<span data-tw="t">${fmt(t, 1)}°</span>` : c.temperature ? "No reading" : ""}${h != null ? `<span style="color:${p.muted};font-weight:500"> · ${Math.round(h)}%</span>` : ""}</span>
+      ${c.temperature ? `<span class="bar"><i data-bar="t" style="width:${(f * 100).toFixed(0)}%"></i></span>` : ""}
       <span class="l t">${esc(this.summary())}</span>
     </div>`;
     this.press(this.shadowRoot.querySelector(".r"), () => {
@@ -2358,6 +2433,8 @@ class RoostAlarm extends RoostBase {
       .w{font-size:22px;font-weight:700;line-height:1.2}
       .d{font-size:12.5px;color:${open.length ? "#FF9F6B" : p.muted};margin-top:3px}
       .btns{display:grid;grid-template-columns:repeat(${Math.max(1, (c.modes || []).length + 1)},minmax(0,1fr));gap:8px}
+      .top > span:last-child{min-width:0}
+      @container (max-width: 320px){:host .top{flex-direction:column;align-items:flex-start;gap:10px}:host .btns{grid-template-columns:repeat(2,minmax(0,1fr))}:host .sh{width:56px;height:56px;border-radius:18px}}
       .b{min-height:64px;border-radius:16px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
         display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px 4px;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .b:active{transform:scale(.95)}
@@ -2371,7 +2448,7 @@ class RoostAlarm extends RoostBase {
       .dr ha-icon{--mdc-icon-size:16px}
     </style>
     <div class="card">
-      <div class="top"><span class="sh"><ha-icon icon="${icon}"></ha-icon></span>
+      <div class="top"><span class="sh" data-pop="${esc(s?.state || "")}" data-popkey="sh"><ha-icon icon="${icon}"></ha-icon></span>
         <span><div class="n t">${esc(this.name(c.entity, "Alarm"))}</div><div class="w t">${esc(word)}</div>${doors.length ? `<div class="d t">${open.length ? `${open.length} open: ${esc(open.map((d) => d.attributes.friendly_name).join(", "))}` : "All doors closed"}</div>` : ""}</span></div>
       ${this._pending ? `<div class="code num">${"•".repeat(this._code.length) || "&nbsp;"}</div><div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, "×", 0, "✓"].map((k) => `<button data-k="${k}">${k}</button>`).join("")}</div>` : `
       <div class="btns">${(c.modes || []).map((m) => `<button class="b ${s?.state === m.replace("arm_", "armed_") ? "on" : ""}" data-m="${m}"><ha-icon icon="${label[m]?.[1] || "mdi:shield"}"></ha-icon>${esc(label[m]?.[0] || m)}</button>`).join("")}
@@ -2438,7 +2515,7 @@ class RoostLight extends RoostBase {
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px;opacity:${un ? 0.6 : 1}}
       .top{display:flex;align-items:center;gap:12px}
       :host{container-type:inline-size}
-      @container (max-width: 240px){.top{flex-wrap:wrap}}
+      @container (max-width: 240px){:host .top{flex-wrap:wrap}:host .tx{flex:1 1 100%}}
       .ic{position:relative;width:48px;height:48px;border-radius:16px;flex:none;display:flex;align-items:center;justify-content:center;background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? g[3] : p.muted};cursor:pointer;
         box-shadow:${on ? `0 0 ${10 + pct / 3}px ${Math.round(pct / 12)}px ${tint}66` : "none"}}
       .ic ha-icon{--mdc-icon-size:24px;${on ? "animation:roost-glow 2.4s ease-in-out infinite" : ""}}
@@ -2455,10 +2532,10 @@ class RoostLight extends RoostBase {
       .dotc{width:36px;padding:0!important;justify-content:center}
     </style>
     <div class="card">
-      <div class="top"><span class="ic" data-more><ha-icon icon="${esc(c.icon || (on ? "mdi:lightbulb-on" : "mdi:lightbulb-outline"))}"></ha-icon></span>
+      <div class="top"><span class="ic" data-more data-pop="${on ? 1 : 0}" data-popkey="ic"><ha-icon icon="${esc(c.icon || (on ? "mdi:lightbulb-on" : "mdi:lightbulb-outline"))}"></ha-icon></span>
         <span class="tx"><div class="n t">${esc(this.name(c.entity))}</div><div class="l t">${!s ? "Device not found" : un ? "Offline" : on ? "On" : "Off"}</div></span>
-        ${dims ? `<span class="pc num">${pct}%</span>` : ""}<span class="sw ${on ? "on" : ""}" role="switch" aria-checked="${on}"></span></div>
-      ${dims ? `<div class="bar" role="slider" aria-valuenow="${pct}"><span class="f" style="width:${pct}%"></span><ha-icon icon="mdi:brightness-6"></ha-icon></div>` : ""}
+        ${dims ? `<span class="pc num" data-tw="pc">${pct}%</span>` : ""}<span class="sw ${on ? "on" : ""}" role="switch" aria-checked="${on}"></span></div>
+      ${dims ? `<div class="bar" role="slider" aria-valuenow="${pct}"><span class="f" data-bar="br" style="width:${pct}%"></span><ha-icon icon="mdi:brightness-6"></ha-icon></div>` : ""}
       ${(temps && c.show_presets) || (colours && c.show_colors) ? `<div class="chips">
         ${temps && c.show_presets ? [["Warm", 2700, "#FFB45A"], ["Neutral", 4000, "#FFE7C2"], ["Cool", 6000, "#CFE6FF"]].map(([w, k, col]) => `<button data-k="${k}"><i style="background:${col}"></i>${w}</button>`).join("") : ""}
         ${colours && c.show_colors ? ["#FF5A5F", "#FFB020", "#3DD68C", "#38BDF8", "#8B6CFF", "#F472B6"].map((col) => `<button class="dotc" data-rgb="${col}" aria-label="Colour"><i style="background:${col}"></i></button>`).join("") : ""}</div>` : ""}
@@ -2570,7 +2647,7 @@ class RoostGraph extends RoostBase {
       .wait{height:${H}px;display:flex;align-items:center;justify-content:center;color:${p.muted};font-size:13px}
     </style>
     <div class="card" role="button" tabindex="0">
-      <div class="top"><span class="n t">${esc(this.name(c.entity))}</span><span class="v num">${now != null ? esc(fmt(now, c.decimals) + u2) : s ? esc(s.state) : "Not found"}</span></div>
+      <div class="top"><span class="n t">${esc(this.name(c.entity))}</span><span class="v num" ${now != null ? 'data-tw="now"' : ""}>${now != null ? esc(fmt(now, c.decimals) + u2) : s ? esc(s.state) : "Not found"}</span></div>
       ${path ? `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs>
           <linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/></linearGradient>
           <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g[1]}" stop-opacity=".35"/><stop offset="1" stop-color="${g[1]}" stop-opacity="0"/></linearGradient></defs>
@@ -2632,7 +2709,7 @@ class RoostPeople extends ticking(RoostBase, 60000) {
       const nm = s.attributes.friendly_name || s.entity_id;
       const where = home ? "Home" : s.state === "not_home" ? "Away" : s.state.charAt(0).toUpperCase() + s.state.slice(1);
       const hue = [...nm].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 360;
-      return `<div class="pp" data-e="${esc(s.entity_id)}" role="button" tabindex="0"><span class="ring ${home ? "home" : "away"}"><span class="av" style="background:hsl(${hue} 55% 50%);color:#fff">${pic ? `<img src="${esc(pic)}" alt="">` : esc(nm.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase())}</span><span class="b"></span></span>
+      return `<div class="pp" data-e="${esc(s.entity_id)}" role="button" tabindex="0"><span class="ring ${home ? "home" : "away"}" data-pop="${home ? 1 : 0}" data-popkey="${esc(s.entity_id)}"><span class="av" style="background:hsl(${hue} 55% 50%);color:#fff">${pic ? `<img src="${esc(pic)}" alt="">` : esc(nm.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase())}</span><span class="b"></span></span>
         <span><div class="n t">${esc(nm.split(" ")[0])}</div><div class="l t">${esc(where)}${c.show_since ? ` · ${esc(since(s.last_changed).replace(/^for /, ""))}` : ""}</div></span></div>`;
     }).join("")}</div>`;
     this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
@@ -2929,7 +3006,7 @@ class RoostPresence extends RoostBase {
         <path d="M0 0 L${R * s60} ${R * c60} A${R} ${R} 0 0 1 ${-R * s60} ${R * c60} Z" fill="url(#fov)" stroke="${g[0]}" stroke-opacity=".35" stroke-width="25"/>
         ${grid}${zones}
         <rect x="-260" y="-200" width="520" height="200" rx="60" fill="${g[0]}"/>
-        ${targets.map((t) => `<g class="dot" style="transform:translate(${t.x}px,${t.y}px)"><circle r="520" fill="url(#dg)" opacity=".55"><animate attributeName="r" values="380;620;380" dur="2s" repeatCount="indefinite"/></circle><circle r="170" fill="${g[1]}" stroke="#fff" stroke-width="45"/></g>`).join("")}
+        ${targets.map((t) => `<g class="dot" data-glide="${t.n}" style="transform:translate(${t.x}px,${t.y}px)"><circle r="520" fill="url(#dg)" opacity=".55"><animate attributeName="r" values="380;620;380" dur="2s" repeatCount="indefinite"/></circle><circle r="170" fill="${g[1]}" stroke="#fff" stroke-width="45"/></g>`).join("")}
       </svg>
     </div>`;
   }
@@ -3028,7 +3105,7 @@ class RoostWeather extends RoostBase {
     <div class="card">
       <div class="now" role="button" tabindex="0">${fx}${orb}
         <div class="info"><div class="nm t">${esc(c.name || a.friendly_name || "Weather")}</div>
-          <div class="tmp num">${a.temperature != null ? `${Math.round(a.temperature)}${unit}` : ""}</div><div class="cd t">${esc(s ? wxWord(cond) : "Not found")}</div>
+          <div class="tmp num" data-tw="tmp">${a.temperature != null ? `${Math.round(a.temperature)}${unit}` : ""}</div><div class="cd t">${esc(s ? wxWord(cond) : "Not found")}</div>
           ${c.show_details ? `<div class="dt">${a.humidity != null ? `<span>Humidity ${Math.round(a.humidity)}%</span>` : ""}${a.wind_speed != null ? `<span>Wind ${Math.round(a.wind_speed)} ${esc(a.wind_speed_unit || "km/h")}</span>` : ""}${a.apparent_temperature != null ? `<span>Feels ${Math.round(a.apparent_temperature)}${unit}</span>` : ""}</div>` : ""}</div></div>
       ${c.forecast !== "none" && fc.length ? `<div class="fc">${fc.map((f) => {
         const d = new Date(f.datetime);
@@ -3098,8 +3175,8 @@ class RoostEnergy extends ticking(RoostBase, 300000) {
     const kw = (w) => (w >= 1000 ? `${(w / 1000).toFixed(1)} kW` : `${Math.round(w)} W`);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px}
-      .top{display:flex;gap:10px}
-      .box{flex:1;padding:12px 14px;border-radius:16px;background:${p.inset}}
+      .top{display:flex;gap:10px;flex-wrap:wrap}
+      .box{flex:1 1 120px;min-width:0;padding:12px 14px;border-radius:16px;background:${p.inset}}
       .box small{display:block;font-size:12px;color:${p.muted}}
       .box b{display:block;font-size:24px;font-weight:700;margin-top:2px}
       .box em{font-style:normal;font-size:12px;font-weight:600}
@@ -3113,10 +3190,10 @@ class RoostEnergy extends ticking(RoostBase, 300000) {
     </style>
     <div class="card">
       <div class="top">
-        ${devs.length ? `<div class="box"><small>Using now</small><b class="num"><ha-icon class="bolt" icon="mdi:flash"></ha-icon> ${kw(total)}</b></div>` : ""}
+        ${devs.length ? `<div class="box"><small>Using now</small><b class="num"><ha-icon class="bolt" icon="mdi:flash"></ha-icon> <span data-tw="tot">${kw(total)}</span></b></div>` : ""}
         ${c.energy ? `<div class="box"><small>Today</small><b class="num">${today != null ? `${today.toFixed(1)} kWh` : "Loading"}</b>${diff != null ? `<em style="color:${diff > 0 ? "#FF9F6B" : "#3DD68C"}">${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)}% vs yesterday</em>` : yesterday != null ? `<em style="color:${p.muted}">Yesterday ${yesterday.toFixed(1)} kWh</em>` : ""}</div>` : ""}
       </div>
-      ${top.length ? `<div class="dv">${top.map((d) => `<div class="row" data-e="${esc(d.id)}"><span class="t">${esc(d.s.attributes.friendly_name || d.id)}</span><b class="num">${kw(d.w)}</b><span class="bar"><i style="width:${((d.w / max) * 100).toFixed(0)}%"></i></span></div>`).join("")}</div>` : ""}
+      ${top.length ? `<div class="dv">${top.map((d) => `<div class="row" data-e="${esc(d.id)}"><span class="t">${esc(d.s.attributes.friendly_name || d.id)}</span><b class="num" data-tw="${esc(d.id)}">${kw(d.w)}</b><span class="bar"><i data-bar="${esc(d.id)}" style="width:${((d.w / max) * 100).toFixed(0)}%"></i></span></div>`).join("")}</div>` : ""}
     </div>`;
     this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
   }
@@ -3245,7 +3322,7 @@ class RoostFan extends RoostBase {
       :host{container-type:inline-size}
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px}
       .top{display:flex;align-items:center;gap:14px}
-      @container (max-width: 260px){.top{flex-direction:column;align-items:flex-start;gap:10px}}
+      @container (max-width: 260px){:host .top{flex-direction:column;align-items:flex-start;gap:10px}}
       .ic{width:64px;height:64px;border-radius:20px;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;
         background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? g[3] : p.muted};box-shadow:${on ? `0 12px 26px -12px ${g[2]}` : "none"}}
       .ic ha-icon{--mdc-icon-size:36px;${on ? `animation:roost-spin ${dur}s linear infinite` : ""}}
@@ -3258,7 +3335,7 @@ class RoostFan extends RoostBase {
       .b ha-icon{--mdc-icon-size:18px}
     </style>
     <div class="card">
-      <div class="top"><span class="ic" role="button" tabindex="0" aria-label="On or off"><ha-icon icon="mdi:fan"></ha-icon></span>
+      <div class="top"><span class="ic" role="button" tabindex="0" aria-label="On or off" data-pop="${on ? 1 : 0}" data-popkey="ic"><ha-icon icon="mdi:fan"></ha-icon></span>
         <span class="tx"><div class="n t">${esc(this.name(c.entity, "Fan"))}</div><div class="l t">${!s ? "Device not found" : UNAVAILABLE.includes(s.state) ? "Offline" : on ? `On${a.percentage != null ? ` · ${Math.round(pct)}%` : ""}${a.preset_mode ? ` · ${esc(a.preset_mode)}` : ""}` : "Off"}</div></span></div>
       ${speeds > 1 ? `<div class="row"><button class="b ${!on ? "on" : ""}" data-p="0">Off</button>${Array.from({ length: speeds }, (_, i) => {
         const v = Math.round(Math.min(100, (i + 1) * step));
@@ -3313,7 +3390,7 @@ class RoostLock extends RoostBase {
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px}
       .top{display:flex;align-items:center;gap:14px}
       :host{container-type:inline-size}
-      @container (max-width: 240px){.top{flex-wrap:wrap}}
+      @container (max-width: 240px){:host .top{flex-wrap:wrap}:host .tx{flex:1 1 100%}}
       .ic{width:60px;height:60px;border-radius:20px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 12px 26px -12px ${g[2]}}
       .ic ha-icon{--mdc-icon-size:30px;${busy ? "animation:roost-pulse .9s ease-in-out infinite" : jam ? "animation:roost-wiggle .6s ease-in-out infinite" : ""}}
       .n{font-size:16px;font-weight:600}
@@ -3321,14 +3398,17 @@ class RoostLock extends RoostBase {
       .d{font-size:12.5px;color:${p.muted}}
       .track{position:relative;height:58px;border-radius:999px;background:${p.inset};border:1px solid ${p.border};overflow:hidden;touch-action:none;user-select:none}
       .hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;color:${p.muted};animation:roost-breathe 2.2s ease-in-out infinite}
+      .hint{padding-left:50px}
+      .short{display:none}
+      @container (max-width: 250px){:host .long{display:none}:host .short{display:inline}}
       .knob{position:absolute;left:5px;top:5px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};display:flex;align-items:center;justify-content:center;cursor:grab;box-shadow:0 6px 16px -6px ${g[2]}}
       .knob ha-icon{--mdc-icon-size:24px}
       .lockb{height:52px;border-radius:999px;border:0;background:linear-gradient(135deg,${COLORS.green[0]},${COLORS.green[1]});color:${COLORS.green[3]};font:inherit;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
     </style>
     <div class="card">
-      <div class="top"><span class="ic"><ha-icon icon="${cover ? (shut ? "mdi:garage-variant-lock" : "mdi:garage-open-variant") : shut ? "mdi:lock" : jam ? "mdi:lock-alert" : "mdi:lock-open-variant"}"></ha-icon></span>
+      <div class="top"><span class="ic" data-pop="${esc(st)}" data-popkey="ic"><ha-icon icon="${cover ? (shut ? "mdi:garage-variant-lock" : "mdi:garage-open-variant") : shut ? "mdi:lock" : jam ? "mdi:lock-alert" : "mdi:lock-open-variant"}"></ha-icon></span>
         <span><div class="n t">${esc(this.name(c.entity, "Lock"))}</div><div class="w t">${esc(word)}</div>${ds ? `<div class="d t">Door ${ds.state === "on" ? "open" : "closed"}</div>` : ""}</span></div>
-      ${s && !busy ? (shut ? `<div class="track"><span class="hint">Slide to ${cover ? "open" : "unlock"} ›››</span><span class="knob"><ha-icon icon="mdi:chevron-double-right"></ha-icon></span></div>`
+      ${s && !busy ? (shut ? `<div class="track"><span class="hint"><span class="long">Slide to ${cover ? "open" : "unlock"} ›››</span><span class="short">›››</span></span><span class="knob"><ha-icon icon="mdi:chevron-double-right"></ha-icon></span></div>`
         : `<button class="lockb"><ha-icon icon="${cover ? "mdi:arrow-down" : "mdi:lock"}"></ha-icon>${cover ? "Close" : "Lock"}</button>`) : ""}
     </div>`;
     const r = this.shadowRoot;
@@ -3415,6 +3495,7 @@ class RoostAgenda extends ticking(RoostBase, 600000) {
       .day{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${p.muted};margin-top:6px}
       .day:first-child{margin-top:0}
       .ev{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:${p.inset}}
+      @container (max-width: 280px){:host .ev{display:grid;grid-template-columns:4px minmax(0,1fr);column-gap:10px;row-gap:2px}:host .ev .bar{grid-row:1/3}:host .tm{min-width:0}}
       .ev.hot{background:${this.dark ? "rgba(255,143,107,.14)" : "rgba(255,143,107,.16)"}}
       .ev.hot ha-icon{--mdc-icon-size:16px;color:#FF8F6B;vertical-align:-3px;animation:roost-bounce 1.6s ease-in-out infinite}
       .bar{width:4px;align-self:stretch;border-radius:4px;flex:none}
@@ -3478,6 +3559,7 @@ class RoostTodo extends RoostBase {
       .c{font-size:12.5px;color:${p.muted}}
       .add{display:flex;gap:8px}
       .add input{flex:1;min-width:0;height:44px;border-radius:14px;border:1px solid ${p.border};background:${p.inset};color:${p.text};font:inherit;font-size:14px;padding:0 14px;outline:none}
+      @container (max-width: 260px){:host .add input{padding:0 10px;font-size:13px}:host .add button{width:40px}}
       .add button{width:44px;height:44px;border-radius:14px;border:0;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};cursor:pointer}
       .it{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid ${p.border};cursor:pointer;font-size:14.5px;color:${p.text}}
       .it:last-child{border-bottom:0}
@@ -3619,7 +3701,7 @@ class RoostSensors extends RoostBase {
     const icons = { temperature: "mdi:thermometer", humidity: "mdi:water-percent", power: "mdi:flash", energy: "mdi:lightning-bolt", battery: "mdi:battery", carbon_dioxide: "mdi:molecule-co2", pm25: "mdi:blur", illuminance: "mdi:brightness-5", pressure: "mdi:gauge", voltage: "mdi:sine-wave", current: "mdi:current-ac" };
     const tint = { temperature: COLORS.coral, humidity: COLORS.blue, power: COLORS.amber, energy: COLORS.green, battery: COLORS.green, carbon_dioxide: COLORS.slate, pm25: COLORS.purple, illuminance: COLORS.amber };
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .grid{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:8px}
+      .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(96px,calc((100% - ${(Math.max(1, c.columns) - 1) * 8}px) / ${Math.max(1, c.columns)})),1fr));gap:8px}
       .sq{${panelCss(p, c.radius)};padding:12px;display:flex;flex-direction:column;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .sq:active{transform:scale(.96)}
       .sq ha-icon{--mdc-icon-size:20px}
@@ -3637,7 +3719,7 @@ class RoostSensors extends RoostBase {
       const unit = s?.attributes.unit_of_measurement || "";
       return `<div class="sq ${warn ? "warn" : ""}" data-e="${esc(it.entity)}" role="button" tabindex="0">
         <ha-icon icon="${esc(it.icon || s?.attributes.icon || icons[dc] || "mdi:information-outline")}" style="color:${g[this.dark ? 1 : 0]}"></ha-icon>
-        <span class="v num">${!s ? "?" : v != null ? `${esc(fmt(v))}<small>${unit.length > 2 ? " " : ""}${esc(unit)}</small>` : esc(UNAVAILABLE.includes(s.state) ? "Offline" : s.state)}</span>
+        <span class="v num">${!s ? "?" : v != null ? `<span data-tw="${esc(it.entity)}">${esc(fmt(v))}</span><small>${unit.length > 2 ? " " : ""}${esc(unit)}</small>` : esc(UNAVAILABLE.includes(s.state) ? "Offline" : s.state)}</span>
         <span class="n t">${esc(it.name || s?.attributes.friendly_name || it.entity)}</span></div>`;
     }).join("")}</div>`;
     this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
@@ -3679,6 +3761,7 @@ class RoostButtons extends RoostBase {
     const c = this._config, p = this.p, g = this.colour();
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .bar{${panelCss(p, c.radius)};padding:6px;display:grid;grid-template-columns:repeat(${c.items.length},minmax(0,1fr));gap:4px}
+      @container (max-width: ${c.items.length * 66}px){:host .b span{display:none}:host .b{min-height:48px}}
       .b{min-height:${c.show_names ? 62 : 48}px;border-radius:${Math.max(8, c.radius - 6)}px;border:0;background:transparent;color:${p.muted};font:inherit;font-size:11px;font-weight:600;cursor:pointer;
         display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 2px;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .b:active{transform:scale(.92)}
@@ -3688,7 +3771,7 @@ class RoostButtons extends RoostBase {
     </style>
     <div class="bar">${c.items.map((it, i) => {
       const s = this.st(it.entity), on = s && !UNAVAILABLE.includes(s.state) && !OFF_STATES.includes(s.state);
-      return `<button class="b ${on ? "on" : ""}" data-i="${i}" aria-label="${esc(it.name || it.icon)}"><ha-icon icon="${esc(it.icon)}"></ha-icon>${c.show_names && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</button>`;
+      return `<button class="b ${on ? "on" : ""}" data-i="${i}" data-pop="${on ? 1 : 0}" data-popkey="${i}" aria-label="${esc(it.name || it.icon)}"><ha-icon icon="${esc(it.icon)}"></ha-icon>${c.show_names && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</button>`;
     }).join("")}</div>`;
     this.shadowRoot.querySelectorAll(".b").forEach((b) => {
       const it = c.items[+b.dataset.i];
@@ -3699,6 +3782,228 @@ class RoostButtons extends RoostBase {
       }, () => it.entity && this.moreInfo(it.entity));
     });
   }
+}
+
+// ------------------------------------------------------------------ Roost Full Screen
+// Hides Home Assistant's top bar and sidebar on a dashboard, so it feels like an app.
+// Three ways to use it:
+//   1. The Roost Full Screen card in "invisible" mode: the dashboard opens full screen by itself.
+//   2. The same card in "button" mode: a chip that maximizes and minimizes.
+//   3. As an action on any card's tap: { action: fire-dom-event, roost_fullscreen: toggle | on | off }.
+// Everything comes back while the dashboard is being edited, and on other dashboards.
+// Adding ?roost_full=off to the address turns it off on that screen.
+const RoostFull = {
+  wants: {},          // dashboard -> { on, header, sidebar }
+  fab: null,          // the floating exit / enter button: { dash, position, allowed }
+  timer: null,
+
+  dash() { return location.pathname.split("/")[1] || ""; },
+  blocked() { return /[?&]roost_full=(off|0|no|false)/i.test(location.search); },
+  key(d) { return `roost-full:${d}`; },
+  remembered(d) { try { return localStorage.getItem(this.key(d)); } catch (e) { return null; } },
+  remember(d, on) { try { localStorage.setItem(this.key(d), on ? "1" : "0"); } catch (e) { /* private mode */ } },
+  exitedThisVisit(d) { try { return sessionStorage.getItem(this.key(d)) === "0"; } catch (e) { return false; } },
+  exitThisVisit(d, out) { try { if (out) sessionStorage.setItem(this.key(d), "0"); else sessionStorage.removeItem(this.key(d)); } catch (e) { /* private mode */ } },
+
+  // A card or an action asks for full screen on the dashboard that is open now.
+  set(on, opts = {}, how = "toggle") {
+    const d = this.dash();
+    const cur = this.wants[d] || {};
+    this.wants[d] = { header: opts.hide_header !== false, sidebar: opts.hide_sidebar !== false, ...cur, on: !!on };
+    if (opts.hide_header !== undefined) this.wants[d].header = opts.hide_header !== false;
+    if (opts.hide_sidebar !== undefined) this.wants[d].sidebar = opts.hide_sidebar !== false;
+    if (how === "auto") this.exitThisVisit(d, !on);
+    else this.remember(d, on);
+    if (opts.browser && on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+    if (opts.browser && !on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+    this.start();
+    this.apply();
+    window.dispatchEvent(new CustomEvent("roost-full-changed"));
+  },
+
+  toggle(opts) { this.set(!this.isOn(), opts, "toggle"); },
+
+  isOn() { const w = this.wants[this.dash()]; return !!(w && w.on) && !this.blocked(); },
+
+  start() {
+    if (this.timer) return;
+    this.timer = setInterval(() => this.apply(), 1000);   // Home Assistant redraws its frame now and then
+    const again = () => setTimeout(() => this.apply(), 80);
+    window.addEventListener("location-changed", again);
+    window.addEventListener("popstate", again);
+  },
+
+  // Home Assistant's own pieces, inside their shadow roots.
+  parts() {
+    const ha = document.querySelector("home-assistant");
+    const main = ha?.shadowRoot?.querySelector("home-assistant-main");
+    const mainRoot = main?.shadowRoot;
+    const drawer = mainRoot?.querySelector("ha-drawer");
+    const panel = mainRoot?.querySelector("partial-panel-resolver ha-panel-lovelace, ha-panel-lovelace");
+    const root = panel?.shadowRoot?.querySelector("hui-root");
+    return { mainRoot, drawerRoot: drawer?.shadowRoot, root, rootShadow: root?.shadowRoot };
+  },
+
+  editing(root) { return !!(root?.lovelace?.editMode || /[?&]edit=1/.test(location.search)); },
+
+  style(where, id, css) {
+    if (!where) return;
+    let el = where.getElementById ? where.getElementById(id) : where.querySelector(`#${id}`);
+    if (!css) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement("style"); el.id = id; where.appendChild(el); }
+    if (el.textContent !== css) el.textContent = css;
+  },
+
+  apply() {
+    const d = this.dash();
+    // a full screen switched on by a button or an action is remembered on this screen
+    if (!this.wants[d] && this.remembered(d) === "1") this.wants[d] = { on: true, header: true, sidebar: true };
+    const w = this.wants[d];
+    const { mainRoot, drawerRoot, root, rootShadow } = this.parts();
+    const on = !!(w && w.on) && !this.blocked() && !this.editing(root);
+    this.style(rootShadow, "roost-full", on && w.header ? `.header{display:none!important}
+      :host{--header-height:0px!important}
+      #view,hui-view-container{padding-top:env(safe-area-inset-top)!important;min-height:100vh!important}` : "");
+    this.style(mainRoot, "roost-full", on && w.sidebar ? "ha-drawer{--mdc-drawer-width:0px!important}ha-sidebar{display:none!important}" : "");
+    this.style(drawerRoot, "roost-full", on && w.sidebar ? ".mdc-drawer{display:none!important}.mdc-drawer-app-content{margin-left:0!important;margin-inline-start:0!important;padding-inline-start:0!important}" : "");
+    this.drawFab(on, root);
+  },
+
+  // The small floating button that leaves (or goes back to) full screen.
+  drawFab(on, root) {
+    let el = document.getElementById("roost-full-fab");
+    const f = this.fab;
+    const show = f && f.dash === this.dash() && f.allowed && !this.editing(root) && !this.blocked() && this.wants[this.dash()];
+    if (!show) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement("button");
+      el.id = "roost-full-fab";
+      el.addEventListener("click", () => { try { navigator.vibrate?.(12); } catch (e) { /* no vibration */ } this.set(!this.isOn(), {}, "auto"); });
+      document.body.appendChild(el);
+    }
+    const pos = { "bottom-right": "right:16px;bottom:calc(96px + env(safe-area-inset-bottom))", "bottom-left": "left:16px;bottom:calc(96px + env(safe-area-inset-bottom))",
+      "top-right": "right:16px;top:calc(16px + env(safe-area-inset-top))", "top-left": "left:16px;top:calc(16px + env(safe-area-inset-top))" }[f.position] || "right:16px;top:calc(16px + env(safe-area-inset-top))";
+    const dark = !!document.querySelector("home-assistant")?.hass?.themes?.darkMode;
+    el.setAttribute("aria-label", on ? "Leave full screen" : "Full screen");
+    el.style.cssText = `position:fixed;${pos};z-index:9;width:40px;height:40px;border-radius:14px;border:1px solid ${dark ? "#242A4D" : "#E2E5F2"};
+      background:${dark ? "rgba(20,24,49,.78)" : "rgba(255,255,255,.85)"};color:${dark ? "#EEF0FF" : "#161936"};display:flex;align-items:center;justify-content:center;
+      backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 8px 20px -10px rgba(0,0,0,.5);cursor:pointer;opacity:.85;padding:0`;
+    const icon = on ? "mdi:fullscreen-exit" : "mdi:fullscreen";
+    if (el.dataset.icon !== icon) { el.dataset.icon = icon; el.innerHTML = `<ha-icon icon="${icon}" style="--mdc-icon-size:22px"></ha-icon>`; }
+  },
+};
+
+RoostFull.start();
+
+// Any card's tap can switch full screen: { action: fire-dom-event, roost_fullscreen: toggle }.
+window.addEventListener("ll-custom", (ev) => {
+  const d = ev.detail || {};
+  const want = d.roost_fullscreen;
+  if (!want) return;
+  const opts = { hide_header: d.hide_header, hide_sidebar: d.hide_sidebar, browser: d.browser_fullscreen };
+  if (want === "on") RoostFull.set(true, opts, "toggle");
+  else if (want === "off") RoostFull.set(false, opts, "toggle");
+  else RoostFull.toggle(opts);
+});
+
+class RoostFullscreen extends RoostBase {
+  static get defaults() {
+    return { mode: "auto", hide_header: true, hide_sidebar: true, users: [], exit_users: [], exit_button: true, exit_position: "top-right",
+      browser_fullscreen: false, show_label: true, color: "active", theme: "auto" };
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "mode", label: "How it works", selector: pick([["auto", "Invisible: this dashboard opens full screen by itself"], ["button", "A button that switches full screen on and off"]]) },
+        { type: "grid", name: "", schema: [{ name: "hide_header", label: "Hide the top bar", selector: { boolean: {} } }, { name: "hide_sidebar", label: "Hide the sidebar", selector: { boolean: {} } }] },
+        { name: "browser_fullscreen", label: "Also hide the browser's own bars (computers and Android, button mode)", selector: { boolean: {} } },
+        { type: "expandable", name: "", title: "Who (invisible mode)", icon: "mdi:account-multiple", schema: [
+          { name: "users", label: "Full screen for (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
+          { name: "exit_button", label: "Show a small exit button", selector: { boolean: {} } },
+          { name: "exit_users", label: "Who sees the exit button (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
+          { name: "exit_position", label: "Where the exit button sits", selector: pick([["top-right", "Top right"], ["top-left", "Top left"], ["bottom-right", "Bottom right"], ["bottom-left", "Bottom left"]]) },
+        ] },
+        { type: "expandable", name: "", title: "Look (button mode)", icon: "mdi:palette", schema: [
+          { name: "show_label", label: "Show the words", selector: { boolean: {} } },
+          ...colourFields("color", "Colour when full screen"),
+          THEME_FIELD,
+        ] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return { mode: "auto" }; }
+
+  getGridOptions() { return this._config?.mode === "button" ? { columns: 4, rows: "auto", min_columns: 2 } : { columns: 12, rows: "auto" }; }
+
+  // people chosen in the editor are matched to Home Assistant users
+  allows(list) {
+    if (!Array.isArray(list) || !list.length) return true;
+    const me = this._hass?.user?.id;
+    return list.some((p) => this._hass?.states?.[p]?.attributes?.user_id === me);
+  }
+
+  editing() { return !!(this.editMode || this.preview || /[?&]edit=1/.test(location.search)); }
+
+  set editMode(v) { this._editMode = v; this._sig = null; if (this._hass) this.hass = this._hass; }
+
+  get editMode() { return this._editMode; }
+
+  connectedCallback() {
+    this._onFull = () => { this._sig = null; if (this._hass) this.hass = this._hass; };
+    window.addEventListener("roost-full-changed", this._onFull);
+    this._autoDone = false;
+    if (this._hass) this.autoStart();
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener("roost-full-changed", this._onFull);
+    if (RoostFull.fab && RoostFull.fab.card === this) { RoostFull.fab = null; RoostFull.apply(); }
+  }
+
+  autoStart() {
+    const c = this._config;
+    if (!c || c.mode !== "auto" || this._autoDone || !this._hass) return;
+    this._autoDone = true;
+    const d = RoostFull.dash();
+    RoostFull.fab = { card: this, dash: d, position: c.exit_position, allowed: c.exit_button && this.allows(c.exit_users) };
+    if (!this.allows(c.users)) return;
+    const on = !RoostFull.exitedThisVisit(d);
+    RoostFull.set(on, { hide_header: c.hide_header, hide_sidebar: c.hide_sidebar }, "auto");
+  }
+
+  signature() { return `${this.dark}|${RoostFull.isOn()}|${this.editing()}|${this._hass?.user?.id}`; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), on = RoostFull.isOn();
+    this.autoStart();
+    if (c.mode === "auto") {
+      this.style.display = this.editing() ? "" : "none";
+      this.shadowRoot.innerHTML = this.editing() ? `<style>${this.baseCss()}
+        .ed{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;border:1px dashed ${p.border};color:${p.muted};font-size:13px;line-height:1.35}
+        .ed ha-icon{--mdc-icon-size:20px;color:${g[this.dark ? 1 : 0]}}</style>
+        <div class="ed"><ha-icon icon="mdi:fullscreen"></ha-icon><span class="t">Full screen is on for this dashboard${this.allows(c.users) ? "" : " (not for you)"}. It is shown here only while editing.</span></div>` : "";
+      return;
+    }
+    this.style.display = "";
+    const word = on ? "Exit full screen" : "Full screen";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      button{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 auto;min-height:44px;min-width:44px;padding:0 ${c.show_label ? 16 : 0}px;border-radius:999px;cursor:pointer;
+        border:1px solid ${on ? "transparent" : p.border};background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.panel};color:${on ? g[3] : p.text};font:inherit;font-size:13.5px;font-weight:600;
+        box-shadow:${on ? `0 10px 22px -10px ${g[2]}` : "none"};-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      button:active{transform:scale(.93)}
+      ha-icon{--mdc-icon-size:22px}
+    </style><button aria-label="${word}" data-pop="${on ? 1 : 0}" data-popkey="b"><ha-icon icon="${on ? "mdi:fullscreen-exit" : "mdi:fullscreen"}"></ha-icon>${c.show_label ? `<span class="t">${word}</span>` : ""}</button>`;
+    this.shadowRoot.querySelector("button").addEventListener("click", () => {
+      this.vibrate();
+      RoostFull.set(!on, { hide_header: c.hide_header, hide_sidebar: c.hide_sidebar, browser: c.browser_fullscreen }, "toggle");
+    });
+  }
+
+  getCardSize() { return this._config?.mode === "auto" && !this.editing() ? 0 : 1; }
 }
 
 // ------------------------------------------------------------------ register
@@ -3736,6 +4041,7 @@ const CARDS = [
   ["roost-camera", RoostCamera, "Roost Camera", "A camera picture or live video, with a banner when someone rings the doorbell."],
   ["roost-sensors", RoostSensors, "Roost Sensors", "Many small readings in neat squares, orange when out of range."],
   ["roost-buttons", RoostButtons, "Roost Buttons", "Several small actions in one rounded bar."],
+  ["roost-fullscreen", RoostFullscreen, "Roost Full Screen", "Full screen without Home Assistant's top bar and sidebar: by itself, or as a button that maximizes and minimizes."],
 ];
 window.customCards = window.customCards || [];
 for (const [, cls] of CARDS) {

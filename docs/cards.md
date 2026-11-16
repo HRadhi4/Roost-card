@@ -384,4 +384,27 @@ items:
   - { name: Movie, icon: mdi:movie, tap_action: { action: perform-action, perform_action: scene.turn_on, target: { entity_id: scene.movie } } }
 ```
 
+
+
+### Roost Full Screen
+```yaml
+type: custom:roost-fullscreen
+mode: auto                # auto (invisible: full screen by itself) or button
+hide_header: true
+hide_sidebar: true
+users: []                 # auto mode: people who get full screen (empty = everyone)
+exit_button: true         # auto mode: a small exit button
+exit_users: [person.saeed] # who sees the exit button (empty = everyone)
+exit_position: top-right
+browser_fullscreen: false # button mode: also hide the browser's own bars
+```
+
+Any card can switch full screen with its tap action:
+```yaml
+tap_action:
+  action: fire-dom-event
+  roost_fullscreen: toggle   # toggle, on or off
+```
+Add `?roost_full=off` to the dashboard's address to turn it off on that screen.
+
 [← Back to the README](../README.md)

@@ -71,6 +71,8 @@ const cases = [
   ["roost-sensors", { entities: ["sensor.cabinet", { entity: "sensor.hum", name: "Humidity", below: 50 }, "sensor.offline", "sensor.missing"], columns: 2 }],
   ["roost-buttons", { items: [{ name: "Kitchen", icon: "mdi:lightbulb", entity: "light.kitchen" }, { name: "Movie", icon: "mdi:movie", tap_action: { action: "perform-action", perform_action: "scene.turn_on", target: { entity_id: "scene.movie" } } }, { icon: "mdi:power" }] }],
   ["roost-buttons", { items: [{ icon: "mdi:home" }], show_names: false }],
+  ["roost-fullscreen", { mode: "button" }],
+  ["roost-fullscreen", { mode: "button", show_label: false, color: "teal" }],
   ["roost-gauge", { entity: "sensor.cabinet", title: "Cabinet", min: 20, max: 45, warn: 32, second: "sensor.hum", second_name: "Humidity" }],
   ["roost-gauge", { entity: "sensor.power", max: 2000, frame: false, show_name: false }],
   ["roost-gauge", { entity: "sensor.offline" }],
