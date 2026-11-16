@@ -487,6 +487,10 @@ A rounded box with a title that holds other cards, like the "Rooms" box on the h
 ```yaml
 type: custom:roost-panel
 title: Rooms
+subtitle: Living room · 8 outlets   # optional line under the title
+picture: /local/strip.png           # or icon: mdi:power-socket-uk
+collapsible: true                   # folds open and closed
+entities: [alarm_control_panel.home, binary_sensor.front_door]   # rows with their state
 cards:
   - { type: custom:roost-room, name: Kitchen, temperature: sensor.kitchen_temperature, plain: true }
   - { type: custom:roost-room, name: Bedroom, temperature: sensor.bedroom_temperature, plain: true }

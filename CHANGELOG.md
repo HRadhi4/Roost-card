@@ -2,6 +2,15 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.2.5 — 2026-11-17
+**More of the original phone dashboard**
+- **Roost Media** has a small look ("TV & sound"): name, state and volume buttons; it turns purple while the TV is on, and a tap switches it.
+- **Roost Panel** can list devices as rows with their state in colour (alarm, doors, someone at the door, light level), fold open and closed, and show a picture or icon with a line under the title (like the power strip).
+- **Roost Alarm** has a pills look: Disarm, Arm home, Arm away.
+- **Roost Room** can say every device's state ("Light off · fan off", "Doors closed · no one there", "51.4% humidity").
+- **Roost Title** can show the room's temperature and humidity under the name ("Room sensor offline" when it has no reading).
+- **Roost Thermostat** can sit inside a panel without its own box.
+
 ## 1.2.4 — 2026-11-17
 - Text lines are spaced like the original dashboard (the hero's "next prayer" line is no longer taller), and the round quick-action buttons sit exactly where the original's do.
 
