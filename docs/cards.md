@@ -269,7 +269,7 @@ confirm: true
 ### Roost People
 ```yaml
 type: custom:roost-people
-entities: [person.omar, person.layla]
+entities: [person.saeed, person.layla]
 layout: row              # row or list
 ```
 

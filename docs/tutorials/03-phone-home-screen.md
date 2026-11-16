@@ -42,7 +42,7 @@ views:
             upcoming:
               - { name: Maghrib, entity: sensor.maghrib }
           - type: custom:roost-chips
-            entities: [binary_sensor.front_door, alarm_control_panel.home, light.living_room, climate.living_room, person.omar, person.layla]
+            entities: [binary_sensor.front_door, alarm_control_panel.home, light.living_room, climate.living_room, person.saeed, person.layla]
           - type: custom:roost-buttons
             items:
               - { name: Good night, icon: mdi:weather-night, tap_action: { action: perform-action, perform_action: script.good_night } }
