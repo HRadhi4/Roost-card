@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.3.1 — 2026-11-16
+**Cards no longer overlap**
+- Every card now tells Home Assistant to give it as much height as it needs. Before, a card with large text (or on a phone with bigger system text) spilled over the card below it: chips on the greeting card, scene buttons on the people bubbles, the navigation bar on the thermostat's buttons.
+- The design-rule check now blocks any card that asks for a fixed height.
+
 ## 0.3.0 — 2026-11-16
 **Follows the design rules (now in `DESIGN_RULES.md`)**
 - Status chips share the width equally in one row that never wraps; on very narrow phones the door chip shows only its icon. A TV chip appears only while the TV is on, and light groups no longer count as lights.

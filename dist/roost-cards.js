@@ -6,7 +6,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.3.0";
+const ROOST_VERSION = "0.3.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -277,7 +277,7 @@ class RoostTile extends RoostBase {
     return { entity: e || "", color: "purple" };
   }
 
-  getGridOptions() { return { columns: 6, rows: this._config?.size === "small" ? 2 : 3, min_columns: 3, min_rows: 2 }; }
+  getGridOptions() { return { columns: 6, rows: "auto", min_columns: 3 }; }
 
   stateText(s, on, un) {
     if (un) return "Offline";
@@ -365,7 +365,7 @@ class RoostChips extends RoostBase {
     return { entities: [...pick(/^alarm_control_panel\./, 1), ...pick(/^light\./, 4), ...pick(/^person\./, 3)] };
   }
 
-  getGridOptions() { return { columns: 12, rows: 1, min_columns: 6 }; }
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
 
   groups() {
     const lights = [], people = [], singles = [];
@@ -503,7 +503,7 @@ class RoostThermostat extends RoostBase {
 
   static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("climate.")) || "" }; }
 
-  getGridOptions() { return { columns: 12, rows: 7, min_columns: 6 }; }
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
 
   get info() {
     const s = this.st();
@@ -670,7 +670,7 @@ class RoostScene extends RoostBase {
 
   static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => /^(scene|script)\./.test(id)) || "", color: "purple" }; }
 
-  getGridOptions() { return this._config?.style === "round" ? { columns: 3, rows: 2 } : { columns: 6, rows: 3, min_rows: 2 }; }
+  getGridOptions() { return this._config?.style === "round" ? { columns: 3, rows: "auto" } : { columns: 6, rows: "auto", min_columns: 3 }; }
 
   activate() {
     const c = this._config;
@@ -743,7 +743,7 @@ class RoostHero extends RoostBase {
 
   static getStubConfig(hass) { return { weather: Object.keys(hass.states).find((id) => id.startsWith("weather.")) || "" }; }
 
-  getGridOptions() { return { columns: 12, rows: 3, min_columns: 6 }; }
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
 
   render() {
     if (!this._hass || !this._config) return;
@@ -828,7 +828,7 @@ class RoostNav extends RoostBase {
     return { items: [{ name: "Home", icon: "mdi:home", path: "#home" }, { name: "Rooms", icon: "mdi:view-grid", path: "#rooms" }, { name: "Security", icon: "mdi:shield-home", path: "#security" }] };
   }
 
-  getGridOptions() { return { columns: 12, rows: 1 }; }
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
 
   active(path) {
     const here = `${location.pathname}${location.hash}`;

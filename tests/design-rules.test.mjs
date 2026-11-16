@@ -11,6 +11,10 @@ for (const m of src.matchAll(/transition\s*:\s*([^;"`}]+)/g)) {
   }
 }
 if (/animation\s*:\s*[^;"`]*\b(rise|fade|slide)/i.test(src)) problems.push("rule 6: no entrance animations");
+for (const m of src.matchAll(/getGridOptions\(\)\s*\{([^}]*\})/g)) {
+  if (/rows:\s*(?!\s|"auto")/.test(m[1])) problems.push(`rule 4: cards must grow to fit (rows: "auto"): ${m[0].slice(0, 80)}`);
+}
+if (/min_rows/.test(src)) problems.push('rule 4: no fixed minimum rows');
 if (!src.includes('"#6D4BFF", "#8B6CFF"')) problems.push("rule 1: the active purple #6D4BFF → #8B6CFF must exist");
 if (!/Space Grotesk/.test(src) || !/Inter/.test(src)) problems.push("rule 1: fonts Space Grotesk and Inter");
 console.log(problems.length ? problems.map((p) => `FAIL ${p}`).join("\n") : "design rules: all checks passed");
