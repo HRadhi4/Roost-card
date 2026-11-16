@@ -2,6 +2,17 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.5.0 — 2026-11-16
+**The look of the original dashboard, with its animations**
+- **Roost Hero** is rebuilt: the sky follows the sun (blue to peach by day, deep purple with twinkling stars at night), a glowing sun or moon floats in the corner, a soft light sweeps across, the date and time sit on top, and the weather reads "26°C · sunny". New **"what's next" pill** with a pulsing dot counts down to the soonest of your times (for example prayer times): "Next prayer **Maghrib** at 5:05 PM · in 3h 36m".
+- **New: Roost Row**, a long row with a ring (an AC's set temperature or any number), a name, a state line and an arrow.
+- **Roost Rooms**: the rooms now sit inside one rounded bar, with the chosen room highlighted, as in the original.
+- **Tiles**: a bigger icon box and text. Animation is automatic: lights glow, fans spin, and a playing TV shows moving sound bars.
+- **Scene buttons**: the round style is bigger, with a stronger glow.
+- **Chips**: icons only. A green door means closed, orange means open (words can be turned back on).
+- **Nav**: a full-width floating bar with equal buttons; the chosen one is a glowing rounded square.
+- Animations stop for people who turn on "reduce motion" on their phone.
+
 ## 0.4.0 — 2026-11-16
 **Colours you can see, and a clearer settings screen**
 - A switched-off tile now shows its colour too: the icon in its colour, a tinted icon box and a coloured edge. Switched on, it fills with its full colour. Before, every switched-off tile looked the same, so changing the colour seemed to do nothing.

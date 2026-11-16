@@ -9,7 +9,8 @@ Every card has a **visual editor**: pick the device, colours, size, icon and sha
 | **Roost Chips** | Status chips in one row: doors, alarm, air conditioner, TV. Lights become one bulb with a count, people become little bubbles (colour = home, grey = away). Tap the bulb or the bubbles for the list. |
 | **Roost Thermostat** | An air conditioner card with a **dial you drag with your finger**, a power button, − and +, and mode buttons. |
 | **Roost Scene** | A coloured card or round button that runs a scene or script. A tick shows when it is done. |
-| **Roost Hero** | A greeting with the time, date and weather. |
+| **Roost Hero** | A greeting with a sky that follows the sun (stars at night), the time, date, weather and a "what's next" countdown. |
+| **Roost Row** | A long row with a ring (an AC's temperature or any number), a name, a state line and an arrow. |
 | **Roost Nav** | Icon navigation: a bar at the bottom on phones, a rail at the side on tablets. |
 | **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. |
 
@@ -104,7 +105,22 @@ weather: weather.home
 title: Sam               # optional; otherwise the signed-in person's first name
 show_clock: true
 show_date: true
-color: purple
+sky: auto                # auto (follows the sun), or any colour
+upcoming_title: Next prayer
+upcoming:                # the soonest of these times is counted down
+  - { name: Fajr, entity: sensor.fajr_prayer }
+  - { name: Maghrib, entity: sensor.maghrib_prayer }
+```
+
+### Roost Row
+```yaml
+type: custom:roost-row
+entity: climate.living_room
+name: Living Room climate
+color: blue              # ring colour
+min: 16                  # for sensors: where the ring starts and is full
+max: 30
+tap_action: { action: navigate, navigation_path: "#living" }
 ```
 
 ### Roost Nav

@@ -16,7 +16,8 @@ const states = Object.fromEntries([
   st("person.sam", "home"), st("person.ali", "not_home"), st("alarm_control_panel.home", "disarmed"),
   st("binary_sensor.front_door", "off", { device_class: "door" }), st("sensor.power", "42", { unit_of_measurement: "W" }),
   st("climate.living", "cool", { hvac_modes: ["off", "cool", "dry", "fan_only", "heat_cool"], temperature: 23, min_temp: 16, max_temp: 30, current_temperature: 27.5 }),
-  st("climate.noTemp", "off", { hvac_modes: ["off", "cool"] }), st("scene.movie", "scening"), st("weather.home", "partlycloudy", { temperature: 31, temperature_unit: "°C" }),
+  st("climate.noTemp", "off", { hvac_modes: ["off", "cool"] }), st("sun.sun", "below_horizon"),
+  st("sensor.maghrib", new Date(Date.now() + 3 * 3600e3).toISOString(), { device_class: "timestamp" }), st("scene.movie", "scening"), st("weather.home", "partlycloudy", { temperature: 31, temperature_unit: "°C" }),
 ].map((s) => [s.entity_id, s]));
 const calls = [];
 const hass = (dark) => ({ states, themes: { darkMode: dark }, user: { name: "Sam Smith" }, callService: async (...a) => { calls.push(a); } });
@@ -31,6 +32,10 @@ const cases = [
   ["roost-scene", { entity: "scene.movie", style: "round" }],
   ["roost-scene", { entity: "scene.movie" }],
   ["roost-hero", { weather: "weather.home" }],
+  ["roost-hero", { weather: "weather.home", sky: "coral", upcoming_title: "Next prayer", upcoming: [{ name: "Maghrib", entity: "sensor.maghrib" }] }],
+  ["roost-row", { entity: "climate.living" }],
+  ["roost-row", { entity: "sensor.power", name: "Power" }],
+  ["roost-row", { entity: "switch.kettle" }],
   ["roost-nav", { items: [{ icon: "mdi:home", path: "#home" }, { icon: "mdi:cog", path: "#settings", name: "Settings" }], show_labels: true }],
 ];
 let fails = 0;

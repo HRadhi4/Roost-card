@@ -2,11 +2,11 @@
  * Roost Cards — beautiful, fully customisable dashboard cards for Home Assistant.
  * Phones and tablets, light and dark. One file, no build step.
  *
- * Cards: roost-tile, roost-chips, roost-thermostat, roost-scene, roost-hero, roost-nav, roost-rooms
+ * Cards: roost-tile, roost-chips, roost-thermostat, roost-scene, roost-hero, roost-nav, roost-rooms, roost-row
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.4.0";
+const ROOST_VERSION = "0.5.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -59,7 +59,13 @@ const KEYFRAMES = `
 @keyframes roost-glow{0%,100%{filter:drop-shadow(0 0 2px rgba(255,255,255,.4))}50%{filter:drop-shadow(0 0 10px rgba(255,255,255,.95))}}
 @keyframes roost-breathe{0%,100%{opacity:.5}50%{opacity:1}}
 @keyframes roost-arc{0%,100%{filter:drop-shadow(0 0 6px rgba(56,189,248,.45))}50%{filter:drop-shadow(0 0 18px rgba(139,92,246,.85))}}
-@keyframes roost-tick{0%{opacity:1}65%{opacity:1}100%{opacity:0}}`;
+@keyframes roost-tick{0%{opacity:1}65%{opacity:1}100%{opacity:0}}
+@keyframes roost-twinkle{0%,100%{opacity:.15}50%{opacity:1}}
+@keyframes roost-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes roost-sheen{0%{transform:translateX(-140%) skewX(-18deg)}60%,100%{transform:translateX(900%) skewX(-18deg)}}
+@keyframes roost-ping{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.6);opacity:0}}
+@keyframes roost-eq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}}`;
 
 // ------------------------------------------------------------------ shared base
 class RoostBase extends HTMLElement {
@@ -283,7 +289,7 @@ if (!customElements.get("roost-editor")) customElements.define("roost-editor", R
 // ------------------------------------------------------------------ Roost Tile
 class RoostTile extends RoostBase {
   static get defaults() {
-    return { color: "purple", size: "large", radius: 22, show_switch: true, show_since: true, animation: "none", locked: false, confirm: false, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
+    return { color: "purple", size: "large", radius: 22, show_switch: true, show_since: true, animation: "auto", locked: false, confirm: false, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
   }
 
   validate(c) { if (!c.entity) throw new Error("Choose a device (entity)"); }
@@ -303,7 +309,7 @@ class RoostTile extends RoostBase {
             { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
             { name: "radius", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
           ] },
-          { name: "animation", selector: { select: { mode: "dropdown", options: [{ value: "none", label: "None" }, { value: "glow", label: "Glow (lights)" }, { value: "spin", label: "Spin (fans)" }] } } },
+          { name: "animation", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Automatic (lights glow, fans spin, TV shows sound bars)" }, { value: "none", label: "None" }, { value: "glow", label: "Glow" }, { value: "spin", label: "Spin" }, { value: "bars", label: "Sound bars" }] } } },
           THEME_FIELD,
         ] },
         { type: "expandable", name: "", title: "What it shows", icon: "mdi:eye-outline", schema: [
@@ -352,27 +358,32 @@ class RoostTile extends RoostBase {
     const h = SIZES[c.size] || SIZES.large;
     const togglable = s && ["light", "switch", "fan", "input_boolean", "automation", "media_player", "climate", "cover", "humidifier", "siren", "lock"].includes(s.entity_id.split(".")[0]);
     const showSwitch = c.show_switch && togglable && !un && !c.locked;
-    const anim = on && c.animation === "spin" ? "animation:roost-spin 1.3s linear infinite" : on && c.animation === "glow" ? "animation:roost-glow 2s ease-in-out infinite" : "";
+    const dom = s ? s.entity_id.split(".")[0] : "";
+    const kind = c.animation === "auto" ? (dom === "light" ? "glow" : dom === "fan" || /fan/.test(s?.attributes.icon || "") ? "spin" : dom === "media_player" && s?.state === "playing" ? "bars" : "none") : c.animation;
+    const anim = on && kind === "spin" ? "animation:roost-spin 1.3s linear infinite" : on && kind === "glow" ? "animation:roost-glow 2s ease-in-out infinite" : "";
+    const bars = on && kind === "bars" ? `<span class="bars">${[0, 0.2, 0.4, 0.1].map((d) => `<i style="animation-delay:${d}s"></i>`).join("")}</span>` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{position:relative;min-height:${h}px;height:100%;border-radius:${c.radius}px;padding:16px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
         display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden;transition:transform .12s;
         background:${on ? `linear-gradient(135deg,${g[0]} 0%,${g[1]} 100%)` : p.off};color:${on ? g[3] : p.text};
         border:1px solid ${on ? "transparent" : `color-mix(in srgb, ${g[0]} 35%, ${p.border})`};box-shadow:${on ? `0 18px 36px -14px ${g[2]}` : "none"};opacity:${un ? 0.55 : 1}}
       .card:active{transform:scale(.96)}
-      .ic{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:none;
+      .ic{width:48px;height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;flex:none;
         background:${on ? "rgba(255,255,255,.24)" : `color-mix(in srgb, ${g[0]} 18%, ${p.inset})`};color:${on ? "inherit" : un ? p.muted : g[this.dark ? 1 : 0]}}
-      .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:22px;${anim}}
+      .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:24px;${anim}}
+      .bars{position:absolute;right:18px;bottom:18px;display:flex;align-items:flex-end;gap:3px;height:22px}
+      .bars i{display:block;width:4px;height:22px;border-radius:2px;background:currentColor;transform-origin:bottom;animation:roost-eq .9s ease-in-out infinite}
       .sw{position:absolute;top:16px;right:14px;width:42px;height:24px;border-radius:999px;background:${on ? "rgba(255,255,255,.38)" : p.track}}
       .sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:${on ? "#fff" : p.knob};transform:translateX(${on ? 18 : 0}px);transition:transform .12s}
       .lk{position:absolute;top:18px;right:16px;opacity:.8;--mdc-icon-size:18px}
-      .nm{font-size:${h < 140 ? 14 : 15}px;font-weight:600;line-height:1.2}
-      .lb{font-size:12px;line-height:1.3;opacity:.85;margin-top:2px;color:${on ? "inherit" : p.muted}}
-      .ago{font-size:11px;opacity:.65;margin-top:4px;color:${on ? "inherit" : p.muted}}
+      .nm{font-size:${h < 140 ? 15 : 17}px;font-weight:600;line-height:1.2}
+      .lb{font-size:13.5px;line-height:1.3;opacity:.85;margin-top:3px;color:${on ? "inherit" : p.muted}}
+      .ago{font-size:12.5px;opacity:.65;margin-top:4px;color:${on ? "inherit" : p.muted}}
     </style>
     <div class="card" role="button" tabindex="0" aria-label="${esc(this.name(c.entity))}">
       <div class="ic"></div>
       ${showSwitch ? '<span class="sw" aria-hidden="true"></span>' : ""}
-      ${c.locked ? '<ha-icon class="lk" icon="mdi:lock" aria-label="Locked"></ha-icon>' : ""}
+      ${c.locked ? '<ha-icon class="lk" icon="mdi:lock" aria-label="Locked"></ha-icon>' : ""}${bars}
       <div><div class="nm t">${esc(this.name(c.entity))}</div>
         <div class="lb t">${esc(s ? this.stateText(s, on, un) + (c.locked && !un ? " · protected" : "") : "Device not found")}</div>
         ${c.show_since && s && !un ? `<div class="ago t">${esc(since(s.last_changed))}</div>` : ""}</div>
@@ -402,6 +413,7 @@ class RoostChips extends RoostBase {
         { name: "entities", required: true, selector: { entity: { multiple: true } } },
         { type: "grid", name: "", schema: [
           { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
+          { name: "show_words", label: "Words next to door icons (“Closed”)", selector: { boolean: {} } },
           { name: "align", label: "Line up", selector: { select: { mode: "dropdown", options: [{ value: "stretch", label: "One row, equal sizes" }, { value: "center", label: "Centre (may use two rows)" }, { value: "start", label: "Left (may use two rows)" }] } } },
         ] },
         THEME_FIELD,
@@ -442,7 +454,7 @@ class RoostChips extends RoostBase {
     if (d === "binary_sensor" && ["door", "window", "garage_door", "opening"].includes(cls)) {
       const open = s.state === "on";
       const icon = cls === "window" ? (open ? "mdi:window-open-variant" : "mdi:window-closed-variant") : (open ? "mdi:door-open" : "mdi:door-closed");
-      return { icon, colour: open ? "#FF9A3D" : this.p.muted, text: open ? "Open" : "Closed", word: true };
+      return { icon, colour: open ? "#FF9A3D" : "#3DD68C", text: this._config.show_words ? (open ? "Open" : "Closed") : "", word: true };
     }
     if (d === "climate") {
       const on = s.state !== "off";
@@ -694,7 +706,7 @@ class RoostThermostat extends RoostBase {
 
 // ------------------------------------------------------------------ Roost Scene
 class RoostScene extends RoostBase {
-  static get defaults() { return { color: "purple", style: "card", size: "large", radius: 20, theme: "auto" }; }
+  static get defaults() { return { color: "purple", style: "card", size: "large", radius: 22, theme: "auto" }; }
 
   validate(c) { if (!c.entity && !c.tap_action) throw new Error("Choose a scene, script or action"); }
 
@@ -745,10 +757,10 @@ class RoostScene extends RoostBase {
           background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 14px 30px -14px ${g[2]}`}}
       .card:active{transform:scale(.95)}
       .ic{display:flex;align-items:center;justify-content:center;flex:none;
-        ${round ? `width:58px;height:58px;border-radius:${Math.min(29, c.radius)}px;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 12px 24px -10px ${g[2]}`
+        ${round ? `width:70px;height:70px;border-radius:${Math.min(35, c.radius)}px;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 12px 24px -10px ${g[2]}`
     : "width:34px;height:34px;border-radius:12px;background:rgba(255,255,255,.22)"}}
-      .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:${round ? 24 : 18}px}
-      .nm{font-size:${round ? 12 : 14}px;font-weight:600;line-height:1.2;text-align:${round ? "center" : "left"}}
+      .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:${round ? 28 : 18}px}
+      .nm{font-size:${round ? 13 : 14}px;font-weight:700;line-height:1.2;text-align:${round ? "center" : "left"}}
       .done{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:#3DD68C;display:none;align-items:center;justify-content:center;color:#fff}
       .done.show{display:flex;animation:roost-tick 1.6s ease-out forwards}
     </style>
@@ -764,10 +776,12 @@ class RoostScene extends RoostBase {
 }
 
 // ------------------------------------------------------------------ Roost Hero
+// The greeting card: a sky that follows the sun (twinkling stars at night), a floating sun or moon,
+// a soft light sweep, the date and time, the weather, and an optional "what's next" pill.
 class RoostHero extends RoostBase {
-  static get defaults() { return { color: "purple", show_date: true, show_clock: true, radius: 28, theme: "auto" }; }
+  static get defaults() { return { sky: "auto", sun: "sun.sun", show_date: true, show_clock: true, upcoming: [], upcoming_title: "Next", radius: 26, theme: "auto" }; }
 
-  watched() { return [this._config.weather].filter(Boolean); }
+  watched() { return [this._config.weather, this._config.sun, ...(this._config.upcoming || []).map((u) => u.entity)].filter(Boolean); }
 
   extraSignature() { return Math.floor(Date.now() / 30000); }
 
@@ -781,8 +795,18 @@ class RoostHero extends RoostBase {
         { name: "title", selector: { text: {} } },
         { name: "weather", selector: { entity: { domain: "weather" } } },
         { type: "grid", name: "", schema: [{ name: "show_clock", selector: { boolean: {} } }, { name: "show_date", selector: { boolean: {} } }] },
-        { type: "expandable", name: "", title: "Colour and shape", icon: "mdi:palette", schema: [
-          ...colourFields(),
+        { type: "expandable", name: "", title: "What's next pill", icon: "mdi:clock-outline", schema: [
+          { name: "upcoming_title", label: "Pill title (for example “Next prayer”)", selector: { text: {} } },
+          { name: "upcoming", label: "Times to count down to (the soonest is shown)", selector: { object: { multiple: true, label_field: "name", fields: {
+            name: { label: "Name", required: true, selector: { text: {} } },
+            entity: { label: "Time (a date/time sensor)", required: true, selector: { entity: { domain: ["sensor", "input_datetime", "calendar"] } } },
+          } } } },
+        ] },
+        { type: "expandable", name: "", title: "Sky and shape", icon: "mdi:palette", schema: [
+          { name: "sky", label: "Background", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Sky that follows the sun" }, ...COLOR_OPTIONS] } } },
+          { name: "sky_start", label: "First colour (my own colours)", selector: { color_rgb: {} } },
+          { name: "sky_end", label: "Second colour (my own colours)", selector: { color_rgb: {} } },
+          { name: "sun", label: "Sun (for day and night)", selector: { entity: { domain: "sun" } } },
           { name: "radius", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
           THEME_FIELD,
         ] },
@@ -795,36 +819,70 @@ class RoostHero extends RoostBase {
 
   getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
 
+  nextUp() {
+    const now = Date.now();
+    const list = (this._config.upcoming || []).map((u) => {
+      const s = this.st(u.entity);
+      if (!s) return null;
+      const raw = s.entity_id.startsWith("calendar.") ? s.attributes.start_time : s.entity_id.startsWith("input_datetime.") ? (s.attributes.timestamp ? s.attributes.timestamp * 1000 : s.state) : s.state;
+      let t = new Date(raw).getTime();
+      if (!Number.isFinite(t)) return null;
+      while (t <= now && s.entity_id.startsWith("sensor.")) t += 86400000; // daily times: tomorrow's
+      return t > now ? { name: u.name, t } : null;
+    }).filter(Boolean).sort((a, b) => a.t - b.t);
+    return list[0] || null;
+  }
+
   render() {
     if (!this._hass || !this._config) return;
-    const c = this._config, g = this.colour();
-    const now = new Date(), hr = now.getHours();
-    const part = hr < 5 ? "Good night" : hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : hr < 21 ? "Good evening" : "Good night";
+    const c = this._config, now = new Date(), hr = now.getHours();
+    const sun = this.st(c.sun);
+    const day = sun ? sun.state === "above_horizon" : hr >= 6 && hr < 18;
+    const part = hr < 5 ? "Good night" : hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
     const who = c.title || (this._hass.user?.name || "").split(" ")[0];
     const w = this.st(c.weather);
-    const cond = w ? (w.state || "").replace(/-/g, " ").replace("partlycloudy", "partly cloudy").replace("clear night", "clear") : "";
-    const icon = { sunny: "mdi:weather-sunny", "clear-night": "mdi:weather-night", partlycloudy: "mdi:weather-partly-cloudy", cloudy: "mdi:weather-cloudy", rainy: "mdi:weather-rainy", pouring: "mdi:weather-pouring",
-      lightning: "mdi:weather-lightning", "lightning-rainy": "mdi:weather-lightning-rainy", windy: "mdi:weather-windy", "windy-variant": "mdi:weather-windy-variant", fog: "mdi:weather-fog", hail: "mdi:weather-hail",
-      snowy: "mdi:weather-snowy", "snowy-rainy": "mdi:weather-snowy-rainy", exceptional: "mdi:alert-circle-outline" }[w?.state] || "mdi:weather-partly-cloudy";
     const temp = w?.attributes.temperature;
-    const unit = w?.attributes.temperature_unit || "°";
-    const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const unit = (w?.attributes.temperature_unit || "°C").replace(/^°?/, "°");
+    const cond = w && !UNAVAILABLE.includes(w.state) ? w.state.replace("clear-night", "clear").replace("partlycloudy", "partly cloudy").replace(/-/g, " ") : "";
+    const sky = c.sky === "auto" || !c.sky
+      ? (day ? "linear-gradient(115deg,#2563EB 0%,#60A5FA 50%,#FDBA74 100%)" : "linear-gradient(115deg,#1B1E52 0%,#38287E 52%,#7A3A90 100%)")
+      : (() => { const g = this.colour("sky"); return `linear-gradient(115deg,${g[0]} 0%,${g[1]} 100%)`; })();
+    let stars = "";
+    if (!day) for (let j = 0; j < 22; j++) stars += `<span class="star" style="left:${(j * 37 + 11) % 96}%;top:${(j * 53 + 7) % 88}%;width:${1 + (j % 3)}px;height:${1 + (j % 3)}px;animation-duration:${2.4 + (j % 5) * 0.7}s;animation-delay:${((j * 0.37) % 3).toFixed(2)}s"></span>`;
+    const orb = day ? "background:radial-gradient(circle at 40% 40%,#FFF7D6,#FDE047 55%,#F59E0B);box-shadow:0 0 50px 16px rgba(253,224,71,.45)"
+      : "background:radial-gradient(circle at 36% 34%,#FFFBEA 0%,#F6E3A6 62%,#E2C273 100%);box-shadow:0 0 40px 12px rgba(255,234,170,.28)";
+    const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     const date = now.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+    const top = [c.show_date ? date : "", c.show_clock ? time : ""].filter(Boolean).join(" · ");
+    const nx = this.nextUp();
+    let pill = "";
+    if (nx) {
+      const dm = Math.max(0, Math.round((nx.t - now.getTime()) / 60000));
+      const left = `${Math.floor(dm / 60) ? `${Math.floor(dm / 60)}h ` : ""}${dm % 60}m`;
+      const at = new Date(nx.t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      pill = `<div class="pill"><span class="dot"><span></span></span><span class="t" style="flex:1">${esc(c.upcoming_title || "Next")} <b>${esc(nx.name)}</b> at ${esc(at)}</span><b class="num">in ${esc(left)}</b></div>`;
+    }
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .card{position:relative;overflow:hidden;border-radius:${c.radius}px;padding:22px;color:${g[3]};
-        background:radial-gradient(420px 220px at 110% -20%,rgba(255,255,255,.28),transparent 60%),linear-gradient(135deg,${g[0]} 0%,${g[1]} 100%);box-shadow:0 22px 44px -18px ${g[2]}}
-      .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
-      .hi{font-size:26px;font-weight:700;line-height:1.15}
-      .sub{font-size:14px;opacity:.85;margin-top:6px;line-height:1.35}
-      .clock{font-size:15px;font-weight:600;opacity:.9;flex:none;font-family:${FONT_NUM}}
-      .wx{display:flex;align-items:center;gap:10px;margin-top:18px;cursor:${w ? "pointer" : "default"}}
-      .wx ha-icon{--mdc-icon-size:34px}
-      .wx .tp{font-size:30px;font-weight:700;font-family:${FONT_NUM}}
-      .wx .cd{font-size:14px;opacity:.85;text-transform:capitalize}
+      .card{position:relative;overflow:hidden;border-radius:${c.radius}px;padding:20px;min-height:180px;color:#fff;background:${sky}}
+      .star{position:absolute;border-radius:50%;background:#fff;animation:roost-twinkle 3s ease-in-out infinite}
+      .sheen{position:absolute;top:0;bottom:0;left:0;width:70px;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.12),rgba(255,255,255,0));animation:roost-sheen 8s ease-in-out 1s infinite;pointer-events:none}
+      .orb{position:absolute;right:24px;top:22px;width:56px;height:56px;border-radius:50%;${orb};animation:roost-float 6s ease-in-out infinite}
+      .body{position:relative;display:flex;flex-direction:column;gap:8px}
+      .top{font-size:13px;opacity:.85}
+      .hi{font-size:25px;font-weight:700;letter-spacing:-.4px;line-height:1.15;padding-right:68px;font-family:${FONT_NUM}}
+      .wx{font-size:14px;line-height:1.5;opacity:.9;cursor:${w ? "pointer" : "default"}}
+      .pill{display:flex;align-items:center;gap:10px;background:rgba(10,8,40,.3);border-radius:16px;padding:10px 12px;margin-top:6px;font-size:13px;line-height:1.35}
+      .pill b.num{font-size:14px;flex:none}
+      .dot{position:relative;width:10px;height:10px;border-radius:50%;background:#E9E2FF;flex:none}
+      .dot span{position:absolute;inset:0;border-radius:50%;background:#E9E2FF;animation:roost-ping 1.8s ease-out infinite}
     </style>
-    <div class="card"><div class="top"><div><div class="hi t">${esc(part)}${who ? `, ${esc(who)}` : ""}</div>
-      ${c.show_date ? `<div class="sub t">${esc(date)}</div>` : ""}</div>${c.show_clock ? `<div class="clock">${esc(time)}</div>` : ""}</div>
-      ${w ? `<div class="wx"><ha-icon icon="${icon}"></ha-icon><span class="tp">${temp != null ? `${Math.round(temp)}${esc(unit.startsWith("°") ? "°" : unit)}` : ""}</span><span class="cd t">${esc(cond)}</span></div>` : ""}</div>`;
+    <div class="card">${stars}<span class="sheen"></span><span class="orb"></span>
+      <div class="body">
+        ${top ? `<span class="top t">${esc(top)}</span>` : ""}
+        <span class="hi t">${esc(part)}${who ? `, ${esc(who)}` : ""}</span>
+        ${w && temp != null ? `<span class="wx t">${esc(Math.round(temp) + unit)}${cond ? ` · ${esc(cond)}` : ""}</span>` : ""}
+        ${pill}
+      </div></div>`;
     const wx = this.shadowRoot.querySelector(".wx");
     if (wx) wx.addEventListener("click", () => this.moreInfo(c.weather));
   }
@@ -893,10 +951,10 @@ class RoostNav extends RoostBase {
     const pos = c.fixed ? (rail ? "position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:4" : "position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4") : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       :host{${c.fixed ? "height:0;" : ""}}
-      nav{${pos};display:flex;flex-direction:${rail ? "column" : "row"};gap:${rail ? 12 : 6}px;padding:${rail ? "14px 10px" : "8px"};border-radius:${rail ? 28 : 26}px;
+      nav{${pos};display:${rail ? "flex" : "grid"};${rail ? "flex-direction:column" : `grid-template-columns:repeat(${c.items.length},minmax(0,1fr))`};gap:${rail ? 12 : 4}px;padding:${rail ? "14px 10px" : "7px"};border-radius:${rail ? 28 : 26}px;
         background:${p.panel};border:1px solid ${p.border};backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 18px 40px -16px rgba(0,0,0,.5);
-        width:max-content;max-width:calc(100vw - 24px);${c.fixed ? "" : "margin:0 auto"}}
-      a{min-width:${c.show_labels ? 64 : 56}px;min-height:${c.show_labels ? 60 : 52}px;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+        ${rail ? "width:max-content" : `width:${c.fixed ? "calc(100vw - 24px)" : "100%"};max-width:536px`};${c.fixed ? "" : "margin:0 auto"}}
+      a{min-width:${rail ? 56 : 0}px;min-height:${c.show_labels ? 60 : 52}px;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
         color:${p.muted};text-decoration:none;font-size:11px;font-weight:600;-webkit-tap-highlight-color:transparent;padding:4px 8px;transition:background .12s}
       a.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -10px ${g[2]}}
       a:active{transform:scale(.94)}
@@ -916,6 +974,82 @@ class RoostNav extends RoostBase {
   }
 
   getCardSize() { return this._config?.fixed ? 0 : 1; }
+}
+
+// ------------------------------------------------------------------ Roost Row
+// A long row: a ring with the number (an AC's set temperature, or any sensor), a name, a short state line and an arrow.
+class RoostRow extends RoostBase {
+  static get defaults() { return { color: "blue", min: 16, max: 30, radius: 22, tap_action: { action: "more-info" }, theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a device"); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: {} } },
+        { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "icon", label: "Icon in the ring (instead of a number)", selector: { icon: {} } }] },
+        { type: "expandable", name: "", title: "Ring", icon: "mdi:circle-slice-5", schema: [
+          { type: "grid", name: "", schema: [
+            { name: "min", label: "Ring starts at", selector: { number: { mode: "box" } } },
+            { name: "max", label: "Ring is full at", selector: { number: { mode: "box" } } },
+          ] },
+          ...colourFields("color", "Ring colour"),
+          { name: "radius", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
+          THEME_FIELD,
+        ] },
+        { type: "expandable", name: "", title: "Tap", icon: "mdi:gesture-tap", schema: [ACTION_FIELD("tap_action")] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("climate.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  reading(s) {
+    const d = s.entity_id.split(".")[0], a = s.attributes;
+    if (d === "climate") {
+      const v = a.temperature ?? a.current_temperature;
+      const mode = s.state === "off" ? "off" : s.state.replace("_only", "").replace("heat_cool", "auto");
+      return { value: v, text: v != null ? `${Math.round(v)}°` : null, line: `AC ${mode}${s.state !== "off" && a.current_temperature != null ? ` · room ${a.current_temperature}°` : ""}`, min: a.min_temp, max: a.max_temp };
+    }
+    const n = parseFloat(s.state);
+    if (Number.isFinite(n)) return { value: n, text: `${Math.round(n * 10) / 10}${a.unit_of_measurement && a.unit_of_measurement.length <= 2 ? a.unit_of_measurement : ""}`, line: a.unit_of_measurement && a.unit_of_measurement.length > 2 ? `${n} ${a.unit_of_measurement}` : "" };
+    return { value: null, text: null, line: s.state.charAt(0).toUpperCase() + s.state.slice(1) };
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), s = this.st();
+    const un = !s || UNAVAILABLE.includes(s.state);
+    const r = s && !un ? this.reading(s) : { value: null, text: null, line: s ? "Offline" : "Device not found" };
+    const mn = r.min ?? c.min, mx = r.max ?? c.max;
+    const f = r.value == null ? 0 : Math.max(0, Math.min(1, (r.value - mn) / (mx - mn || 1)));
+    const R = 26, C = 2 * Math.PI * R, L = C * 0.75;
+    const on = s && !un && !OFF_STATES.includes(s.state);
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .row{display:flex;align-items:center;gap:16px;padding:14px 18px 14px 14px;border-radius:${c.radius}px;background:${p.panel};border:1px solid ${p.border};color:${p.text};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s;opacity:${un ? 0.55 : 1}}
+      .row:active{transform:scale(.98)}
+      .ring{position:relative;width:64px;height:64px;flex:none;display:flex;align-items:center;justify-content:center}
+      .ring svg{position:absolute;inset:0}
+      .ring .v{font-size:19px;font-weight:700;font-family:${FONT_NUM}}
+      .ring ha-icon{--mdc-icon-size:24px;color:${on ? g[1] : p.muted}}
+      .tx{flex:1;min-width:0}
+      .n{font-size:17px;font-weight:600;line-height:1.25}
+      .l{font-size:13.5px;color:${p.muted};margin-top:3px;line-height:1.3}
+      .ch{flex:none;color:${p.muted};--mdc-icon-size:22px}
+    </style>
+    <div class="row" role="button" tabindex="0" aria-label="${esc(this.name(c.entity))}">
+      <span class="ring"><svg viewBox="0 0 64 64"><defs><linearGradient id="rg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/></linearGradient></defs>
+        <circle cx="32" cy="32" r="${R}" fill="none" stroke="${p.track}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 32 32)"/>
+        ${f > 0 ? `<circle cx="32" cy="32" r="${R}" fill="none" stroke="${on ? "url(#rg)" : p.tick}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(L * f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 32 32)"/>` : ""}</svg>
+        ${c.icon || r.text == null ? `<ha-icon icon="${esc(c.icon || "mdi:information-outline")}"></ha-icon>` : `<span class="v">${esc(r.text)}</span>`}</span>
+      <span class="tx"><div class="n t">${esc(this.name(c.entity))}</div>${r.line ? `<div class="l t">${esc(r.line)}</div>` : ""}</span>
+      <ha-icon class="ch" icon="mdi:chevron-right"></ha-icon>
+    </div>`;
+    this.press(this.shadowRoot.querySelector(".row"), () => this.run(c.tap_action, c.entity), () => this.moreInfo(c.entity));
+  }
 }
 
 // ------------------------------------------------------------------ Roost Rooms
@@ -998,11 +1132,12 @@ class RoostRooms extends RoostBase {
     const c = this._config, p = this.p, g = this.colour();
     const showName = (i) => c.show_names === "all" || (c.show_names === "active" && i === this._active);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .pills{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 12px}
+      .bar{border-radius:999px;border:1px solid ${p.border};background:${p.panel};padding:4px;margin-bottom:12px}
+      .pills{display:flex;gap:2px;justify-content:space-between;overflow-x:auto;scrollbar-width:none}
       .pills::-webkit-scrollbar{display:none}
-      .pill{flex:1 0 auto;min-height:48px;min-width:48px;border-radius:999px;border:1px solid ${p.border};background:${p.panel};color:${p.muted};
+      .pill{flex:0 0 auto;min-height:44px;min-width:52px;border-radius:999px;border:0;background:transparent;color:${p.muted};
         display:flex;align-items:center;justify-content:center;gap:8px;padding:0 14px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
-      .pill.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 10px 24px -12px ${g[2]}}
+      .pill.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -12px ${g[2]}}
       .pill:active{transform:scale(.95)}
       .pill ha-icon{--mdc-icon-size:22px}
       .room{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:12px}
@@ -1010,8 +1145,8 @@ class RoostRooms extends RoostBase {
       .room > *{min-width:0}
       .room > .wide{grid-column:1/-1}
     </style>
-    <div class="pills" role="tablist">${c.rooms.map((r, i) => `<button class="pill ${i === this._active ? "on" : ""}" role="tab" aria-selected="${i === this._active}" data-i="${i}" aria-label="${esc(r.name)}">
-      ${r.icon ? `<ha-icon icon="${esc(r.icon)}"></ha-icon>` : ""}${showName(i) || !r.icon ? `<span>${esc(r.name)}</span>` : ""}</button>`).join("")}</div>
+    <div class="bar"><div class="pills" role="tablist">${c.rooms.map((r, i) => `<button class="pill ${i === this._active ? "on" : ""}" role="tab" aria-selected="${i === this._active}" data-i="${i}" aria-label="${esc(r.name)}">
+      ${r.icon ? `<ha-icon icon="${esc(r.icon)}"></ha-icon>` : ""}${showName(i) || !r.icon ? `<span>${esc(r.name)}</span>` : ""}</button>`).join("")}</div></div>
     ${c.rooms.map((r, i) => `<div class="room" data-room="${i}" ${i === this._active ? "" : "hidden"}></div>`).join("")}`;
     this.shadowRoot.querySelectorAll(".room").forEach((box) => {
       const i = +box.dataset.room;
@@ -1041,6 +1176,7 @@ const CARDS = [
   ["roost-scene", RoostScene, "Roost Scene", "A coloured button that runs a scene, script or action."],
   ["roost-hero", RoostHero, "Roost Hero", "A greeting with the time, date and weather."],
   ["roost-nav", RoostNav, "Roost Nav", "Icon navigation: a bar on phones and a side rail on tablets."],
+  ["roost-row", RoostRow, "Roost Row", "A long row with a ring (an AC's temperature or any number), a name, a state line and an arrow."],
   ["roost-rooms", RoostRooms, "Roost Rooms", "A room switcher: tap a room pill to show that room's cards. Switching is instant."],
 ];
 window.customCards = window.customCards || [];
