@@ -2,6 +2,13 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.1.1 — 2026-11-16
+- **Roost Curtain** now sits on a card background like the other cards (can be turned off with "Card background").
+- Fan, light, lock and media cards stack the icon above the name in narrow columns, so names never break inside a word.
+- The presence map's last metre label is no longer clipped.
+- Screenshots of every card, in dark and light mode, in the README.
+- The HACS store checks now run on GitHub for every change.
+
 ## 1.1.0 — 2026-11-16
 **Twelve more cards**
 - **Roost Remote**: a remote-control pad with power, arrows and OK, back / home / menu / input, volume and channel rockers, mute, play / pause and number keys. Works with an Athom Hub remote (its buttons are matched to the keys by name), any remote entity, or a TV. Keys it cannot send are greyed out.
