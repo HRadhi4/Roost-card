@@ -463,6 +463,13 @@ tap_action:
 ```
 Add `?roost_full=off` to the dashboard's address to turn it off on that screen.
 
+### Sample data
+Roost Fan, Lock, Camera, Timer and Remote can show pretend devices so you can try them before you own one:
+```yaml
+type: custom:roost-fan
+sample: true
+```
+
 ### Roost Page
 A whole phone page laid out like the original dashboard: 14 px at the sides, 16 px between cards, the night-sky background and room for the bottom bar. Put it in a **Panel** view and list the page's cards in it. Cards that sit side by side go in a `grid` (8 px apart).
 

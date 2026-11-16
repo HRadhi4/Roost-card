@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.2.8";
+const ROOST_VERSION = "1.2.9";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -124,12 +124,100 @@ const KEYFRAMES = `
 @keyframes roost-wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important}}`;
 
+// ------------------------------------------------------------------ Sample devices
+// "Try it with sample data": a card set to `sample: true` shows pretend devices that react to taps,
+// so people can see a card before they own the device. Nothing is sent to Home Assistant for them.
+const SAMPLE_DOOR = `data:image/svg+xml;base64,${typeof btoa === "function" ? btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><defs><linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8dccb"/><stop offset="1" stop-color="#cdbda6"/></linearGradient><linearGradient id="d" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7a4a2a"/><stop offset="1" stop-color="#5a3519"/></linearGradient></defs><rect width="400" height="300" fill="url(#w)"/><rect x="0" y="250" width="400" height="50" fill="#b9a68c"/><rect x="140" y="40" width="130" height="215" rx="4" fill="url(#d)"/><rect x="152" y="54" width="106" height="88" rx="3" fill="#6b4022"/><rect x="152" y="152" width="106" height="88" rx="3" fill="#6b4022"/><circle cx="252" cy="152" r="6" fill="#d9b24a"/><rect x="92" y="96" width="30" height="40" rx="4" fill="#f4efe6"/><text x="107" y="124" font-family="Arial" font-size="20" text-anchor="middle" fill="#5a4a3a">12</text><circle cx="330" cy="236" r="26" fill="#3f7d4a"/><rect x="322" y="250" width="16" height="22" fill="#8a5a3a"/></svg>`) : ""}`;
+
+const Sample = {
+  cards: new Set(),
+  timers: {},
+  states: null,
+
+  make() {
+    const now = new Date(Date.now() - 3600e3).toISOString(), st = (entity_id, state, attributes) => ({ entity_id, state, attributes, last_changed: now, last_updated: now });
+    const keys = ["Power", "Up", "Down", "Left", "Right", "OK", "Back", "Home", "Menu", "Vol up", "Vol down", "Mute", "Ch up", "Ch down", "Input"];
+    const s = {
+      "fan.sample_fan": st("fan.sample_fan", "on", { friendly_name: "Bedroom fan", percentage: 66, percentage_step: 33.33, oscillating: true, preset_modes: ["Breeze", "Sleep"], preset_mode: "Breeze", supported_features: 63 }),
+      "lock.sample_front_door": st("lock.sample_front_door", "locked", { friendly_name: "Front door" }),
+      "binary_sensor.sample_front_door": st("binary_sensor.sample_front_door", "off", { friendly_name: "Front door", device_class: "door" }),
+      "camera.sample_door": st("camera.sample_door", "idle", { friendly_name: "Front door", entity_picture: SAMPLE_DOOR }),
+      "binary_sensor.sample_doorbell": st("binary_sensor.sample_doorbell", "off", { friendly_name: "Doorbell", device_class: "occupancy" }),
+      "timer.sample_kettle": st("timer.sample_kettle", "idle", { friendly_name: "Kettle", duration: "0:05:00" }),
+    };
+    keys.forEach((k) => { const id = `button.sample_tv_${k.toLowerCase().replace(/ /g, "_")}`; s[id] = st(id, "unknown", { friendly_name: `Sample TV ${k}`, remote: "Sample TV" }); });
+    return s;
+  },
+
+  set(id, state, attrs = {}) {
+    const o = this.states[id];
+    this.states[id] = { ...o, state: state == null ? o.state : state, attributes: { ...o.attributes, ...attrs }, last_changed: new Date().toISOString() };
+    this.cards.forEach((card) => { if (!card.isConnected) { this.cards.delete(card); return; } card._sig = null; card.hass = card._realHass; });
+  },
+
+  // What a pretend device does when a card asks it to do something.
+  act(domain, service, data = {}) {
+    const ids = [].concat(data.entity_id || []), id = ids[0], s = this.states[id];
+    if (!s) return;
+    if (domain === "fan" || (domain === "homeassistant" && id.startsWith("fan."))) {
+      if (service === "set_percentage") return this.set(id, data.percentage ? "on" : "off", { percentage: data.percentage });
+      if (service === "oscillate") return this.set(id, null, { oscillating: data.oscillating });
+      if (service === "set_preset_mode") return this.set(id, "on", { preset_mode: data.preset_mode });
+      if (service === "turn_on") return this.set(id, "on", { percentage: s.attributes.percentage || 33 });
+      if (service === "turn_off") return this.set(id, "off");
+      return this.set(id, s.state === "on" ? "off" : "on");
+    }
+    if (domain === "lock" || id.startsWith("lock.")) {
+      const to = service === "unlock" || service === "open" || (service === "toggle" && s.state === "locked") ? "unlocked" : "locked";
+      this.set(id, to === "unlocked" ? "unlocking" : "locking");
+      setTimeout(() => this.set(id, to), 900);
+      return undefined;
+    }
+    if (domain === "timer") {
+      clearTimeout(this.timers[id]);
+      if (service === "start") {
+        const dur = data.duration || (s.state === "paused" ? s.attributes.remaining : s.attributes.duration) || "0:05:00";
+        const [h, m, x] = String(dur).split(":").map(Number), ms = ((h || 0) * 3600 + (m || 0) * 60 + (x || 0)) * 1000;
+        this.set(id, "active", { duration: data.duration || s.attributes.duration, finishes_at: new Date(Date.now() + ms).toISOString(), remaining: dur });
+        this.timers[id] = setTimeout(() => this.set(id, "idle", { finishes_at: null }), ms);
+      } else if (service === "pause" && s.state === "active") {
+        const left = Math.max(0, Math.round((new Date(s.attributes.finishes_at) - Date.now()) / 1000));
+        this.set(id, "paused", { remaining: `${Math.floor(left / 3600)}:${String(Math.floor((left % 3600) / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`, finishes_at: null });
+      } else if (service === "cancel" || service === "finish") this.set(id, "idle", { finishes_at: null });
+      return undefined;
+    }
+    if (domain === "camera" || domain === "button") return undefined;
+    return undefined;
+  },
+
+  wrap(hass, card) {
+    if (!this.states) this.states = this.make();
+    this.cards.add(card);
+    // the sample doorbell rings now and then, so the camera card shows its banner
+    if (card.localName === "roost-camera" && !this.bell) this.bell = setInterval(() => { if ([...this.cards].some((x) => x.isConnected && x.localName === "roost-camera")) { this.set("binary_sensor.sample_doorbell", "on"); setTimeout(() => this.set("binary_sensor.sample_doorbell", "off"), 6000); } }, 30000);
+    const merged = Object.create(hass);
+    merged.states = { ...hass.states, ...this.states };
+    merged.callService = (domain, service, data = {}, target) => {
+      const ids = [].concat(data.entity_id || target?.entity_id || []);
+      if (ids.length && ids.every((i) => this.states[i])) { this.act(domain, service, { ...data, entity_id: ids }); return Promise.resolve(); }
+      return hass.callService(domain, service, data, target);
+    };
+    return merged;
+  },
+};
+
 // ------------------------------------------------------------------ shared base
 class RoostBase extends HTMLElement {
   static get defaults() { return {}; }
 
   setConfig(config) {
     if (!config) throw new Error("Missing configuration");
+    if (config.sample) {
+      const fill = { "roost-fan": { entity: "fan.sample_fan" }, "roost-lock": { entity: "lock.sample_front_door", door: "binary_sensor.sample_front_door" }, "roost-camera": { entity: "camera.sample_door", doorbell: "binary_sensor.sample_doorbell" },
+        "roost-timer": { entity: "timer.sample_kettle" }, "roost-remote": { athom_remote: "Sample TV" } }[this.localName] || {};
+      config = { ...fill, ...config };
+      if (this.localName === "roost-remote" && config.entity && !config.athom_remote) config = { ...config, entity: undefined, athom_remote: "Sample TV" };
+    }
     this._config = { ...this.constructor.defaults, ...config };
     this.validate?.(this._config);
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
@@ -138,6 +226,7 @@ class RoostBase extends HTMLElement {
   }
 
   set hass(hass) {
+    if (this._config?.sample && hass) { this._realHass = hass; hass = Sample.wrap(hass, this); }
     this._hass = hass;
     const sig = this.signature();
     if (sig === this._sig) return;
@@ -199,6 +288,31 @@ class RoostBase extends HTMLElement {
       mem[key] = v;
       if (old != null && old !== v) run(el, [{ boxShadow: "0 0 0 0 rgba(139,108,255,.0)" }, { boxShadow: "0 0 0 6px rgba(139,108,255,.45)" }, { boxShadow: "0 0 0 0 rgba(139,108,255,0)" }], { duration: 1100, easing: "ease-out" });
     });
+  }
+
+  /**
+   * A coloured pill that slides from the old choice to the new one (bottom bar, room pills).
+   * `box` holds the buttons; the pill is drawn behind `on`. `memo` remembers where it was, across pages too.
+   */
+  slidePill(box, on, memo, css) {
+    if (!box || !on) return;
+    let ind = box.querySelector(":scope > .ind");
+    if (!ind) { ind = document.createElement("span"); ind.className = "ind"; ind.setAttribute("aria-hidden", "true"); box.prepend(ind); }
+    ind.style.cssText = `position:absolute;z-index:0;pointer-events:none;${css}`;
+    const r = { left: on.offsetLeft, top: on.offsetTop, width: on.offsetWidth, height: on.offsetHeight };
+    Object.assign(ind.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    const old = memo.rect;
+    memo.rect = r; memo.at = Date.now();
+    let still = false;
+    try { still = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { /* old browser */ }
+    if (!still && old && (old.left !== r.left || old.top !== r.top) && Date.now() - (memo.go || 0) < 1500) {
+      try {
+        ind.animate([{ left: `${old.left}px`, top: `${old.top}px`, width: `${old.width}px`, height: `${old.height}px` }, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` }],
+          { duration: 380, easing: "cubic-bezier(.3,1.25,.5,1)" });
+        on.animate([{ transform: "scale(.9)" }, { transform: "scale(1.06)" }, { transform: "scale(1)" }], { duration: 380, easing: "ease-out" });
+      } catch (e) { /* jumps */ }
+    }
+    memo.go = 0;
   }
 
   /** Entities whose changes redraw the card. */
@@ -1234,14 +1348,16 @@ class RoostNav extends RoostBase {
       a{position:relative;min-width:${rail ? 56 : 0}px;min-height:${Number(c.bar_height) || 54}px;border-radius:${c.active_style === "pill" ? 999 : Math.max(8, Number(c.radius) - 8)}px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
         color:${p.muted};text-decoration:none;font-size:clamp(8.5px, 2.7vw, 10.5px);font-weight:600;-webkit-tap-highlight-color:transparent;padding:4px 6px;transition:background .12s}
       ${{
-    filled: `a.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -8px color-mix(in srgb, ${g[0]} 95%, transparent), inset 0 1px 0 rgba(255,255,255,.35)}`,
-    pill: `a.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 22px -8px ${g[2]}}`,
-    soft: `a.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]}}`,
+    filled: `a.on{color:${g[3]}}`,
+    pill: `a.on{color:${g[3]}}`,
+    soft: `a.on{color:${g[this.dark ? 1 : 0]}}`,
     line: `a.on{color:${g[this.dark ? 1 : 0]}}a.on::after{content:"";position:absolute;bottom:3px;left:30%;right:30%;height:3px;border-radius:3px;background:linear-gradient(90deg,${g[0]},${g[1]})}`,
     dot: `a.on{color:${g[this.dark ? 1 : 0]}}a.on::after{content:"";position:absolute;bottom:3px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:${g[1]};box-shadow:0 0 8px ${g[2]}}`,
     icon: `a.on{color:${g[this.dark ? 1 : 0]}}a.on ha-icon{filter:drop-shadow(0 0 6px ${g[2]})}`,
   }[c.active_style] || ""}
       a:active{transform:scale(.94)}
+      nav{position:${fixed ? "fixed" : "relative"}}
+      a{z-index:1}
       a ha-icon{--mdc-icon-size:${Number(c.icon_size) || 22}px}
       a{min-width:0}
       @container (max-width: ${shown.length * 64}px){:host a span{display:none}:host a{padding:4px 2px}:host nav{padding:5px;gap:2px}}
@@ -1249,9 +1365,18 @@ class RoostNav extends RoostBase {
     </style>
     ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${shown.map(({ it, i }) => `<a href="${esc(it.path)}" data-i="${i}" class="${this.active(it.path, it) ? "on" : ""}" aria-label="${esc(it.name || it.path)}">
       <ha-icon icon="${esc(it.icon || "mdi:circle")}"></ha-icon>${c.show_labels && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</a>`).join("")}</nav>`;
+    const pillCss = { filled: `background:linear-gradient(135deg,${g[0]},${g[1]});box-shadow:0 10px 24px -8px color-mix(in srgb, ${g[0]} 95%, transparent), inset 0 1px 0 rgba(255,255,255,.35)`,
+      pill: `background:linear-gradient(135deg,${g[0]},${g[1]});box-shadow:0 10px 22px -8px ${g[2]}`, soft: `background:${g[0]}2E` }[c.active_style];
+    if (pillCss) {
+      const key = (c.items || []).map((it) => it.path).join("|"), memo = (RoostNav.memo = RoostNav.memo || {})[key] || (RoostNav.memo[key] = {});
+      const navEl = this.shadowRoot.querySelector("nav"), on = navEl?.querySelector("a.on");
+      const draw = () => this.slidePill(navEl, on, memo, `${pillCss};border-radius:${c.active_style === "pill" ? 999 : Math.max(8, Number(c.radius) - 8)}px`);
+      if (on) (window.requestAnimationFrame || setTimeout)(draw);
+    }
     this.shadowRoot.querySelectorAll("a").forEach((a) => a.addEventListener("click", (ev) => {
       const it = c.items[+a.dataset.i];
       ev.preventDefault();
+      const mk = (c.items || []).map((x) => x.path).join("|"); ((RoostNav.memo = RoostNav.memo || {})[mk] = RoostNav.memo[mk] || {}).go = Date.now();
       this.vibrate();
       if (it.path.startsWith("#")) location.hash = it.path;
       else { history.pushState(null, "", it.path); this.fire("location-changed", { replace: false }); }
@@ -1483,6 +1608,7 @@ class RoostRooms extends RoostBase {
   }
 
   go(i) {
+    (this._pillMemo = this._pillMemo || {}).go = Date.now();
     const n = this._config.rooms.length;
     this._active = (i + n) % n;
     if (this._config.remember) { try { localStorage.setItem(this.memKey(), this._config.rooms[this._active].name); } catch (e) { /* private mode */ } }
@@ -1509,7 +1635,8 @@ class RoostRooms extends RoostBase {
         display:flex;align-items:center;justify-content:center;gap:6px;padding:0 17px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
       ${c.active_style === "soft" ? `.pill.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]}}`
     : c.active_style === "line" ? `.pill.on{color:${g[this.dark ? 1 : 0]}}.pill.on::after{content:"";position:absolute;bottom:4px;left:28%;right:28%;height:3px;border-radius:3px;background:linear-gradient(90deg,${g[0]},${g[1]})}`
-      : `.pill.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 8px 20px -8px color-mix(in srgb, ${g[0]} 90%, transparent)}`}
+      : `.pill.on{color:${g[3]}}`}
+      .pills{position:relative}.pill{z-index:1}
       .pill:active{transform:scale(.95)}
       .pill ha-icon{--mdc-icon-size:${Number(c.pill_icon_size) || 20}px}
       .cnt{position:absolute;top:3px;right:4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#FCD34D;color:#2A1800;font-size:10px;font-weight:700;line-height:16px;text-align:center}
@@ -1544,6 +1671,11 @@ class RoostRooms extends RoostBase {
       }
     });
     this.shadowRoot.querySelectorAll(".pill").forEach((b) => b.addEventListener("click", () => this.go(+b.dataset.i)));
+    if (c.active_style !== "soft" && c.active_style !== "line") {
+      const box = this.shadowRoot.querySelector(".pills"), onp = box?.querySelector(".pill.on");
+      (window.requestAnimationFrame || setTimeout)(() => this.slidePill(box, onp, this._pillMemo || (this._pillMemo = {}),
+        `background:linear-gradient(135deg,${g[0]},${g[1]});box-shadow:0 8px 20px -8px color-mix(in srgb, ${g[0]} 90%, transparent);border-radius:${rad}px`));
+    }
     const on = this.shadowRoot.querySelector(".pill.on");
     if (on && on.scrollIntoView && c.pill_align !== "spread") on.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
@@ -2169,7 +2301,7 @@ class RoostTitle extends RoostBase {
       .h.withback{gap:14px;padding-top:2px}
     </style>
     <div class="h${c.back ? " withback" : ""}">${c.back ? '<button class="bk" aria-label="Back"><ha-icon icon="mdi:chevron-left"></ha-icon></button>' : ""}${c.icon ? `<ha-icon icon="${esc(c.icon)}"></ha-icon>` : ""}
-      <div class="tx"><div class="t1 t">${esc(c.title)}${c.badge ? `<span class="bd">${esc(c.badge)}</span>` : ""}</div>${c.subtitle || this.reading() ? `<div class="t2 t">${esc(c.subtitle || this.reading())}</div>` : ""}</div>
+      <div class="tx"><div class="t1 t">${esc(c.title)}${c.badge ? `<span class="bd" data-pop="${esc(c.badge)}" data-popkey="bd">${esc(c.badge)}</span>` : ""}</div>${c.subtitle || this.reading() ? `<div class="t2 t">${esc(c.subtitle || this.reading())}</div>` : ""}</div>
       ${c.link_text ? `<button class="ln">${esc(c.link_text)}<ha-icon icon="mdi:chevron-right"></ha-icon></button>` : ""}</div>`;
     const ln = this.shadowRoot.querySelector(".ln");
     if (ln) ln.addEventListener("click", () => this.run(c.tap_action));
@@ -3008,10 +3140,16 @@ class RoostAlerts extends ticking(RoostBase, 60000) {
       .ok ha-icon{color:#3DD68C;--mdc-icon-size:22px}
       .more{font-size:12px;color:${p.muted};text-align:center}
     </style>
-    <div class="wrap">${shown.length ? shown.map((a) => `<div class="a" data-e="${esc(a.id)}" style="border-left-color:${a.tone}"><ha-icon icon="${esc(a.icon)}" style="color:${a.tone}"></ha-icon><span class="t">${esc(a.text)}</span></div>`).join("")
+    <div class="wrap">${shown.length ? shown.map((a) => `<div class="a" data-e="${esc(a.id)}" data-k="${esc(a.id + a.text)}" style="border-left-color:${a.tone}"><ha-icon icon="${esc(a.icon)}" style="color:${a.tone}"></ha-icon><span class="t">${esc(a.text)}</span></div>`).join("")
       : '<div class="ok"><ha-icon icon="mdi:check-circle-outline"></ha-icon><span class="t">All good</span></div>'}
       ${list.length > shown.length ? `<div class="more t">and ${list.length - shown.length} more</div>` : ""}</div>`;
     this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
+    // a new alert gives a little nudge so the eye catches it
+    const keys = [...this.shadowRoot.querySelectorAll("[data-k]")].map((el) => el.dataset.k), before = this._alertKeys;
+    this._alertKeys = keys;
+    let still = false;
+    try { still = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { /* old browser */ }
+    if (before && !still) this.shadowRoot.querySelectorAll("[data-k]").forEach((el) => { if (!before.includes(el.dataset.k)) { try { el.animate([{ transform: "translateX(0)" }, { transform: "translateX(-6px)" }, { transform: "translateX(5px)" }, { transform: "translateX(-3px)" }, { transform: "translateX(0)" }], { duration: 520, easing: "ease-out" }); } catch (e) { /* still */ } } });
   }
 
   getCardSize() { return this.style.display === "none" ? 0 : 2; }
@@ -3048,6 +3186,7 @@ class RoostRemote extends RoostBase {
   static getConfigForm() {
     return {
       schema: [
+        { name: "sample", label: "Show sample data (try the card without the device)", selector: { boolean: {} } },
         { name: "athom_remote", label: "Athom Hub remote (its name)", selector: { text: {} } },
         { name: "entity", label: "Or a remote / TV entity", selector: { entity: { domain: ["remote", "media_player"] } } },
         { name: "buttons", label: "Or pick buttons (named Power, Up, OK, Vol up and so on)", selector: { entity: { multiple: true, domain: "button" } } },
@@ -3147,7 +3286,10 @@ class RoostRemote extends RoostBase {
         <div class="rock">${k("ch_up", "mdi:chevron-up")}<small>CH</small>${k("ch_down", "mdi:chevron-down")}</div></div>
       ${c.show_numbers ? `<div class="nums">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => k(`n${n}`, String(n))).join("")}<span></span>${k("n0", "0")}</div>` : ""}
     </div>`;
-    this.shadowRoot.querySelectorAll(".k:not(.no)").forEach((b) => b.addEventListener("click", () => this.press_(b.dataset.r, map)));
+    this.shadowRoot.querySelectorAll(".k:not(.no)").forEach((b) => b.addEventListener("click", () => {
+      try { if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) b.animate([{ boxShadow: `0 0 0 0 ${g[2]}` }, { boxShadow: "0 0 0 12px rgba(0,0,0,0)" }], { duration: 450, easing: "ease-out" }); } catch (e) { /* no glow */ }
+      this.press_(b.dataset.r, map);
+    }));
   }
 }
 
@@ -3429,6 +3571,7 @@ class RoostTimer extends RoostBase {
   static getConfigForm() {
     return {
       schema: [
+        { name: "sample", label: "Show sample data (try the card without the device)", selector: { boolean: {} } },
         { name: "entity", required: true, selector: { entity: { domain: "timer" } } },
         { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "icon", selector: { icon: {} } }] },
         { name: "presets", label: "Quick times (minutes)", selector: { select: { multiple: true, custom_value: true, mode: "dropdown", options: ["1", "2", "3", "4", "5", "10", "15", "20", "30", "45", "60"] } } },
@@ -3515,6 +3658,7 @@ class RoostFan extends RoostBase {
   static getConfigForm() {
     return {
       schema: [
+        { name: "sample", label: "Show sample data (try the card without the device)", selector: { boolean: {} } },
         { name: "entity", required: true, selector: { entity: { domain: "fan" } } },
         { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "radius", selector: slider(0, 40, 2) }] },
         ...colourFields("color"),
@@ -3583,6 +3727,7 @@ class RoostLock extends RoostBase {
   static getConfigForm() {
     return {
       schema: [
+        { name: "sample", label: "Show sample data (try the card without the device)", selector: { boolean: {} } },
         { name: "entity", required: true, selector: { entity: { domain: ["lock", "cover"] } } },
         { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "door", label: "Door sensor (optional)", selector: { entity: { domain: "binary_sensor" } } }] },
         ...colourFields("color", "Colour when locked"),
@@ -3705,18 +3850,20 @@ class RoostAgenda extends ticking(RoostBase, 600000) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const dayName = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); const n = Math.round((x - today) / 86400e3); return n === 0 ? "Today" : n === 1 ? "Tomorrow" : x.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" }); };
     let last = "", html = "";
+    const nextOne = ev.find((e) => !e.allDay && new Date(e.start) > new Date() && new Date(e.start) - Date.now() < 86400e3);
     for (const e of ev) {
       const dn = dayName(e.start);
       if (dn !== last) { html += `<div class="day">${esc(dn)}</div>`; last = dn; }
       const hot = words.some((w) => e.title.toLowerCase().includes(w));
       html += `<div class="ev ${hot ? "hot" : ""}"><span class="bar" style="background:${hot ? "#FF8F6B" : cols[e.cal % cols.length]}"></span>
         <span class="tm num">${e.allDay ? "All day" : esc(new Date(e.start).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}</span>
-        <span class="tx"><b class="t">${hot ? '<ha-icon icon="mdi:trash-can-outline"></ha-icon> ' : ""}${esc(e.title)}</b>${e.where ? `<small class="t">${esc(e.where)}</small>` : ""}</span></div>`;
+        <span class="tx"><b class="t">${e === nextOne ? '<i class="nx" title="Next"></i>' : ""}${hot ? '<ha-icon icon="mdi:trash-can-outline"></ha-icon> ' : ""}${esc(e.title)}</b>${e.where ? `<small class="t">${esc(e.where)}</small>` : ""}</span></div>`;
     }
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:8px}
       .day{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${p.muted};margin-top:6px}
       .day:first-child{margin-top:0}
+      .nx{display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B6CFF;margin-right:6px;vertical-align:1px;animation:roost-breathe 1.8s ease-in-out infinite}
       .ev{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:${p.inset}}
       @container (max-width: 280px){:host .ev{display:grid;grid-template-columns:4px minmax(0,1fr);column-gap:10px;row-gap:2px}:host .ev .bar{grid-row:1/3}:host .tm{min-width:0}}
       .ev.hot{background:${this.dark ? "rgba(255,143,107,.14)" : "rgba(255,143,107,.16)"}}
@@ -3774,7 +3921,7 @@ class RoostTodo extends RoostBase {
     this.subscribe();
     const items = this._items || [];
     const open = items.filter((i) => i.status !== "completed"), done = items.filter((i) => i.status === "completed");
-    const row = (i) => `<div class="it ${i.status === "completed" ? "done" : ""}" data-uid="${esc(i.uid)}"><span class="ck">${i.status === "completed" ? '<ha-icon icon="mdi:check"></ha-icon>' : ""}</span><span class="t">${esc(i.summary)}</span></div>`;
+    const row = (i) => `<div class="it ${i.status === "completed" ? "done" : ""}" data-uid="${esc(i.uid)}"><span class="ck" data-pop="${esc(i.status)}" data-popkey="${esc(i.uid)}">${i.status === "completed" ? '<ha-icon icon="mdi:check"></ha-icon>' : ""}</span><span class="t">${esc(i.summary)}</span></div>`;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:10px}
       .top{display:flex;justify-content:space-between;align-items:baseline}
@@ -3826,6 +3973,7 @@ class RoostCamera extends RoostBase {
   static getConfigForm() {
     return {
       schema: [
+        { name: "sample", label: "Show sample data (try the card without the device)", selector: { boolean: {} } },
         { name: "entity", required: true, selector: { entity: { domain: "camera" } } },
         { name: "name", selector: { text: {} } },
         { name: "doorbell", label: "Doorbell (button press or ring sensor)", selector: { entity: { domain: ["binary_sensor", "event"] } } },
@@ -3845,7 +3993,7 @@ class RoostCamera extends RoostBase {
 
   disconnectedCallback() { clearInterval(this._t); }
 
-  url() { const s = this.st(); return s?.attributes.entity_picture ? `${s.attributes.entity_picture}&t=${Date.now()}` : ""; }
+  url() { const s = this.st(), u = s?.attributes.entity_picture; return u ? (u.startsWith("data:") ? u : `${u}&t=${Date.now()}`) : ""; }
 
   refreshImg() { const img = this.shadowRoot?.querySelector("img.pic"); if (img && !document.hidden) img.src = this.url(); }
 
@@ -4375,7 +4523,11 @@ class RoostPanel extends RoostPage {
     this.shadowRoot.querySelectorAll("[data-icon]").forEach((el) => this.icon(el, null, el.dataset.icon));
     this.shadowRoot.querySelectorAll(".rw").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
     const hd = this.shadowRoot.querySelector(".hd");
-    if (fold && hd) hd.addEventListener("click", () => { this._isOpen = !this._isOpen; this.vibrate(); this._sig = null; this.hass = this._hass; });
+    if (fold && hd) hd.addEventListener("click", () => {
+      this._isOpen = !this._isOpen; this.vibrate(); this._sig = null; this.hass = this._hass;
+      const b = this.shadowRoot.querySelector(".body");
+      if (b && this._isOpen) { try { if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) b.animate([{ opacity: 0, transform: "translateY(-6px)" }, { opacity: 1, transform: "none" }], { duration: 260, easing: "ease-out" }); } catch (e) { /* opens at once */ } }
+    });
   }
 
   getCardSize() { return 4; }

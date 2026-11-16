@@ -2,6 +2,14 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.2.9 — 2026-11-17
+**Try a card without the device**
+- **Sample data**: Roost Fan, Lock, Camera, Timer and Remote can show pretend devices (`sample: true`, or "Show sample data" in the editor). They react to taps like the real thing, the sample doorbell rings now and then, and nothing is sent to Home Assistant.
+
+**More movement**
+- The coloured pill of the **bottom bar** and of the **room pills** now slides to the button you tap, even between pages.
+- **Remote** keys glow when pressed; a new **alert** gives a small nudge; ticking a **to-do** item bounces its box; the **next event** of the day has a soft pulsing dot; a **title badge** bounces when it changes; a folding **panel** opens smoothly.
+
 ## 1.2.8 — 2026-11-17
 - **Watts, lux and ppm** show whole numbers everywhere ("43 W", not "43.0 W").
 - **Roost Energy** compares today with yesterday up to the same time of day, so the morning no longer shows a big drop. Small totals show two decimals ("0.04 kWh"). Devices can have short names.
