@@ -2,6 +2,9 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.2.4 — 2026-11-17
+- Text lines are spaced like the original dashboard (the hero's "next prayer" line is no longer taller), and the round quick-action buttons sit exactly where the original's do.
+
 ## 1.2.3 — 2026-11-17
 - **Bottom bar**: a button can also light up on other pages (for example **Rooms** stays lit on every room's page), and "only for these people" now takes people from your list.
 

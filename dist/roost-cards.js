@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.2.3";
+const ROOST_VERSION = "1.2.4";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -322,7 +322,7 @@ class RoostBase extends HTMLElement {
 
   baseCss() {
     const p = this.p;
-    return `:host{display:block;container-type:inline-size;--roost-text:${p.text};--roost-muted:${p.muted};font-family:${FONT_TEXT}}
+    return `:host{display:block;container-type:inline-size;--roost-text:${p.text};--roost-muted:${p.muted};font-family:${FONT_TEXT};line-height:normal}
       .num,svg text{font-family:${FONT_NUM}}
       *{box-sizing:border-box}
       .t{white-space:normal;overflow-wrap:break-word;word-break:normal;overflow:visible;text-overflow:clip}
@@ -942,7 +942,7 @@ class RoostScene extends RoostBase {
     const look = fillLook(c.fill, c.glow, g, p), bs = Math.max(36, Number(c.button_size) || 58);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{position:relative;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;transition:transform .12s;
-        ${round ? `display:flex;flex-direction:column;align-items:center;gap:8px;padding:2px;color:${p.text}`
+        ${round ? `display:flex;flex-direction:column;align-items:center;gap:8px;padding:0;color:${p.text}`
     : `min-height:${h}px;height:100%;border-radius:${c.radius}px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;
           background:${look.bg};color:${look.light ? "#fff" : look.fg};border:${c.fill === "outline" ? 2 : 1}px solid ${look.border};box-shadow:${(c.glow || "soft") === "soft" && c.fill !== "outline" ? `0 14px 30px -14px ${g[2]}` : look.shadow};${look.blur ? "backdrop-filter:blur(14px);" : ""}`}}
       .card:active{transform:scale(.95)}
