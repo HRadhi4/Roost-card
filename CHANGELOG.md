@@ -2,6 +2,9 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.2.7 — 2026-11-17
+- **Bottom bar**: it no longer jumps sideways when you open a page that is shorter than the screen (on computers the scroll bar used to push it).
+
 ## 1.2.6 — 2026-11-17
 - **Bottom bar fixed**: Home Assistant's pop-up messages (for example "Starting broadlink" while an integration starts) sat on top of the bar and caught the taps, so the buttons seemed dead. The messages now appear above the bar.
 - Room lines show power and light level as whole numbers ("Plug 42 W").
