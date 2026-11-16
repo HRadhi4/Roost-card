@@ -2,6 +2,18 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.7.0 — 2026-11-16
+**A much more flexible room card, a hero you can shape, and an easier bottom bar**
+- **Roost Rooms**
+  - Pick each room's devices in the editor: every device becomes a tile, coloured by type (lights amber, ACs blue, curtains coral, TVs purple, plugs green, fans teal). Extra cards can still be added.
+  - Each room can have its own button colour.
+  - Room buttons: shape (pill, rounded, square), height, icon size, line-up (spread, left, centre), and an optional badge with how many things are on in each room.
+  - Tiles in the rooms: size, look when on, glow, roundness, tiles per row and the space between them.
+  - Swipe left or right to change room, open the last room used, or choose the room to show first.
+  - An empty room says how to add devices instead of showing nothing.
+- **Roost Hero**: your own greeting (for example "Welcome home"), show or hide the greeting, name, weather, date and clock, greeting size, left or centred text, small readings under the weather (for example the inside temperature), ready-made skies (day, night, sunrise, sunset, ocean, aurora, desert), sun or moon size, the pill's look, and what a tap on the card does.
+- **Roost Nav**: while you edit the dashboard, the bottom bar now sits in its own place with a short note, so you can find it and tap it to change it. It goes back to the bottom of the screen when you are done.
+
 ## 0.6.3 — 2026-11-16
 - **Tiles now look exactly like the original phone dashboard by default**: plain grey when off (the hint of colour when off is now a setting you can turn on), a 42 px icon box with a 22 px icon, and a 15 px name with smaller state and "for 5 min" lines.
 

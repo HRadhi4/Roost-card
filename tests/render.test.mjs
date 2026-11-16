@@ -35,6 +35,8 @@ const cases = [
   ["roost-chips", { entities: ["light.kitchen", "person.sam"], chip_shape: "square", background: "glass" }],
   ["roost-row", { entity: "climate.living", ring_size: 90, ring_width: 10 }],
   ["roost-hero", { show_orb: false, show_stars: false, show_sheen: false, min_height: 140 }],
+  ["roost-hero", { greeting: "Welcome home", show_name: false, greeting_size: 34, align: "center", sky: "aurora", orb_size: 80, pill_style: "light", info: [{ entity: "sensor.power", name: "Power", icon: "mdi:flash" }], tap_action: { action: "navigate", navigation_path: "#rooms" } }],
+  ["roost-hero", { show_greeting: false, show_weather: false, sky: "sunset" }],
   ["roost-nav", { items: [{ name: "Home", icon: "mdi:home", path: "#home" }, { name: "Rooms", icon: "mdi:view-grid", path: "#rooms" }], active_style: "filled", background: "glass" }],
   ["roost-nav", { items: [{ name: "Home", icon: "mdi:home", path: "#home" }, { name: "Rooms", icon: "mdi:view-grid", path: "#rooms" }], active_style: "soft", background: "solid" }],
   ["roost-nav", { items: [{ name: "Home", icon: "mdi:home", path: "#home" }, { name: "Rooms", icon: "mdi:view-grid", path: "#rooms" }], active_style: "pill", background: "none" }],
@@ -88,6 +90,16 @@ const gh = g.shadowRoot.innerHTML;
 if ((g.shadowRoot.querySelectorAll(".chip").length !== 2) || !/mdi:door-open/.test(gh) || !/data-g="climates"/.test(gh)) { fails++; console.error("FAIL chips grouping", g.shadowRoot.querySelectorAll(".chip").length); }
 g._open = "climates"; g.render();
 if (!/Cool · 23°/.test(g.shadowRoot.innerHTML) || g.shadowRoot.querySelectorAll("[data-m]").length !== 2) { fails++; console.error("FAIL chips AC list"); }
+// The pinned bottom bar sits in its own place while the dashboard is being edited.
+const nv = document.createElement("roost-nav"); nv.setConfig({ items: [{ name: "Home", icon: "mdi:home", path: "#home" }] });
+document.body.appendChild(nv); nv.editMode = true; nv.hass = hass(true);
+if (/position:fixed/.test(nv.shadowRoot.innerHTML) || !/shown here while editing/.test(nv.shadowRoot.innerHTML)) { fails++; console.error("FAIL nav in edit mode"); }
+nv.editMode = false;
+if (!/position:fixed/.test(nv.shadowRoot.innerHTML)) { fails++; console.error("FAIL nav pinned after editing"); }
+// Hero: own greeting, readings, presets.
+const he = document.createElement("roost-hero"); he.setConfig({ greeting: "Welcome home", show_name: false, info: [{ entity: "sensor.power", name: "Power" }], sky: "ocean" });
+document.body.appendChild(he); he.hass = hass(true);
+if (!/Welcome home</.test(he.shadowRoot.innerHTML) || !/Power <b>42W/.test(he.shadowRoot.innerHTML) || !/#0E7490/.test(he.shadowRoot.innerHTML)) { fails++; console.error("FAIL hero options"); }
 // Doors say Closed, not Off.
 const dt = document.createElement("roost-tile"); dt.setConfig({ entity: "binary_sensor.front_door" }); document.body.appendChild(dt); dt.hass = hass(true);
 if (!/Closed/.test(dt.shadowRoot.innerHTML)) { fails++; console.error("FAIL door tile word"); }
@@ -103,6 +115,17 @@ rooms.shadowRoot.querySelectorAll(".pill")[1].dispatchEvent(new window.Event("cl
 if (visible().join() !== "2") { fails++; console.error("FAIL rooms switch", visible()); }
 if (!/Bedroom/.test(rooms.shadowRoot.querySelector(".pill.on").textContent) || /Living/.test(rooms.shadowRoot.querySelectorAll(".pill")[0].textContent)) { fails++; console.error("FAIL rooms names only on the chosen room"); }
 if (!rooms.shadowRoot.querySelector("roost-tile").shadowRoot.innerHTML.includes("Kitchen") && !rooms.shadowRoot.querySelectorAll("roost-tile")[1].shadowRoot.innerHTML) { fails++; console.error("FAIL rooms cards not drawn"); }
+// Rooms from the device picker: tiles coloured by type, a count badge, a per-room colour, and an empty-room note.
+const r2 = document.createElement("roost-rooms");
+r2.setConfig({ rooms: [{ name: "Kitchen", icon: "mdi:stove", color: "teal", entities: ["light.kitchen", "light.hall", "climate.living"] }, { name: "Empty", icon: "mdi:door" }], show_count: true, remember: false });
+document.body.appendChild(r2); r2.hass = hass(true);
+await new Promise((r) => setTimeout(r, 20));
+const tiles = [...r2.shadowRoot.querySelectorAll(".room:not([hidden]) roost-tile")];
+if (tiles.length !== 3 || tiles[0]._config.color !== "amber" || tiles[2]._config.color !== "blue") { fails++; console.error("FAIL rooms auto tiles", tiles.length, tiles[0]?._config?.color); }
+if (!r2.shadowRoot.querySelector(".cnt")) { fails++; console.error("FAIL rooms count badge"); }
+if (!/#0E9F8A/.test(r2.shadowRoot.innerHTML)) { fails++; console.error("FAIL rooms per-room colour"); }
+r2.shadowRoot.querySelectorAll(".pill")[1].dispatchEvent(new window.Event("click"));
+if (!/No devices in this room yet/.test(r2.shadowRoot.innerHTML)) { fails++; console.error("FAIL rooms empty note"); }
 // The settings screen shows the real values, the own-colour pickers only when chosen, and saves only what changed.
 customElements.define("ha-form", class extends window.HTMLElement {});
 const names = (schema) => schema.flatMap((x) => (x.schema ? names(x.schema) : [x.name]));

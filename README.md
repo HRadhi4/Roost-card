@@ -131,6 +131,19 @@ show_orb: true
 show_stars: true
 show_sheen: true
 min_height: 180
+greeting: ""             # empty = Good morning / afternoon / evening
+show_greeting: true
+show_name: true
+greeting_size: 27
+align: left             # left or center
+show_weather: true
+info:                   # small readings under the weather
+  - entity: sensor.inside_temperature
+    name: Inside
+sky: auto               # auto, day, night, sunrise, sunset, ocean, aurora, desert, a colour or custom
+orb_size: 56
+pill_style: glass       # glass, light or none
+tap_action: { action: none }
 ```
 
 ### Roost Row
@@ -166,22 +179,39 @@ icon_size: 22
 ### Roost Rooms
 ```yaml
 type: custom:roost-rooms
-columns: 2               # cards per row
-show_names: active       # active (only the chosen room), all, or none (icons only)
-color: active            # the selected purple; or any colour
 rooms:
   - name: Living
     icon: mdi:sofa
-    cards:
-      - { type: custom:roost-tile, entity: light.living_room }
-      - { type: custom:roost-tile, entity: switch.tv }
-      - { type: custom:roost-thermostat, entity: climate.living_room, wide: true }
+    color: teal            # optional, this room's button colour
+    entities:              # each device becomes a tile, coloured by type
+      - light.living
+      - climate.living_ac
+      - cover.living_curtain
+    cards:                 # optional extra cards
+      - type: custom:roost-row
+        entity: climate.living_ac
+        wide: true
   - name: Bedroom
-    icon: mdi:bed
-    cards:
-      - { type: custom:roost-tile, entity: light.bedroom }
-active_style: filled  # filled, soft or line
-background: solid     # solid, glass or none
+    icon: mdi:bed-king
+    entities: [light.bedroom]
+show_names: active         # active, all or none
+pill_shape: pill           # pill, rounded or square
+pill_height: 44
+pill_icon_size: 22
+pill_align: spread         # spread, start or center
+show_count: false          # badge: how many things are on
+active_style: filled       # filled, soft or line
+background: solid          # solid, glass or none
+columns: 2
+gap: 12
+tile_size: large
+tile_fill: gradient
+tile_glow: soft
+tile_radius: 22
+auto_colors: true
+swipe: true
+remember: true
+start_room: ""
 ```
 
 ## Keep your Home Assistant up to date automatically
