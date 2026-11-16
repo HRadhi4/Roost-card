@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.2.0";
+const ROOST_VERSION = "1.2.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1265,7 +1265,7 @@ class RoostRow extends RoostBase {
       return { value: v, text: v != null ? `${Math.round(v)}°` : null, line: `AC ${mode}${s.state !== "off" && a.current_temperature != null ? ` · room ${a.current_temperature}°` : ""}`, min: a.min_temp, max: a.max_temp };
     }
     const n = parseFloat(s.state);
-    if (Number.isFinite(n)) return { value: n, text: `${Math.round(n * 10) / 10}${a.unit_of_measurement && a.unit_of_measurement.length <= 2 ? a.unit_of_measurement : ""}`, line: a.unit_of_measurement && a.unit_of_measurement.length > 2 ? `${n} ${a.unit_of_measurement}` : "" };
+    if (Number.isFinite(n)) return { value: n, text: `${Math.round(n * 10) / 10}${a.unit_of_measurement && /^(°|°C|°F|%)$/.test(a.unit_of_measurement) ? a.unit_of_measurement : ""}`, line: a.unit_of_measurement && a.unit_of_measurement.length > 2 ? `${n} ${a.unit_of_measurement}` : "" };
     return { value: null, text: null, line: s.state.charAt(0).toUpperCase() + s.state.slice(1) };
   }
 
@@ -1775,6 +1775,10 @@ function ago(iso) {
 
 const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
 const fmt = (v, dec) => (v == null ? "" : Number(v).toFixed(dec == null ? (Math.abs(v) >= 100 ? 0 : 1) : dec));
+// as many decimals as the sensor itself gives (52 stays 52, 26.4 stays 26.4), at most two
+const decOf = (state) => Math.min(2, (String(state).split(".")[1] || "").length);
+// "26°" and "52%" sit next to the number; "1460 W" and "612 ppm" get a space
+const unitGap = (u) => (!u ? "" : /^(°|°C|°F|%)$/.test(u) ? u : ` ${u}`);
 const panelCss = (p, radius = 22) => `background:${p.panel};border:1px solid ${p.border};border-radius:${radius}px;color:${p.text}`;
 // a ring: the track and the coloured part, in a 0..1 fraction
 function ringSvg({ size = 210, r = 80, width = 14, f = 0, track, id = "g", from, to, inner, innerFill }) {
@@ -1836,9 +1840,9 @@ class RoostGauge extends RoostBase {
     const f = ok ? Math.max(0, Math.min(1, (v - c.min) / ((c.max - c.min) || 1))) : 0;
     const g = hot ? ["#FF9F6B", "#F43F6B"] : this.colour();
     const unit = c.unit != null && c.unit !== "" ? c.unit : s?.attributes.unit_of_measurement || "";
-    const u2 = unit.length <= 2 ? unit : ` ${unit}`;
+    const u2 = unitGap(unit);
     const sub = c.second ? this.st(c.second) : null, sv = sub ? num(sub.state) : null;
-    const line = !s ? "Device not found" : !ok ? "Offline" : hot ? (c.warn_below != null && v <= c.warn_below ? "Too low" : "Too high") : sub ? `${c.second_name || sub.attributes.friendly_name || "Also"} ${sv != null ? fmt(sv, 0) : sub.state}${sub.attributes.unit_of_measurement ? (sub.attributes.unit_of_measurement.length <= 2 ? "" : " ") + sub.attributes.unit_of_measurement : ""}` : "";
+    const line = !s ? "Device not found" : !ok ? "Offline" : hot ? (c.warn_below != null && v <= c.warn_below ? "Too low" : "Too high") : sub ? `${c.second_name || sub.attributes.friendly_name || "Also"} ${sv != null ? fmt(sv, decOf(sub.state)) : sub.state}${sv != null ? unitGap(sub.attributes.unit_of_measurement || "") : ""}` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${c.frame ? panelCss(p, c.radius) : `color:${p.text}`};padding:${c.frame ? "16px 14px" : 0};display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
       .ring{position:relative;width:100%;max-width:${c.size}px;container-type:inline-size}
@@ -1852,7 +1856,7 @@ class RoostGauge extends RoostBase {
     </style>
     <div class="card" role="button" tabindex="0">
       <div class="ring">${ringSvg({ f, track: p.track, from: g[0], to: g[1], id: "gg", inner: 58, innerFill: p.dial })}
-        <div class="in">${c.title ? `<span class="ti t">${esc(c.title)}</span>` : ""}<span class="v num" ${ok ? 'data-tw="v"' : ""}>${ok ? esc(fmt(v, c.decimals) + u2) : '<ha-icon icon="mdi:help-circle-outline"></ha-icon>'}</span>${line ? `<span class="ln t">${esc(line)}</span>` : ""}</div></div>
+        <div class="in">${c.title ? `<span class="ti t">${esc(c.title)}</span>` : ""}<span class="v num" ${ok ? 'data-tw="v"' : ""}>${ok ? esc(fmt(v, c.decimals ?? decOf(s.state)) + u2) : '<ha-icon icon="mdi:help-circle-outline"></ha-icon>'}</span>${line ? `<span class="ln t">${esc(line)}</span>` : ""}</div></div>
       ${c.show_name ? `<div class="nm t">${esc(this.name(c.entity))}</div>` : ""}
     </div>`;
     // the arc grows to its new value instead of jumping
@@ -2478,6 +2482,9 @@ class RoostAlarm extends RoostBase {
 
 // ------------------------------------------------------------------ Roost Light
 // One light with its brightness you drag, warm-to-cool presets and colour dots.
+// Warm whites and ambers keep the card's own amber gradient; a picked colour gets its own.
+const warmTone = ([r, g, b]) => r > 200 && g > 120 && b < 200 && r - b > 60;
+
 class RoostLight extends RoostBase {
   static get defaults() { return { color: "amber", show_presets: true, show_colors: true, radius: 22, theme: "auto" }; }
 
@@ -2524,8 +2531,8 @@ class RoostLight extends RoostBase {
       .l{font-size:12.5px;color:${p.muted};margin-top:2px}
       .pc{font-size:28px;font-weight:700;color:${on ? p.text : p.muted}}
       .bar{position:relative;height:52px;border-radius:18px;background:${p.inset};overflow:hidden;cursor:pointer;touch-action:none}
-      .bar .f{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,${g[0]},${tint});border-radius:18px}
-      .bar ha-icon{position:absolute;left:14px;top:14px;--mdc-icon-size:24px;color:${on ? g[3] : p.muted}}
+      .bar .f{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,${on && a.rgb_color && !warmTone(a.rgb_color) ? `color-mix(in srgb, ${tint} 70%, #fff)` : g[0]},${tint});border-radius:18px}
+      .bar ha-icon{position:absolute;left:14px;top:14px;--mdc-icon-size:24px;color:${on ? (a.rgb_color && !warmTone(a.rgb_color) ? "#fff" : g[3]) : p.muted}}
       .chips{display:flex;flex-wrap:wrap;gap:8px}
       .chips button{height:36px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
       .chips button i{display:block;width:14px;height:14px;border-radius:50%}
@@ -2566,6 +2573,46 @@ class RoostLight extends RoostBase {
 
 // ------------------------------------------------------------------ Roost Graph
 // A smooth line of one reading over the last hours, with now, lowest and highest.
+// A calm line for sensor history: readings are grouped into small time slots and
+// gently evened out, so tiny ups and downs read as one smooth curve. A real jump
+// (bigger than about a tenth of the chart) is kept sharp and is never smoothed away.
+function smoothLine(xy, W, h) {
+  if (xy.length < 3) return xy;
+  const slot = W / 60, out = [];
+  for (const [x, y] of xy) {
+    const last = out[out.length - 1];
+    if (last && x - last.x0 < slot) { last.sy += y; last.n++; last.x = x; } else out.push({ x0: x, x, sy: y, n: 1 });
+  }
+  let pts = out.map((b) => [b.x, b.sy / b.n]);
+  if (pts.length > 1) pts[pts.length - 1] = xy[xy.length - 1];
+  const jump = h * 0.1;
+  for (let pass = 0; pass < 3; pass++) {
+    pts = pts.map((pt, i) => {
+      if (i === 0 || i === pts.length - 1) return pt;
+      const a = pts[i - 1][1], b = pts[i + 1][1];
+      if (Math.abs(pt[1] - a) > jump || Math.abs(pt[1] - b) > jump) return pt;
+      return [pt[0], (a + 2 * pt[1] + b) / 4];
+    });
+  }
+  return pts;
+}
+
+// Smooth path through points that never overshoots (no fake bumps above or below the readings).
+function curvePath(pts) {
+  const n = pts.length;
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  if (n < 3) return d + pts.slice(1).map(([x, y]) => ` L${x.toFixed(1)},${y.toFixed(1)}`).join("");
+  const dx = [], m = [], t = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = (pts[i + 1][0] - pts[i][0]) || 1e-6; m[i] = (pts[i + 1][1] - pts[i][1]) / dx[i]; }
+  t[0] = m[0]; t[n - 1] = m[n - 2];
+  for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (3 * (dx[i - 1] + dx[i])) / ((2 * dx[i] + dx[i - 1]) / m[i - 1] + (dx[i] + 2 * dx[i - 1]) / m[i]);
+  for (let i = 0; i < n - 1; i++) {
+    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], h3 = dx[i] / 3;
+    d += ` C${(x0 + h3).toFixed(1)},${(y0 + t[i] * h3).toFixed(1)} ${(x1 - h3).toFixed(1)},${(y1 - t[i + 1] * h3).toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`;
+  }
+  return d;
+}
+
 class RoostGraph extends RoostBase {
   static get defaults() { return { hours: 24, color: "blue", height: 90, show_stats: true, fill: true, radius: 22, theme: "auto" }; }
 
@@ -2620,18 +2667,15 @@ class RoostGraph extends RoostBase {
     const vals = pts.map((x) => x[1]);
     const lo = vals.length ? Math.min(...vals) : null, hi = vals.length ? Math.max(...vals) : null;
     const unit = c.unit != null && c.unit !== "" ? c.unit : s?.attributes.unit_of_measurement || "";
-    const u2 = unit.length <= 2 ? unit : ` ${unit}`;
+    const u2 = unitGap(unit);
     const W = 300, H = c.height, t0 = Date.now() - c.hours * 3600e3;
     let path = "", area = "";
     if (pts.length > 1) {
       const span = (hi - lo) || 1;
       const xy = pts.map(([t, v]) => [Math.max(0, (t - t0) / (c.hours * 3600e3)) * W, H - 6 - ((v - lo) / span) * (H - 16)]);
-      path = `M${xy[0][0].toFixed(1)},${xy[0][1].toFixed(1)}`;
-      for (let i = 1; i < xy.length; i++) {
-        const [x0, y0] = xy[i - 1], [x1, y1] = xy[i], mx = (x0 + x1) / 2;
-        path += ` C${mx.toFixed(1)},${y0.toFixed(1)} ${mx.toFixed(1)},${y1.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`;
-      }
-      area = `${path} L${W},${H} L${xy[0][0].toFixed(1)},${H} Z`;
+      const sm = smoothLine(xy, W, H - 16);
+      path = curvePath(sm);
+      area = `${path} L${sm[sm.length - 1][0].toFixed(1)},${H} L${sm[0][0].toFixed(1)},${H} Z`;
     }
     const st = (w, v) => `<div class="s"><span>${w}</span><b class="num">${v == null ? "" : esc(fmt(v, c.decimals) + u2)}</b></div>`;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
@@ -2647,7 +2691,7 @@ class RoostGraph extends RoostBase {
       .wait{height:${H}px;display:flex;align-items:center;justify-content:center;color:${p.muted};font-size:13px}
     </style>
     <div class="card" role="button" tabindex="0">
-      <div class="top"><span class="n t">${esc(this.name(c.entity))}</span><span class="v num" ${now != null ? 'data-tw="now"' : ""}>${now != null ? esc(fmt(now, c.decimals) + u2) : s ? esc(s.state) : "Not found"}</span></div>
+      <div class="top"><span class="n t">${esc(this.name(c.entity))}</span><span class="v num" ${now != null ? 'data-tw="now"' : ""}>${now != null ? esc(fmt(now, c.decimals ?? decOf(s.state)) + u2) : s ? esc(s.state) : "Not found"}</span></div>
       ${path ? `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs>
           <linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/></linearGradient>
           <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g[1]}" stop-opacity=".35"/><stop offset="1" stop-color="${g[1]}" stop-opacity="0"/></linearGradient></defs>
@@ -2699,7 +2743,8 @@ class RoostPeople extends ticking(RoostBase, 60000) {
       .ring.away .av{filter:grayscale(.7);opacity:.75}
       .b{position:absolute;right:0;bottom:0;width:${Math.round(c.size * 0.3)}px;height:${Math.round(c.size * 0.3)}px;border-radius:50%;border:3px solid ${this.dark ? "#141831" : "#fff"};display:flex;align-items:center;justify-content:center;font-size:0}
       .home .b{background:#10B981}
-      .home .b::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid #10B981;animation:roost-ping 2.4s ease-out infinite}
+      .ring.home::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid #10B981;animation:roost-halo2 2.6s ease-out infinite;pointer-events:none}
+      @keyframes roost-halo2{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.22);opacity:0}}
       .away .b{background:${p.knob}}
       .n{font-size:14px;font-weight:600;color:${p.text}}
       .l{font-size:12px;color:${p.muted}}
@@ -3068,19 +3113,20 @@ class RoostWeather extends RoostBase {
     const r = (i, m) => ((i * 37 + 13) % m);
     if (/rain|pour/.test(cond)) for (let i = 0; i < 16; i++) fx += `<i class="drop" style="left:${r(i * 3, 100)}%;animation-duration:${(0.6 + (i % 4) * 0.12).toFixed(2)}s;animation-delay:-${((i % 7) * 0.13).toFixed(2)}s"></i>`;
     if (/snow/.test(cond)) for (let i = 0; i < 14; i++) fx += `<i class="flake" style="left:${r(i * 5, 100)}%;animation-duration:${(3 + (i % 5) * 0.6).toFixed(1)}s;animation-delay:-${((i % 9) * 0.5).toFixed(1)}s"></i>`;
-    if (/cloud|rain|pour|lightning|snow/.test(cond)) for (let i = 0; i < 3; i++) fx += `<i class="cloud" style="top:${10 + i * 16}%;animation-duration:${20 + i * 8}s;animation-delay:-${i * 7}s"></i>`;
+    if (/cloud|rain|pour|lightning|snow/.test(cond)) { let cl = ""; for (let i = 0; i < 3; i++) cl += `<i class="cloud" style="top:${14 + i * 22}%;animation-duration:${20 + i * 8}s;animation-delay:-${i * 7}s"></i>`; fx += `<i class="sky">${cl}</i>`; }
     if (/lightning/.test(cond)) fx += '<i class="flash"></i>';
     if (!day && !grey) for (let i = 0; i < 8; i++) fx += `<i class="star" style="left:${r(i * 7, 95)}%;top:${r(i * 11, 70)}%;animation-delay:${(i * 0.4).toFixed(1)}s"></i>`;
     const orb = !grey ? `<span class="orb ${day ? "sun" : "moon"}"></span>` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      @keyframes roost-drift{from{transform:translateX(-60px)}to{transform:translateX(420px)}}
+      @keyframes roost-wdrift{from{transform:translateX(-90px)}to{transform:translateX(260px)}}
       @keyframes roost-rain{from{transform:translateY(-20px)}to{transform:translateY(190px)}}
       @keyframes roost-snow{from{transform:translate(0,-10px)}to{transform:translate(14px,190px)}}
       @keyframes roost-flash{0%,92%,100%{opacity:0}94%,97%{opacity:.6}}
       .card{${panelCss(p, c.radius)};overflow:hidden}
       .now{position:relative;overflow:hidden;padding:18px;min-height:150px;background:${sky};color:#fff}
       .now > i{position:absolute;display:block}
-      .cloud{left:0;width:80px;height:24px;border-radius:999px;background:rgba(255,255,255,.75);animation:roost-drift linear infinite}
+      .sky{top:0;bottom:0;left:46%;right:0;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 30%);mask-image:linear-gradient(90deg,transparent,#000 30%)}
+      .cloud{position:absolute;left:0;width:80px;height:24px;border-radius:999px;background:rgba(255,255,255,.75);animation:roost-wdrift linear infinite}
       .cloud::before{content:"";position:absolute;left:16px;top:-14px;width:34px;height:34px;border-radius:50%;background:inherit}
       .drop{top:0;width:2px;height:12px;border-radius:2px;background:rgba(220,235,255,.85);animation:roost-rain linear infinite}
       .flake{top:0;width:5px;height:5px;border-radius:50%;background:#fff;animation:roost-snow linear infinite}
@@ -3403,13 +3449,16 @@ class RoostLock extends RoostBase {
       @container (max-width: 250px){:host .long{display:none}:host .short{display:inline}}
       .knob{position:absolute;left:5px;top:5px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};display:flex;align-items:center;justify-content:center;cursor:grab;box-shadow:0 6px 16px -6px ${g[2]}}
       .knob ha-icon{--mdc-icon-size:24px}
+      .wait{position:relative;height:58px;border-radius:999px;background:${p.inset};border:1px solid ${p.border};overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:${p.muted}}
+      .wait::before{content:"";position:absolute;top:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,${ACTIVE[2]},transparent);opacity:.5;animation:roost-sweep 1.2s linear infinite}
+      @keyframes roost-sweep{from{left:-40%}to{left:100%}}
       .lockb{height:52px;border-radius:999px;border:0;background:linear-gradient(135deg,${COLORS.green[0]},${COLORS.green[1]});color:${COLORS.green[3]};font:inherit;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
     </style>
     <div class="card">
       <div class="top"><span class="ic" data-pop="${esc(st)}" data-popkey="ic"><ha-icon icon="${cover ? (shut ? "mdi:garage-variant-lock" : "mdi:garage-open-variant") : shut ? "mdi:lock" : jam ? "mdi:lock-alert" : "mdi:lock-open-variant"}"></ha-icon></span>
         <span><div class="n t">${esc(this.name(c.entity, "Lock"))}</div><div class="w t">${esc(word)}</div>${ds ? `<div class="d t">Door ${ds.state === "on" ? "open" : "closed"}</div>` : ""}</span></div>
       ${s && !busy ? (shut ? `<div class="track"><span class="hint"><span class="long">Slide to ${cover ? "open" : "unlock"} ›››</span><span class="short">›››</span></span><span class="knob"><ha-icon icon="mdi:chevron-double-right"></ha-icon></span></div>`
-        : `<button class="lockb"><ha-icon icon="${cover ? "mdi:arrow-down" : "mdi:lock"}"></ha-icon>${cover ? "Close" : "Lock"}</button>`) : ""}
+        : `<button class="lockb"><ha-icon icon="${cover ? "mdi:arrow-down" : "mdi:lock"}"></ha-icon>${cover ? "Close" : "Lock"}</button>`) : busy ? `<div class="wait" role="status">${word}</div>` : ""}
     </div>`;
     const r = this.shadowRoot;
     r.querySelector(".lockb")?.addEventListener("click", () => { this.vibrate(); this.call(cover ? "cover" : "lock", cover ? "close_cover" : "lock", { entity_id: c.entity }); });
@@ -3719,7 +3768,7 @@ class RoostSensors extends RoostBase {
       const unit = s?.attributes.unit_of_measurement || "";
       return `<div class="sq ${warn ? "warn" : ""}" data-e="${esc(it.entity)}" role="button" tabindex="0">
         <ha-icon icon="${esc(it.icon || s?.attributes.icon || icons[dc] || "mdi:information-outline")}" style="color:${g[this.dark ? 1 : 0]}"></ha-icon>
-        <span class="v num">${!s ? "?" : v != null ? `<span data-tw="${esc(it.entity)}">${esc(fmt(v))}</span><small>${unit.length > 2 ? " " : ""}${esc(unit)}</small>` : esc(UNAVAILABLE.includes(s.state) ? "Offline" : s.state)}</span>
+        <span class="v num">${!s ? "?" : v != null ? `<span data-tw="${esc(it.entity)}">${esc(fmt(v, it.decimals ?? decOf(s.state)))}</span><small>${esc(unitGap(unit))}</small>` : esc(UNAVAILABLE.includes(s.state) ? "Offline" : s.state)}</span>
         <span class="n t">${esc(it.name || s?.attributes.friendly_name || it.entity)}</span></div>`;
     }).join("")}</div>`;
     this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));

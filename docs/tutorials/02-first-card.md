@@ -10,6 +10,8 @@
 6. Open **Colour and shape** and pick a colour, for example **Amber**. The preview on the right changes as you go.
 7. Tap **Save**, then **Done** at the top.
 
+![A Roost Tile turning on and off](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile.gif)
+
 Tap the tile: the light switches. Hold it: its details open.
 
 ![A Roost tile and other cards, dark and light](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/control.png)

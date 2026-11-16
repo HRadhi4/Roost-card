@@ -57,42 +57,42 @@ Short, written, with pictures:
 
 ## All 34 cards
 
-| Card | What it is |
-|---|---|
-| **Roost Tile** | A big tile with a switch. Shows the state, the power used and how long it has been on. Glows or spins when on. |
-| **Roost Chips** | Status chips in one row: doors, alarm, air conditioner, TV. Lights become one bulb with a count, people become little bubbles (colour = home, grey = away). Tap the bulb or the bubbles for the list. |
-| **Roost Thermostat** | An air conditioner card with a **dial you drag with your finger**, a power button, − and +, and mode buttons. |
-| **Roost Scene** | A coloured card or round button that runs a scene or script. A tick shows when it is done. |
-| **Roost Hero** | A greeting with a sky that follows the sun (stars at night), the time, date, weather and a "what's next" countdown. |
-| **Roost Row** | A long row with a ring (an AC's temperature or any number), a name, a state line and an arrow. |
-| **Roost Nav** | Icon navigation: a bar at the bottom on phones, a rail at the side on tablets. |
-| **Roost Curtain** | A window with curtains that really slide open and closed, a sky behind them, and Open / Stop / Close buttons. |
-| **Roost Gauge** | A big ring for one reading (a cabinet's temperature, a plug's power). Turns orange and glows when too high, with a second reading under it. |
-| **Roost Graph** | A smooth line of a reading over the last hours, with the lowest and highest. |
-| **Roost Room** | One room at a glance: temperature bar, humidity and what is on, open or running. Tap to open the room. |
-| **Roost Light** | A light with brightness you drag, warm / neutral / cool buttons and colour dots. |
-| **Roost Media** | TV and sound: power, what is playing (with moving sound bars), volume you drag, mute, play/pause and inputs. |
-| **Roost Alarm** | The alarm in a big shield: arm and disarm with a question first, a keypad when it needs a code, and the doors. |
-| **Roost People** | Who is home: a picture or initials with a green ring when home, and for how long. |
-| **Roost Automations** | A list of automations with a switch, when each last ran, and an optional "run now" button. |
-| **Roost Clock** | A big clock and date with a line of the day's times (such as prayer times) and a countdown to the next one. |
-| **Roost Alerts** | Only shows when something needs you: a low battery, a device gone offline, a door left open, or your own rules. |
-| **Roost Title** | A section heading with an optional line under it, a badge and a "See all" link. |
-| **Roost Light/Dark** | A sun / moon button that switches this screen between light and dark. |
-| **Roost Remote** | A remote-control pad (power, arrows, OK, volume, channels, numbers) for an Athom Hub remote, any remote, or a TV. Keys it cannot send are greyed out. |
-| **Roost Presence Map** | The room from above as a presence radar sees it (for example the LD2450 in an Athom sensor): people as glowing moving dots, and its zones with how many are inside. |
-| **Roost Weather** | The weather now on an animated sky (rain falls, clouds drift, storms flash, stars at night), and the next days or hours. |
-| **Roost Energy** | Power used now, today against yesterday, and the hungriest devices as bars. |
-| **Roost Timer** | A countdown ring for a timer (kettle, washing) with start, pause, cancel and quick times. |
-| **Roost Fan** | A fan that spins as fast as it is set, with speed buttons, swing and its modes. |
-| **Roost Lock** | A lock or garage door: slide to unlock, tap to lock; says when it is jammed. |
-| **Roost Agenda** | Today's and the next days' calendar events. Bin day (or any word you choose) stands out. |
-| **Roost To-do** | A to-do or shopping list: tick off, add and clear. |
-| **Roost Camera** | A camera picture or live video, with a banner when someone rings the doorbell. |
-| **Roost Sensors** | Many small readings in neat squares, orange when out of the range you set. |
-| **Roost Buttons** | Several small actions in one rounded bar; a button lights up when its device is on. |
-| **Roost Full Screen** | Hides Home Assistant's top bar and sidebar so your dashboard feels like an app: by itself (invisible), as a button that maximizes and minimizes, or as the tap action of any card. Comes back while editing. |
-| **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. |
+| Card | What it is | See it |
+|---|---|:-:|
+| **Roost Tile** | A big tile with a switch. Shows the state, the power used and how long it has been on. Glows or spins when on. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile.gif" width="180" alt="Roost Tile"> |
+| **Roost Chips** | Status chips in one row: doors, alarm, air conditioner, TV. Lights become one bulb with a count, people become little bubbles (colour = home, grey = away). Tap the bulb or the bubbles for the list. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/chips.gif" width="180" alt="Roost Chips"> |
+| **Roost Thermostat** | An air conditioner card with a **dial you drag with your finger**, a power button, − and +, and mode buttons. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/thermostat.gif" width="180" alt="Roost Thermostat"> |
+| **Roost Scene** | A coloured card or round button that runs a scene or script. A tick shows when it is done. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/scene.gif" width="180" alt="Roost Scene"> |
+| **Roost Hero** | A greeting with a sky that follows the sun (stars at night), the time, date, weather and a "what's next" countdown. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/hero.gif" width="180" alt="Roost Hero"> |
+| **Roost Row** | A long row with a ring (an AC's temperature or any number), a name, a state line and an arrow. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/row.gif" width="180" alt="Roost Row"> |
+| **Roost Nav** | Icon navigation: a bar at the bottom on phones, a rail at the side on tablets. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/nav.gif" width="180" alt="Roost Nav"> |
+| **Roost Curtain** | A window with curtains that really slide open and closed, a sky behind them, and Open / Stop / Close buttons. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/curtain.gif" width="180" alt="Roost Curtain"> |
+| **Roost Gauge** | A big ring for one reading (a cabinet's temperature, a plug's power). Turns orange and glows when too high, with a second reading under it. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/gauge.gif" width="180" alt="Roost Gauge"> |
+| **Roost Graph** | A smooth line of a reading over the last hours, with the lowest and highest. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/graph.gif" width="180" alt="Roost Graph"> |
+| **Roost Room** | One room at a glance: temperature bar, humidity and what is on, open or running. Tap to open the room. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/room.gif" width="180" alt="Roost Room"> |
+| **Roost Light** | A light with brightness you drag, warm / neutral / cool buttons and colour dots. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/light.gif" width="180" alt="Roost Light"> |
+| **Roost Media** | TV and sound: power, what is playing (with moving sound bars), volume you drag, mute, play/pause and inputs. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/media.gif" width="180" alt="Roost Media"> |
+| **Roost Alarm** | The alarm in a big shield: arm and disarm with a question first, a keypad when it needs a code, and the doors. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alarm.gif" width="180" alt="Roost Alarm"> |
+| **Roost People** | Who is home: a picture or initials with a green ring when home, and for how long. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/people.gif" width="180" alt="Roost People"> |
+| **Roost Automations** | A list of automations with a switch, when each last ran, and an optional "run now" button. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/automations.gif" width="180" alt="Roost Automations"> |
+| **Roost Clock** | A big clock and date with a line of the day's times (such as prayer times) and a countdown to the next one. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/clock.gif" width="180" alt="Roost Clock"> |
+| **Roost Alerts** | Only shows when something needs you: a low battery, a device gone offline, a door left open, or your own rules. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alerts.gif" width="180" alt="Roost Alerts"> |
+| **Roost Title** | A section heading with an optional line under it, a badge and a "See all" link. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/title.gif" width="180" alt="Roost Title"> |
+| **Roost Light/Dark** | A sun / moon button that switches this screen between light and dark. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/theme.gif" width="180" alt="Roost Light/Dark"> |
+| **Roost Remote** | A remote-control pad (power, arrows, OK, volume, channels, numbers) for an Athom Hub remote, any remote, or a TV. Keys it cannot send are greyed out. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/remote.gif" width="180" alt="Roost Remote"> |
+| **Roost Presence Map** | The room from above as a presence radar sees it (for example the LD2450 in an Athom sensor): people as glowing moving dots, and its zones with how many are inside. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/presence.gif" width="180" alt="Roost Presence Map"> |
+| **Roost Weather** | The weather now on an animated sky (rain falls, clouds drift, storms flash, stars at night), and the next days or hours. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/weather.gif" width="180" alt="Roost Weather"> |
+| **Roost Energy** | Power used now, today against yesterday, and the hungriest devices as bars. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/energy.gif" width="180" alt="Roost Energy"> |
+| **Roost Timer** | A countdown ring for a timer (kettle, washing) with start, pause, cancel and quick times. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/timer.gif" width="180" alt="Roost Timer"> |
+| **Roost Fan** | A fan that spins as fast as it is set, with speed buttons, swing and its modes. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fan.gif" width="180" alt="Roost Fan"> |
+| **Roost Lock** | A lock or garage door: slide to unlock, tap to lock; says when it is jammed. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/lock.gif" width="180" alt="Roost Lock"> |
+| **Roost Agenda** | Today's and the next days' calendar events. Bin day (or any word you choose) stands out. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/agenda.gif" width="180" alt="Roost Agenda"> |
+| **Roost To-do** | A to-do or shopping list: tick off, add and clear. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/todo.gif" width="180" alt="Roost To-do"> |
+| **Roost Camera** | A camera picture or live video, with a banner when someone rings the doorbell. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/camera.gif" width="180" alt="Roost Camera"> |
+| **Roost Sensors** | Many small readings in neat squares, orange when out of the range you set. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/sensors.gif" width="180" alt="Roost Sensors"> |
+| **Roost Buttons** | Several small actions in one rounded bar; a button lights up when its device is on. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/buttons.gif" width="180" alt="Roost Buttons"> |
+| **Roost Full Screen** | Hides Home Assistant's top bar and sidebar so your dashboard feels like an app: by itself (invisible), as a button that maximizes and minimizes, or as the tap action of any card. Comes back while editing. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fullscreen.gif" width="180" alt="Roost Full Screen"> |
+| **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="180" alt="Roost Rooms"> |
 
 
 Every setting of every card, with YAML to copy: **[docs/cards.md](docs/cards.md)**.

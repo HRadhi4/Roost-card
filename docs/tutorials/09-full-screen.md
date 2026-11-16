@@ -2,6 +2,8 @@
 
 **Roost Full Screen** hides Home Assistant's top bar and sidebar, so a dashboard looks and feels like an app. Use it one of three ways.
 
+![The full-screen button switching on and off](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fullscreen.gif)
+
 ## 1 · Invisible: the dashboard opens full screen by itself
 
 1. Edit the dashboard → **Add card** → **Roost Full Screen**.

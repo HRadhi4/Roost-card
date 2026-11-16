@@ -13,6 +13,8 @@ Every card has these colour and look settings:
 - **Icon box** (tiles): rounded square, circle, square, or no box. Icon size and name size are sliders.
 
 ### Roost Tile
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile.gif" width="320" alt="Roost tile card in action">
+
 ```yaml
 type: custom:roost-tile
 entity: light.kitchen
@@ -41,6 +43,8 @@ hold_action: { action: more-info }
 ```
 
 ### Roost Chips
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/chips.gif" width="320" alt="Roost chips card in action">
+
 ```yaml
 type: custom:roost-chips
 entities:
@@ -58,6 +62,8 @@ background: solid     # solid, glass or none
 ```
 
 ### Roost Thermostat
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/thermostat.gif" width="320" alt="Roost thermostat card in action">
+
 ```yaml
 type: custom:roost-thermostat
 entity: climate.living_room
@@ -71,6 +77,8 @@ max_width: 260           # dial size in px
 Drag the knob or tap anywhere on the ring. The number follows your finger, and the temperature is sent when you let go.
 
 ### Roost Scene
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/scene.gif" width="320" alt="Roost scene card in action">
+
 ```yaml
 type: custom:roost-scene
 entity: scene.movie_night
@@ -84,6 +92,8 @@ show_name: true
 ```
 
 ### Roost Hero
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/hero.gif" width="320" alt="Roost hero card in action">
+
 ```yaml
 type: custom:roost-hero
 weather: weather.home
@@ -115,6 +125,8 @@ tap_action: { action: none }
 ```
 
 ### Roost Row
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/row.gif" width="320" alt="Roost row card in action">
+
 ```yaml
 type: custom:roost-row
 entity: climate.living_room
@@ -128,6 +140,8 @@ ring_width: 6
 ```
 
 ### Roost Nav
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/nav.gif" width="320" alt="Roost nav card in action">
+
 ```yaml
 type: custom:roost-nav
 layout: auto             # auto (bar on phones, rail on tablets), bar or rail
@@ -145,6 +159,8 @@ icon_size: 22
 ```
 
 ### Roost Rooms
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="320" alt="Roost rooms card in action">
+
 ```yaml
 type: custom:roost-rooms
 rooms:
@@ -183,6 +199,8 @@ start_room: ""
 ```
 
 ### Roost Curtain
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/curtain.gif" width="320" alt="Roost curtain card in action">
+
 ```yaml
 type: custom:roost-curtain
 entity: cover.living_room
@@ -209,6 +227,8 @@ stop_action:            # optional: what Stop does as well as stopping the curta
 ```
 
 ### Roost Gauge
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/gauge.gif" width="320" alt="Roost gauge card in action">
+
 ```yaml
 type: custom:roost-gauge
 entity: sensor.cabinet_temperature
@@ -221,6 +241,8 @@ second_name: Humidity
 ```
 
 ### Roost Graph
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/graph.gif" width="320" alt="Roost graph card in action">
+
 ```yaml
 type: custom:roost-graph
 entity: sensor.plug_power
@@ -230,6 +252,8 @@ height: 90
 ```
 
 ### Roost Room
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/room.gif" width="320" alt="Roost room card in action">
+
 ```yaml
 type: custom:roost-room
 name: Living room
@@ -241,6 +265,8 @@ tap_action: { action: navigate, navigation_path: "#living" }
 ```
 
 ### Roost Light
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/light.gif" width="320" alt="Roost light card in action">
+
 ```yaml
 type: custom:roost-light
 entity: light.desk_lamp
@@ -249,6 +275,8 @@ show_colors: true
 ```
 
 ### Roost Media
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/media.gif" width="320" alt="Roost media card in action">
+
 ```yaml
 type: custom:roost-media
 entity: media_player.living_room_tv
@@ -258,6 +286,8 @@ max_sources: 6
 ```
 
 ### Roost Alarm
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alarm.gif" width="320" alt="Roost alarm card in action">
+
 ```yaml
 type: custom:roost-alarm
 entity: alarm_control_panel.alarmo
@@ -267,6 +297,8 @@ confirm: true
 ```
 
 ### Roost People
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/people.gif" width="320" alt="Roost people card in action">
+
 ```yaml
 type: custom:roost-people
 entities: [person.saeed, person.layla]
@@ -274,6 +306,8 @@ layout: row              # row or list
 ```
 
 ### Roost Automations
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/automations.gif" width="320" alt="Roost automations card in action">
+
 ```yaml
 type: custom:roost-automations
 title: Automations
@@ -283,6 +317,8 @@ show_run: true
 ```
 
 ### Roost Clock
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/clock.gif" width="320" alt="Roost clock card in action">
+
 ```yaml
 type: custom:roost-clock
 countdown_title: Next prayer
@@ -294,6 +330,8 @@ hour24: false
 ```
 
 ### Roost Alerts
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alerts.gif" width="320" alt="Roost alerts card in action">
+
 ```yaml
 type: custom:roost-alerts
 batteries: true
@@ -306,6 +344,8 @@ rules:
 ```
 
 ### Roost Title and Roost Light/Dark
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/title.gif" width="240" alt="Roost title card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/theme.gif" width="240" alt="Roost theme card in action">
+
 ```yaml
 type: custom:roost-title
 title: Devices
@@ -317,6 +357,8 @@ show_label: true
 ```
 
 ### Roost Remote
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/remote.gif" width="320" alt="Roost remote card in action">
+
 ```yaml
 type: custom:roost-remote
 athom_remote: Living room TV    # an Athom Hub remote's name
@@ -326,6 +368,8 @@ show_numbers: false
 ```
 
 ### Roost Presence Map
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/presence.gif" width="320" alt="Roost presence card in action">
+
 ```yaml
 type: custom:roost-presence
 device: 0123456789abcdef        # the presence sensor (pick it in the editor)
@@ -333,6 +377,8 @@ range: 6                        # metres
 ```
 
 ### Roost Weather, Energy and Timer
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/weather.gif" width="240" alt="Roost weather card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/energy.gif" width="240" alt="Roost energy card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/timer.gif" width="240" alt="Roost timer card in action">
+
 ```yaml
 type: custom:roost-weather
 entity: weather.home
@@ -348,6 +394,8 @@ presets: [1, 3, 5, 10]
 ```
 
 ### Roost Fan, Lock, Agenda and To-do
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fan.gif" width="240" alt="Roost fan card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/lock.gif" width="240" alt="Roost lock card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/agenda.gif" width="240" alt="Roost agenda card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/todo.gif" width="240" alt="Roost todo card in action">
+
 ```yaml
 type: custom:roost-fan
 entity: fan.bedroom
@@ -366,6 +414,8 @@ entity: todo.shopping_list
 ```
 
 ### Roost Camera, Sensors and Buttons
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/camera.gif" width="240" alt="Roost camera card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/sensors.gif" width="240" alt="Roost sensors card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/buttons.gif" width="240" alt="Roost buttons card in action">
+
 ```yaml
 type: custom:roost-camera
 entity: camera.doorbell
@@ -387,6 +437,8 @@ items:
 
 
 ### Roost Full Screen
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fullscreen.gif" width="320" alt="Roost fullscreen card in action">
+
 ```yaml
 type: custom:roost-fullscreen
 mode: auto                # auto (invisible: full screen by itself) or button

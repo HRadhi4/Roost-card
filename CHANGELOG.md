@@ -2,6 +2,19 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.2.1 — 2026-11-16
+**Design fixes**
+- **Graph**: the line is now one smooth, calm curve. Tiny ups and downs no longer look like waves, but a real sudden change (like the AC switching on) stays sharp.
+- **Weather**: clouds drift on the right side of the sky and no longer cover the temperature or the words.
+- **Lock**: while it is locking or unlocking, a "Locking" bar stays in place of the slider, so the card no longer jumps in size.
+- **Light**: when you pick a colour, the brightness bar takes that colour (no more orange-to-purple mix), and its icon stays readable.
+- Numbers and units: a space before words like `1460 W` and `612 ppm`, none before `°C` and `%`; no extra `.0` added to readings.
+- **People**: the "home" ring now glows evenly around the picture.
+
+**See every card in action**
+- A short animated picture for **every card** in the README and in the card guide, and new animated pictures in the tutorials (first card, light/dark, full screen).
+- All screenshots redone with realistic times, prayer times, weather and temperatures.
+
 ## 1.2.0 — 2026-11-16
 **New: Roost Full Screen**
 - Hides Home Assistant's top bar and sidebar so a dashboard feels like an app. Three ways: **invisible** (the dashboard opens full screen by itself, for everyone or only the people you choose, with a small exit button for the people you choose), a **button** that maximizes and minimizes, or the **tap action of any card** (`fire-dom-event` with `roost_fullscreen: toggle | on | off`).

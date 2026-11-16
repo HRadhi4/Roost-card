@@ -4,6 +4,8 @@
 
 Every card follows Home Assistant's light or dark mode by itself. Add a **Roost Light/Dark** button to switch the mode on this screen with one tap (it can also offer *Automatic*). To keep a card always dark or always light, set **Theme** in its editor.
 
+![The Light/Dark button](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/theme.gif)
+
 ## Colours
 
 Every colour setting offers ready-made colours (purple, blue, coral, green, amber, teal, pink, slate), **Selected purple**, or **My own colours** (pick a start and an end colour).
