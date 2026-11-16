@@ -2,6 +2,9 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.5.3 — 2026-11-16
+- **Roost Nav**: when the bar is pinned to the bottom of a phone, it keeps space free under the last card, so nothing hides behind it.
+
 ## 0.5.2 — 2026-11-16
 **Closer to the original home screen**
 - **Chips**: two or more doors now share one door chip (green = all closed, orange with a number = how many are open), and two or more air conditioners share one snowflake (blue with a number = how many are on). Tap either to see the list; tap a name to open it.

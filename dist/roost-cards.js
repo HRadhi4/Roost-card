@@ -6,7 +6,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.5.2";
+const ROOST_VERSION = "0.5.3";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -974,7 +974,7 @@ class RoostNav extends RoostBase {
     const rail = c.layout === "rail" || (c.layout === "auto" && window.innerWidth >= 768);
     const pos = c.fixed ? (rail ? "position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:4" : "position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4") : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      :host{${c.fixed ? "height:0;" : ""}}
+      :host{${c.fixed ? (rail ? "height:0;" : "height:calc(76px + env(safe-area-inset-bottom));") : ""}display:block}
       nav{${pos};display:${rail ? "flex" : "grid"};${rail ? "flex-direction:column" : `grid-template-columns:repeat(${c.items.length},minmax(0,1fr))`};gap:${rail ? 12 : 4}px;padding:${rail ? "14px 10px" : "7px"};border-radius:${rail ? 28 : 26}px;
         background:${p.panel};border:1px solid ${p.border};backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 18px 40px -16px rgba(0,0,0,.5);
         ${rail ? "width:max-content" : `width:${c.fixed ? "calc(100vw - 24px)" : "100%"};max-width:536px`};${c.fixed ? "" : "margin:0 auto"}}
