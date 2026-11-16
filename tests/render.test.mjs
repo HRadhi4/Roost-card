@@ -16,7 +16,7 @@ const states = Object.fromEntries([
   st("person.sam", "home"), st("person.ali", "not_home"), st("alarm_control_panel.home", "disarmed"),
   st("binary_sensor.front_door", "off", { device_class: "door" }), st("sensor.power", "42", { unit_of_measurement: "W" }),
   st("climate.living", "cool", { hvac_modes: ["off", "cool", "dry", "fan_only", "heat_cool"], temperature: 23, min_temp: 16, max_temp: 30, current_temperature: 27.5 }),
-  st("climate.noTemp", "off", { hvac_modes: ["off", "cool"] }), st("sun.sun", "below_horizon"),
+  st("climate.noTemp", "off", { hvac_modes: ["off", "cool"] }), st("binary_sensor.back_door", "on", { device_class: "door" }), st("sun.sun", "below_horizon"),
   st("sensor.maghrib", new Date(Date.now() + 3 * 3600e3).toISOString(), { device_class: "timestamp" }), st("scene.movie", "scening"), st("weather.home", "partlycloudy", { temperature: 31, temperature_unit: "°C" }),
 ].map((s) => [s.entity_id, s]));
 const calls = [];
@@ -64,6 +64,14 @@ document.body.appendChild(chips); chips.hass = hass(true);
 if (!/mdi:lightbulb-on/.test(chips.shadowRoot.innerHTML) || !/<span class="num">1<\/span>/.test(chips.shadowRoot.innerHTML)) { fails++; console.error("FAIL chips light count"); }
 chips._open = "lights"; chips.render();
 if ((chips.shadowRoot.innerHTML.match(/class="tog/g) || []).length !== 2) { fails++; console.error("FAIL chips list"); }
+// Two doors share one door chip (1 open), two ACs share one snowflake (1 on); the list opens on tap.
+const g = document.createElement("roost-chips");
+g.setConfig({ entities: ["binary_sensor.front_door", "binary_sensor.back_door", "climate.living", "climate.noTemp"] });
+document.body.appendChild(g); g.hass = hass(true);
+const gh = g.shadowRoot.innerHTML;
+if ((g.shadowRoot.querySelectorAll(".chip").length !== 2) || !/mdi:door-open/.test(gh) || !/data-g="climates"/.test(gh)) { fails++; console.error("FAIL chips grouping", g.shadowRoot.querySelectorAll(".chip").length); }
+g._open = "climates"; g.render();
+if (!/Cool · 23°/.test(g.shadowRoot.innerHTML) || g.shadowRoot.querySelectorAll("[data-m]").length !== 2) { fails++; console.error("FAIL chips AC list"); }
 // Rooms: pills switch the room instantly, and the room's cards get Home Assistant.
 const rooms = document.createElement("roost-rooms");
 rooms.setConfig({ rooms: [{ name: "Living", icon: "mdi:sofa", cards: [{ type: "custom:roost-tile", entity: "light.kitchen" }] },

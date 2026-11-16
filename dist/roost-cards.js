@@ -6,7 +6,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.5.1";
+const ROOST_VERSION = "0.5.2";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -398,8 +398,9 @@ class RoostTile extends RoostBase {
 }
 
 // ------------------------------------------------------------------ Roost Chips
-// Status chips in one centred row. Lights are grouped into one bulb with a count,
-// people into one row of bubbles (colour = home, grey = away). Tap a group to see its list.
+// Status chips in one centred row. Lights are grouped into one bulb with a count, doors into one door,
+// air conditioners into one snowflake, people into one row of bubbles (colour = home, grey = away).
+// Tap a group to see its list.
 class RoostChips extends RoostBase {
   static get defaults() { return { entities: [], theme: "auto", align: "stretch", size: "medium" }; }
 
@@ -432,14 +433,19 @@ class RoostChips extends RoostBase {
   getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
 
   groups() {
-    const lights = [], people = [], singles = [];
+    const lights = [], people = [], doors = [], climates = [];
+    let singles = [];
     for (const id of this.ids()) {
       const d = id.split(".")[0];
       if (d === "light") { if (!Array.isArray(this.st(id)?.attributes.entity_id)) lights.push(id); } // light groups are not lights
       else if (d === "person" || d === "device_tracker") people.push(id);
+      else if (d === "binary_sensor" && ["door", "window", "garage_door", "opening"].includes(this.st(id)?.attributes.device_class)) doors.push(id);
+      else if (d === "climate") climates.push(id);
       else singles.push(id);
     }
-    return { lights, people, singles };
+    // one door or one AC stays a plain chip; two or more become one grouped chip
+    const lone = (arr) => (arr.length === 1 ? (singles.push(arr[0]), []) : arr);
+    return { lights, people, singles, doors: lone(doors), climates: lone(climates) };
   }
 
   chipFor(id) {
@@ -471,7 +477,7 @@ class RoostChips extends RoostBase {
   render() {
     if (!this._hass || !this._config) return;
     const p = this.p, c = this._config;
-    const { lights, people, singles } = this.groups();
+    const { lights, people, singles, doors, climates } = this.groups();
     const h = { small: 40, medium: 48, large: 56 }[c.size] || 48;
     const lightsOn = lights.filter((id) => this.st(id)?.state === "on").length;
     const chips = [];
@@ -479,6 +485,14 @@ class RoostChips extends RoostBase {
       if (id.startsWith("media_player.") && OFF_STATES.concat(UNAVAILABLE).includes(this.st(id)?.state)) return; // a TV chip only while it is on
       chips.push({ key: id, ...this.chipFor(id), entity: id });
     });
+    if (doors.length) {
+      const open = doors.filter((id) => this.st(id)?.state === "on").length;
+      chips.unshift({ key: "__doors", icon: open ? "mdi:door-open" : "mdi:door-closed", colour: open ? "#FF9A3D" : "#3DD68C", text: open ? String(open) : "", group: "doors", label: "Doors" });
+    }
+    if (climates.length) {
+      const on = climates.filter((id) => this.st(id) && !OFF_STATES.concat(UNAVAILABLE).includes(this.st(id).state)).length;
+      chips.push({ key: "__climates", icon: "mdi:snowflake", colour: on ? "#38BDF8" : p.muted, text: on ? String(on) : "", group: "climates", label: "Air conditioners" });
+    }
     if (lights.length) chips.push({ key: "__lights", icon: lightsOn ? "mdi:lightbulb-on" : "mdi:lightbulb-outline", colour: lightsOn ? "#FCD34D" : p.muted, text: lightsOn ? String(lightsOn) : "", group: "lights" });
     if (people.length) chips.push({ key: "__people", people: true, group: "people" });
     const open = this._open;
@@ -487,7 +501,14 @@ class RoostChips extends RoostBase {
       const s = this.st(id), home = s?.state === "home", pic = s?.attributes.entity_picture;
       return `<span class="av" style="z-index:${10 - i};margin-left:${i ? -10 : 0}px;${home ? "" : "filter:grayscale(1);opacity:.55;"}background:${home ? "linear-gradient(135deg,#6D4BFF,#38BDF8)" : p.track}">${pic ? `<img src="${esc(pic)}" alt="">` : esc(initials(id))}</span>`;
     };
-    const list = open === "lights" ? lights : open === "people" ? people : [];
+    const list = { lights, people, doors, climates }[open] || [];
+    const stateWord = (id, s) => {
+      if (!s) return "Not found";
+      if (open === "people") return s.state === "home" ? "Home" : "Away";
+      if (open === "doors") return s.state === "on" ? "Open" : "Closed";
+      if (open === "climates") return s.state === "off" ? "Off" : `${s.state.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase())}${s.attributes.temperature != null ? ` · ${s.attributes.temperature}°` : ""}`;
+      return s.state === "on" ? "On" : "Off";
+    };
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .row{${c.align === "stretch" ? "display:grid;grid-auto-flow:column;grid-auto-columns:minmax(max-content,1fr);gap:6px"
     : `display:flex;flex-wrap:wrap;gap:8px;justify-content:${c.align === "start" ? "flex-start" : "center"}`}}
@@ -511,18 +532,19 @@ class RoostChips extends RoostBase {
     </style>
     <div class="row">${chips.map((ch) => ch.people
       ? `<button class="chip ${open === "people" ? "on" : ""}" data-g="people" aria-label="People">${people.map(avatar).join("")}</button>`
-      : `<button class="chip ${open && open === ch.group ? "on" : ""}" ${ch.group ? `data-g="${ch.group}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(ch.entity ? this.name(ch.entity) : "Lights")}">
+      : `<button class="chip ${open && open === ch.group ? "on" : ""}" ${ch.group ? `data-g="${ch.group}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(ch.entity ? this.name(ch.entity) : ch.label || "Lights")}">
           ${ch.icon ? `<ha-icon icon="${ch.icon}" style="color:${ch.colour}"></ha-icon>` : `<span class="ent" data-icon="${esc(ch.entity)}" style="color:${ch.colour};display:flex"></span>`}
           ${ch.text ? `<span class="${ch.word ? "word" : "num"}">${esc(ch.text)}</span>` : ""}</button>`).join("")}</div>
     ${list.length ? `<div class="list">${list.map((id) => {
       const s = this.st(id), isOn = s?.state === "on" || s?.state === "home";
-      return `<div class="it"><span class="n t">${esc(s?.attributes.friendly_name || id)}<br><span class="s">${open === "people" ? (isOn ? "Home" : "Away") : isOn ? "On" : "Off"}</span></span>
+      return `<div class="it" ${open === "climates" || open === "doors" ? `data-m="${esc(id)}" style="cursor:pointer"` : ""}><span class="n t">${esc(s?.attributes.friendly_name || id)}<br><span class="s">${esc(stateWord(id, s))}</span></span>
         ${open === "lights" ? `<button class="tog ${isOn ? "on" : ""}" data-t="${esc(id)}" aria-label="Switch ${esc(s?.attributes.friendly_name || id)}"></button>` : ""}</div>`;
     }).join("")}</div>` : ""}`;
     this.shadowRoot.querySelectorAll("[data-icon]").forEach((el) => this.icon(el, null, el.dataset.icon));
     this.shadowRoot.querySelectorAll(".chip").forEach((el) => this.press(el,
       () => { if (el.dataset.g) { this._open = this._open === el.dataset.g ? null : el.dataset.g; this.vibrate(); this.render(); } else this.moreInfo(el.dataset.e); },
       () => this.moreInfo(el.dataset.e)));
+    this.shadowRoot.querySelectorAll("[data-m]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.m)));
     this.shadowRoot.querySelectorAll("[data-t]").forEach((el) => el.addEventListener("click", () => { this.vibrate(); this.call("light", "toggle", { entity_id: el.dataset.t }); }));
   }
 
@@ -762,7 +784,7 @@ class RoostScene extends RoostBase {
         ${round ? `width:70px;height:70px;border-radius:${Math.min(35, c.radius)}px;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 12px 24px -10px ${g[2]}`
     : "width:34px;height:34px;border-radius:12px;background:rgba(255,255,255,.22)"}}
       .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:${round ? 28 : 18}px}
-      .nm{font-size:${round ? 13 : 14}px;font-weight:700;line-height:1.2;text-align:${round ? "center" : "left"}}
+      .nm{font-size:${round ? 12 : 14}px;font-weight:${round ? 600 : 700};line-height:1.2;text-align:${round ? "center" : "left"}${round ? ";margin:0 -6px;letter-spacing:-.1px" : ""}}
       .done{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:#3DD68C;display:none;align-items:center;justify-content:center;color:#fff}
       .done.show{display:flex;animation:roost-tick 1.6s ease-out forwards}
     </style>
@@ -871,7 +893,7 @@ class RoostHero extends RoostBase {
       .orb{position:absolute;right:24px;top:22px;width:56px;height:56px;border-radius:50%;${orb};animation:roost-float 6s ease-in-out infinite}
       .body{position:relative;display:flex;flex-direction:column;gap:8px}
       .top{font-size:13px;opacity:.85}
-      .hi{font-size:25px;font-weight:700;letter-spacing:-.4px;line-height:1.15;padding-right:68px;font-family:${FONT_NUM}}
+      .hi{font-size:27px;font-weight:700;letter-spacing:-.4px;line-height:1.15;padding-right:68px;font-family:${FONT_NUM}}
       .wx{font-size:14px;line-height:1.5;opacity:.9;cursor:${w ? "pointer" : "default"}}
       .pill{display:flex;align-items:center;gap:10px;background:rgba(10,8,40,.3);border-radius:16px;padding:10px 12px;margin-top:6px;font-size:13px;line-height:1.35}
       .pill b.num{font-size:14px;flex:none}

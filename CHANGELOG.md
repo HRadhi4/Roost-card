@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.5.2 — 2026-11-16
+**Closer to the original home screen**
+- **Chips**: two or more doors now share one door chip (green = all closed, orange with a number = how many are open), and two or more air conditioners share one snowflake (blue with a number = how many are on). Tap either to see the list; tap a name to open it.
+- **Round scene buttons**: smaller names, so "Arm away" and "Good night" fit on one line.
+- **Roost Hero**: a slightly bigger greeting.
+
 ## 0.5.1 — 2026-11-16
 **Tiles for things that are broken**
 - **Tiles can say they are not working**: set "Not working? Say why" (for example "Not working · battery"). The tile greys out, shows a battery warning, and a tap opens its details instead of switching it.
