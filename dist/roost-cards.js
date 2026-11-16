@@ -6,7 +6,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.3.1";
+const ROOST_VERSION = "0.4.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -231,6 +231,55 @@ const LABELS = {
 };
 const computeLabel = (s) => s.label || LABELS[s.name] || s.name;
 
+// ------------------------------------------------------------------ the editor
+// Shows the values a card really uses (its defaults included), and the "own colour" pickers only when chosen.
+const sameValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+function fitSchema(schema, data) {
+  const out = [];
+  for (const item of schema) {
+    const m = /^(.*)_(start|end|text)$/.exec(item.name || "");
+    if (m && data[m[1]] !== "custom" && (`${m[1]}` in data || m[1] === "color")) continue;
+    out.push(item.schema ? { ...item, schema: fitSchema(item.schema, data) } : item);
+  }
+  return out;
+}
+
+class RoostEditor extends HTMLElement {
+  setConfig(config) { this._config = { ...config }; this.draw(); }
+
+  set hass(hass) { this._hass = hass; this.draw(); }
+
+  draw() {
+    const cls = this.cardClass;
+    if (!cls || !this._hass || !this._config) return;
+    const { schema, computeLabel: label } = cls.getConfigForm();
+    this._data = { ...cls.defaults, ...this._config };
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.addEventListener("value-changed", (ev) => {
+        ev.stopPropagation();
+        const next = ev.detail.value || {};
+        const config = { ...this._config };
+        for (const key of new Set([...Object.keys(next), ...Object.keys(this._data)])) {
+          if (sameValue(next[key], this._data[key])) continue;
+          if (next[key] === undefined || next[key] === "" || next[key] === null) delete config[key];
+          else config[key] = next[key];
+        }
+        this._config = config;
+        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
+        this.draw();
+      });
+      this.appendChild(this._form);
+    }
+    this._form.hass = this._hass;
+    this._form.data = this._data;
+    this._form.schema = fitSchema(schema, this._data);
+    this._form.computeLabel = label;
+  }
+}
+if (!customElements.get("roost-editor")) customElements.define("roost-editor", RoostEditor);
+
 // ------------------------------------------------------------------ Roost Tile
 class RoostTile extends RoostBase {
   static get defaults() {
@@ -308,9 +357,10 @@ class RoostTile extends RoostBase {
       .card{position:relative;min-height:${h}px;height:100%;border-radius:${c.radius}px;padding:16px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
         display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden;transition:transform .12s;
         background:${on ? `linear-gradient(135deg,${g[0]} 0%,${g[1]} 100%)` : p.off};color:${on ? g[3] : p.text};
-        border:1px solid ${on ? "transparent" : p.border};box-shadow:${on ? `0 18px 36px -14px ${g[2]}` : "none"};opacity:${un ? 0.55 : 1}}
+        border:1px solid ${on ? "transparent" : `color-mix(in srgb, ${g[0]} 35%, ${p.border})`};box-shadow:${on ? `0 18px 36px -14px ${g[2]}` : "none"};opacity:${un ? 0.55 : 1}}
       .card:active{transform:scale(.96)}
-      .ic{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:${on ? "rgba(255,255,255,.24)" : p.inset};color:${on ? "inherit" : p.muted};flex:none}
+      .ic{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex:none;
+        background:${on ? "rgba(255,255,255,.24)" : `color-mix(in srgb, ${g[0]} 18%, ${p.inset})`};color:${on ? "inherit" : un ? p.muted : g[this.dark ? 1 : 0]}}
       .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:22px;${anim}}
       .sw{position:absolute;top:16px;right:14px;width:42px;height:24px;border-radius:999px;background:${on ? "rgba(255,255,255,.38)" : p.track}}
       .sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:${on ? "#fff" : p.knob};transform:translateX(${on ? 18 : 0}px);transition:transform .12s}
@@ -994,6 +1044,9 @@ const CARDS = [
   ["roost-rooms", RoostRooms, "Roost Rooms", "A room switcher: tap a room pill to show that room's cards. Switching is instant."],
 ];
 window.customCards = window.customCards || [];
+for (const [, cls] of CARDS) {
+  cls.getConfigElement = function getConfigElement() { const el = document.createElement("roost-editor"); el.cardClass = cls; return el; };
+}
 for (const [tag, cls, name, description] of CARDS) {
   if (!customElements.get(tag)) customElements.define(tag, cls);
   if (!window.customCards.some((c) => c.type === tag)) window.customCards.push({ type: tag, name, description, preview: true, documentationURL: "https://github.com/HRadhi4/Roost-card" });

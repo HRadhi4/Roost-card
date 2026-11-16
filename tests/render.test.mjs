@@ -70,9 +70,22 @@ rooms.shadowRoot.querySelectorAll(".pill")[1].dispatchEvent(new window.Event("cl
 if (visible().join() !== "2") { fails++; console.error("FAIL rooms switch", visible()); }
 if (!/Bedroom/.test(rooms.shadowRoot.querySelector(".pill.on").textContent) || /Living/.test(rooms.shadowRoot.querySelectorAll(".pill")[0].textContent)) { fails++; console.error("FAIL rooms names only on the chosen room"); }
 if (!rooms.shadowRoot.querySelector("roost-tile").shadowRoot.innerHTML.includes("Kitchen") && !rooms.shadowRoot.querySelectorAll("roost-tile")[1].shadowRoot.innerHTML) { fails++; console.error("FAIL rooms cards not drawn"); }
+// The settings screen shows the real values, the own-colour pickers only when chosen, and saves only what changed.
+customElements.define("ha-form", class extends window.HTMLElement {});
+const names = (schema) => schema.flatMap((x) => (x.schema ? names(x.schema) : [x.name]));
+const ed = customElements.get("roost-tile").getConfigElement();
+let saved = null;
+ed.addEventListener("config-changed", (e) => { saved = e.detail.config; });
+ed.setConfig({ type: "custom:roost-tile", entity: "light.kitchen" }); ed.hass = hass(true);
+const form = ed.querySelector("ha-form");
+if (form.data.radius !== 22 || form.data.size !== "large") { fails++; console.error("FAIL editor shows defaults", form.data); }
+if (names(form.schema).includes("color_start")) { fails++; console.error("FAIL editor hides own colours for a preset"); }
+form.dispatchEvent(new window.CustomEvent("value-changed", { detail: { value: { ...form.data, color: "custom" } } }));
+if (!saved || saved.color !== "custom" || "radius" in saved || saved.entity !== "light.kitchen") { fails++; console.error("FAIL editor saves only the change", saved); }
+if (!names(form.schema).includes("color_start")) { fails++; console.error("FAIL editor shows own colours when chosen"); }
 // Errors for missing settings
 for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }], ["roost-rooms", { rooms: [] }]]) {
   try { document.createElement(tag).setConfig(cfg); fails++; console.error(`FAIL ${tag} accepted an empty config`); } catch { /* expected */ }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 8} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 12} checks passed`);
 process.exit(fails ? 1 : 0);

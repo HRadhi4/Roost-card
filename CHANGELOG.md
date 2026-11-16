@@ -2,6 +2,13 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.4.0 — 2026-11-16
+**Colours you can see, and a clearer settings screen**
+- A switched-off tile now shows its colour too: the icon in its colour, a tinted icon box and a coloured edge. Switched on, it fills with its full colour. Before, every switched-off tile looked the same, so changing the colour seemed to do nothing.
+- The settings screen shows the values a card really uses (for example "Large" and 22 px corners) instead of empty boxes.
+- The two "own colour" pickers appear only after choosing "My own colours".
+- Saving from the settings screen keeps your card short: only what you changed is written.
+
 ## 0.3.1 — 2026-11-16
 **Cards no longer overlap**
 - Every card now tells Home Assistant to give it as much height as it needs. Before, a card with large text (or on a phone with bigger system text) spilled over the card below it: chips on the greeting card, scene buttons on the people bubbles, the navigation bar on the thermostat's buttons.
