@@ -17,7 +17,12 @@ const states = Object.fromEntries([
   st("binary_sensor.front_door", "off", { device_class: "door" }), st("sensor.power", "42", { unit_of_measurement: "W" }),
   st("climate.living", "cool", { hvac_modes: ["off", "cool", "dry", "fan_only", "heat_cool"], temperature: 23, min_temp: 16, max_temp: 30, current_temperature: 27.5 }),
   st("climate.noTemp", "off", { hvac_modes: ["off", "cool"] }), st("cover.curtain", "closed", { current_position: 0 }), st("cover.assumed", "unknown", { assumed_state: true }), st("binary_sensor.back_door", "on", { device_class: "door" }), st("sun.sun", "below_horizon"),
-  st("sensor.maghrib", new Date(Date.now() + 3 * 3600e3).toISOString(), { device_class: "timestamp" }), st("scene.movie", "scening"), st("weather.home", "partlycloudy", { temperature: 31, temperature_unit: "°C" }),
+  st("sensor.maghrib", new Date(Date.now() + 3 * 3600e3).toISOString(), { device_class: "timestamp" }), st("sensor.fajr", "04:40"), st("sensor.dhuhr", new Date(Date.now() - 2 * 3600e3).toISOString()),
+  st("sensor.cabinet", "34.2", { unit_of_measurement: "°C", device_class: "temperature" }), st("sensor.hum", "48", { unit_of_measurement: "%" }), st("sensor.lock_battery", "12", { unit_of_measurement: "%", device_class: "battery" }),
+  st("sensor.offline", "unavailable"), st("automation.morning", "on", { last_triggered: new Date(Date.now() - 5 * 60000).toISOString() }), st("automation.night", "off", { last_triggered: null }),
+  st("media_player.tv", "playing", { volume_level: 0.35, is_volume_muted: false, media_title: "News", app_name: "YouTube", source: "HDMI 1", source_list: ["HDMI 1", "HDMI 2", "YouTube"] }), st("media_player.off_tv", "off"),
+  st("light.color", "on", { brightness: 200, supported_color_modes: ["color_temp", "hs"], rgb_color: [255, 180, 90] }), st("light.dim", "off", { supported_color_modes: ["brightness"] }),
+  st("alarm_control_panel.coded", "armed_away", { code_format: "number" }), st("alarm_control_panel.boom", "triggered"), st("scene.movie", "scening"), st("weather.home", "partlycloudy", { temperature: 31, temperature_unit: "°C" }),
 ].map((s) => [s.entity_id, s]));
 const calls = [];
 const hass = (dark) => ({ states, themes: { darkMode: dark }, user: { name: "Sam Smith" }, callService: async (...a) => { calls.push(a); } });
@@ -26,6 +31,39 @@ const cases = [
   ["roost-tile", { entity: "light.kitchen", animation: "glow", power_entity: "sensor.power" }],
   ["roost-tile", { entity: "light.hall", color: "custom", color_start: [10, 20, 30], color_end: [200, 100, 50], size: "small" }],
   ["roost-tile", { entity: "switch.missing" }],
+  ["roost-gauge", { entity: "sensor.cabinet", title: "Cabinet", min: 20, max: 45, warn: 32, second: "sensor.hum", second_name: "Humidity" }],
+  ["roost-gauge", { entity: "sensor.power", max: 2000, frame: false, show_name: false }],
+  ["roost-gauge", { entity: "sensor.offline" }],
+  ["roost-gauge", { entity: "sensor.missing" }],
+  ["roost-automations", { entities: ["automation.morning", "automation.night", "automation.missing"], show_run: true, title: "Automations" }],
+  ["roost-automations", { all: true, columns: 2 }],
+  ["roost-automations", { all: true, only_on: true }],
+  ["roost-clock", { times: [{ name: "Fajr", short: "F", entity: "sensor.fajr" }, { name: "Dhuhr", entity: "sensor.dhuhr" }, { name: "Maghrib", short: "M", entity: "sensor.maghrib" }], hour24: true }],
+  ["roost-clock", { times: [], seconds: true, frame: false }],
+  ["roost-title", { title: "Devices", subtitle: "3 on", icon: "mdi:devices", badge: "3 on", link_text: "See all", tap_action: { action: "navigate", navigation_path: "#rooms" } }],
+  ["roost-title", { title: "Rooms" }],
+  ["roost-theme", {}],
+  ["roost-theme", { include_auto: true, show_label: true, shape: "pill" }],
+  ["roost-media", { entity: "media_player.tv", power_entity: "switch.kettle" }],
+  ["roost-media", { entity: "media_player.off_tv" }],
+  ["roost-media", { entity: "media_player.missing" }],
+  ["roost-room", { name: "Living", temperature: "sensor.cabinet", humidity: "sensor.hum", entities: ["light.kitchen", "climate.living", "cover.curtain", "media_player.tv", "binary_sensor.back_door"] }],
+  ["roost-room", { name: "Bedroom", style: "card", icon: "mdi:bed", temperature: "sensor.missing" }],
+  ["roost-room", { name: "Hall" }],
+  ["roost-alarm", { entity: "alarm_control_panel.home", doors: ["binary_sensor.front_door", "binary_sensor.back_door"] }],
+  ["roost-alarm", { entity: "alarm_control_panel.coded", modes: ["arm_away"] }],
+  ["roost-alarm", { entity: "alarm_control_panel.boom" }],
+  ["roost-alarm", { entity: "alarm_control_panel.missing" }],
+  ["roost-light", { entity: "light.color" }],
+  ["roost-light", { entity: "light.dim" }],
+  ["roost-light", { entity: "light.kitchen", show_presets: false }],
+  ["roost-light", { entity: "light.missing" }],
+  ["roost-graph", { entity: "sensor.power", hours: 6 }],
+  ["roost-graph", { entity: "sensor.missing" }],
+  ["roost-people", { entities: ["person.sam", "person.ali"] }],
+  ["roost-people", { entities: ["person.sam", "person.ali"], layout: "list", size: 40 }],
+  ["roost-alerts", { offline: ["sensor.offline"], doors: ["binary_sensor.back_door"], door_minutes: 0, rules: [{ entity: "sensor.cabinet", above: 32, message: "Cabinet too hot" }] }],
+  ["roost-alerts", { batteries: false, show_all_good: true }],
   ["roost-curtain", { entity: "cover.curtain" }],
   ["roost-curtain", { entity: "cover.assumed", style: "left", show_buttons: false, show_header: false }],
   ["roost-curtain", { entity: "cover.curtain", style: "blind", color: "teal", show_sky: false, height: 220 }],
@@ -118,6 +156,17 @@ if (!/1% open/.test(rc.shadowRoot.innerHTML)) { fails++; console.error("FAIL rev
 rc.shadowRoot.querySelector('.btn[data-a="open"]').dispatchEvent(new window.Event("click"));
 await new Promise((r) => setTimeout(r, 10));
 if (rcalls[0] !== "cover.close_cover") { fails++; console.error("FAIL reverse open button", rcalls); }
+// Alerts hide themselves when nothing needs you.
+const al = document.createElement("roost-alerts"); al.setConfig({ batteries: false }); document.body.appendChild(al); al.hass = hass(true);
+if (al.style.display !== "none") { fails++; console.error("FAIL alerts hide when all good"); }
+const al2 = document.createElement("roost-alerts"); al2.setConfig({ battery_below: 20 }); document.body.appendChild(al2); al2.hass = hass(true);
+if (!/lock battery 12%/i.test(al2.shadowRoot.innerHTML)) { fails++; console.error("FAIL alerts battery"); }
+// Gauge warns when too high.
+const ga = document.createElement("roost-gauge"); ga.setConfig({ entity: "sensor.cabinet", warn: 32, min: 20, max: 45 }); document.body.appendChild(ga); ga.hass = hass(true);
+if (!/Too high/.test(ga.shadowRoot.innerHTML)) { fails++; console.error("FAIL gauge warn"); }
+// Room sums up what is on.
+const ro = document.createElement("roost-room"); ro.setConfig({ name: "Living", entities: ["light.kitchen", "climate.living", "cover.curtain"] }); document.body.appendChild(ro); ro.hass = hass(true);
+if (!/1 light on · AC cool 23° · Curtain closed/.test(ro.shadowRoot.innerHTML)) { fails++; console.error("FAIL room summary", ro.shadowRoot.querySelector(".l")?.textContent); }
 // Doors say Closed, not Off.
 const dt = document.createElement("roost-tile"); dt.setConfig({ entity: "binary_sensor.front_door" }); document.body.appendChild(dt); dt.hass = hass(true);
 if (!/Closed/.test(dt.shadowRoot.innerHTML)) { fails++; console.error("FAIL door tile word"); }

@@ -2,6 +2,21 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.0.0 — 2026-11-16
+**Twelve new cards**
+- **Roost Gauge**: a big ring for one reading. Turns orange and glows when too high (or too low), shows a second reading, and the ring grows smoothly to new values.
+- **Roost Graph**: a smooth line of a reading over the last hours (1 to 168), with the lowest and highest.
+- **Roost Room**: one room at a glance: a temperature bar that turns orange when too hot, humidity, and a short line of what is on ("1 light on · AC cool 24° · Curtain open"). Tap to open the room.
+- **Roost Light**: brightness you drag with your finger, warm / neutral / cool buttons and colour dots for colour bulbs. The bulb glows brighter as you turn it up.
+- **Roost Media**: power, what is playing with moving sound bars, volume you drag, mute, play / pause / skip, and the inputs and apps. Can use a separate sound bar for the volume and a plug for the power.
+- **Roost Alarm**: the alarm in a big shield that pulses while armed and shakes when triggered; Away, Home, Night, Holiday and Off with a question first (it warns if a door is open), a keypad when a code is needed, and the doors.
+- **Roost People**: a picture or initials with a green ring and a gentle pulse when home, and for how long.
+- **Roost Automations**: a list with a switch and when each last ran; an optional "run now" button; all automations or only the ones you pick.
+- **Roost Clock**: a big clock and date, a line of the day's times with the next one glowing, and a countdown to it.
+- **Roost Alerts**: shows only when something needs you: a low battery, a device gone offline, a door left open too long, or your own rules. Hides itself when all is fine.
+- **Roost Title**: section headings with a small line, a badge and a "See all" link.
+- **Roost Light/Dark**: a sun / moon button that switches this phone or tablet between light, dark and (optionally) automatic.
+
 ## 0.9.0 — 2026-11-16
 **Roost Curtain: choose what is behind the window**
 - **Sky that follows the sun** (as before), **your own picture** (for example a photo of your view, with an optional night photo), **live weather**, or nothing.
