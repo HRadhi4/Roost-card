@@ -350,6 +350,8 @@ rules:
 ```yaml
 type: custom:roost-title
 title: Devices
+temperature: sensor.living_temperature   # optional: shows "22.8°C · 52% humidity" under the title
+humidity: sensor.living_humidity
 link_text: See all
 back: "#rooms"           # optional: a back button (a page, or "back")
 tap_action: { action: navigate, navigation_path: "#devices" }

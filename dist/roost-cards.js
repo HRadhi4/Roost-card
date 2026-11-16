@@ -1196,10 +1196,28 @@ class RoostNav extends RoostBase {
     return here === path || location.pathname === path;
   }
 
+  // Home Assistant's pop-up messages ("Starting broadlink") appear at the bottom of the screen, on top of the bar,
+  // and catch the taps meant for it. While a pinned bar is shown, they are lifted above it.
+  liftToasts(on) {
+    try {
+      const nm = document.querySelector("home-assistant")?.shadowRoot?.querySelector("notification-manager")?.shadowRoot;
+      if (!nm) return;
+      let el = nm.getElementById("roost-nav-toast");
+      if (!on) { if (el) el.remove(); return; }
+      if (!el) { el = document.createElement("style"); el.id = "roost-nav-toast"; nm.appendChild(el); }
+      el.textContent = ".stack{bottom:calc(96px + env(safe-area-inset-bottom))!important}";
+    } catch (e) { /* nothing to lift */ }
+  }
+
+  disconnectedCallback() { if (this._lifted) { this._lifted = false; RoostNav.lifts = Math.max(0, (RoostNav.lifts || 1) - 1); setTimeout(() => { if (!RoostNav.lifts) this.liftToasts(false); }, 400); } }
+
   render() {
     if (!this._hass || !this._config) return;
     const c = this._config, p = this.p, g = this.colour();
     const editing = this.editing();
+    const lift = !!c.fixed && !editing;
+    if (lift !== !!this._lifted) { this._lifted = lift; RoostNav.lifts = Math.max(0, (RoostNav.lifts || 0) + (lift ? 1 : -1)); if (lift || !RoostNav.lifts) this.liftToasts(lift); }
+    else if (lift) this.liftToasts(true);
     const rail = !editing && (c.layout === "rail" || (c.layout === "auto" && window.innerWidth >= 768));
     const fixed = c.fixed && !editing;
     const uid = this._hass.user?.id;
@@ -2406,7 +2424,7 @@ class RoostRoom extends RoostBase {
       if (d === "climate") parts.push(`${word} ${s.state === "off" ? "off" : s.state.replace("_only", "").replace("heat_cool", "auto")}`);
       else if (d === "cover") parts.push(`${word} ${coverView(s, typeof e === "object" && e.reverse).state}`);
       else if (d === "media_player") parts.push(`${word} ${["off", "standby"].includes(s.state) ? "off" : "on"}`);
-      else if (d === "sensor") parts.push(`${word} ${fmt(num(s.state) ?? s.state, decOf(s.state))}${unitGap(s.attributes.unit_of_measurement || "")}`);
+      else if (d === "sensor") { const u = s.attributes.unit_of_measurement || ""; parts.push(`${word} ${fmt(num(s.state) ?? s.state, /^(W|kW|lx|ppm)$/.test(u) ? 0 : decOf(s.state))}${unitGap(u)}`); }
       else parts.push(`${word} ${s.state === "on" ? "on" : "off"}`);
     }
     if (doors.length) parts.unshift(doors.some(Boolean) ? (doors.length > 1 ? "A door is open" : "Door open") : doors.length > 1 ? "Doors closed" : "Door closed");
