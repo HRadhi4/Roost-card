@@ -260,7 +260,8 @@ name: Living room
 temperature: sensor.living_temperature
 humidity: sensor.living_humidity
 entities: [light.living, climate.living_ac, cover.living_curtain, media_player.tv]
-style: row               # row or card
+style: row               # row, card, or tile (the big coloured tile of the Rooms page)
+subtitle: TV off · curtain open   # optional: your own line instead of the automatic one
 tap_action: { action: navigate, navigation_path: "#living" }
 ```
 
@@ -350,6 +351,7 @@ rules:
 type: custom:roost-title
 title: Devices
 link_text: See all
+back: "#rooms"           # optional: a back button (a page, or "back")
 tap_action: { action: navigate, navigation_path: "#devices" }
 ---
 type: custom:roost-theme
@@ -458,5 +460,36 @@ tap_action:
   roost_fullscreen: toggle   # toggle, on or off
 ```
 Add `?roost_full=off` to the dashboard's address to turn it off on that screen.
+
+### Roost Page
+A whole phone page laid out like the original dashboard: 14 px at the sides, 16 px between cards, the night-sky background and room for the bottom bar. Put it in a **Panel** view and list the page's cards in it. Cards that sit side by side go in a `grid` (8 px apart).
+
+```yaml
+type: custom:roost-page
+cards:
+  - type: custom:roost-hero
+  - type: custom:roost-chips
+    entities: [binary_sensor.front_door, alarm_control_panel.home, person.saeed]
+  - type: grid
+    columns: 2
+    square: false
+    cards:
+      - { type: custom:roost-tile, entity: light.kitchen }
+      - { type: custom:roost-tile, entity: switch.kettle }
+gap: 16           # space between cards
+side: 14          # space at the sides
+bottom: 130       # room for the bottom bar
+```
+
+### Roost Panel
+A rounded box with a title that holds other cards, like the "Rooms" box on the home page.
+
+```yaml
+type: custom:roost-panel
+title: Rooms
+cards:
+  - { type: custom:roost-room, name: Kitchen, temperature: sensor.kitchen_temperature, plain: true }
+  - { type: custom:roost-room, name: Bedroom, temperature: sensor.bedroom_temperature, plain: true }
+```
 
 [← Back to the README](../README.md)

@@ -2,6 +2,16 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.2.2 — 2026-11-17
+**Matches the original phone dashboard**
+- Same fonts as the original (Inter and Space Grotesk, loaded automatically), same spacing, sizes and shadows.
+- **Chips**: same height, colours, icons and order (door, alarm, lights, air conditioners, people); people are small overlapping circles; the count takes the icon's colour.
+- **Hero**: greeting size, date written as "Tuesday 17 November", smaller moon at night.
+- **Quick actions, room pills, tiles, the AC row and the bottom bar**: sizes, gaps and glows now match the original. Tiles sit 8 px apart.
+- **Bottom bar**: a button can be shown only to some people (for example Settings).
+- New **Roost Page**: lays a whole phone page out like the original. New **Roost Panel**: a box with a title around other cards.
+- **Roost Room** has a new big coloured **tile** look (like the Rooms page) and can sit inside a panel without its own box. **Roost Title** can show a back button.
+
 ## 1.2.1 — 2026-11-16
 **Design fixes**
 - **Graph**: the line is now one smooth, calm curve. Tiny ups and downs no longer look like waves, but a real sudden change (like the AC switching on) stays sharp.

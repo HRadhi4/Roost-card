@@ -1,7 +1,7 @@
 <h1 align="center">Roost Cards</h1>
 
 <p align="center"><b>Beautiful, animated dashboard cards for Home Assistant. Made for phones and tablets.</b><br>
-34 cards · a visual editor for every setting · light and dark · no code needed</p>
+36 cards · a visual editor for every setting · light and dark · no code needed</p>
 
 <p align="center">
 <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
@@ -55,7 +55,7 @@ Short, written, with pictures:
 8. [Full screen, like an app](docs/tutorials/09-full-screen.md)
 9. [Looks, light and dark, tablets](docs/tutorials/08-looks.md)
 
-## All 34 cards
+## All 36 cards
 
 | Card | What it is | See it |
 |---|---|:-:|
@@ -92,6 +92,8 @@ Short, written, with pictures:
 | **Roost Sensors** | Many small readings in neat squares, orange when out of the range you set. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/sensors.gif" width="180" alt="Roost Sensors"> |
 | **Roost Buttons** | Several small actions in one rounded bar; a button lights up when its device is on. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/buttons.gif" width="180" alt="Roost Buttons"> |
 | **Roost Full Screen** | Hides Home Assistant's top bar and sidebar so your dashboard feels like an app: by itself (invisible), as a button that maximizes and minimizes, or as the tap action of any card. Comes back while editing. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fullscreen.gif" width="180" alt="Roost Full Screen"> |
+| **Roost Page** | A whole phone page laid out like the original: even spacing, the night-sky background and room for the bottom bar. | |
+| **Roost Panel** | A rounded box with a title that holds other cards, such as a list of rooms. | |
 | **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="180" alt="Roost Rooms"> |
 
 
