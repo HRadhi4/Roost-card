@@ -6,7 +6,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.5.0";
+const ROOST_VERSION = "0.5.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -320,6 +320,7 @@ class RoostTile extends RoostBase {
         { type: "expandable", name: "", title: "Safety", icon: "mdi:shield-lock-outline", schema: [
           { name: "locked", label: "Locked: can't be switched from here (for things that must stay on)", selector: { boolean: {} } },
           { name: "confirm", label: "Ask before switching (for things that affect many devices)", selector: { boolean: {} } },
+          { name: "problem", label: "Not working? Say why (for example “Not working · battery”). Leave empty when it works.", selector: { text: {} } },
         ] },
         { type: "expandable", name: "", title: "Tap and hold", icon: "gesture-tap", schema: [ACTION_FIELD("tap_action"), ACTION_FIELD("hold_action")] },
       ],
@@ -353,7 +354,8 @@ class RoostTile extends RoostBase {
   render() {
     if (!this._hass || !this._config) return;
     const c = this._config, s = this.st(), p = this.p, g = this.colour();
-    const un = !s || UNAVAILABLE.includes(s.state);
+    const broken = !!c.problem;
+    const un = !s || UNAVAILABLE.includes(s.state) || broken;
     const on = !un && !OFF_STATES.includes(s.state);
     const h = SIZES[c.size] || SIZES.large;
     const togglable = s && ["light", "switch", "fan", "input_boolean", "automation", "media_player", "climate", "cover", "humidifier", "siren", "lock"].includes(s.entity_id.split(".")[0]);
@@ -383,13 +385,13 @@ class RoostTile extends RoostBase {
     <div class="card" role="button" tabindex="0" aria-label="${esc(this.name(c.entity))}">
       <div class="ic"></div>
       ${showSwitch ? '<span class="sw" aria-hidden="true"></span>' : ""}
-      ${c.locked ? '<ha-icon class="lk" icon="mdi:lock" aria-label="Locked"></ha-icon>' : ""}${bars}
+      ${c.locked ? '<ha-icon class="lk" icon="mdi:lock" aria-label="Locked"></ha-icon>' : ""}${broken ? '<ha-icon class="lk" icon="mdi:battery-alert-variant-outline" style="color:#FF9F6B;--mdc-icon-size:20px" aria-label="Not working"></ha-icon>' : ""}${bars}
       <div><div class="nm t">${esc(this.name(c.entity))}</div>
-        <div class="lb t">${esc(s ? this.stateText(s, on, un) + (c.locked && !un ? " · protected" : "") : "Device not found")}</div>
-        ${c.show_since && s && !un ? `<div class="ago t">${esc(since(s.last_changed))}</div>` : ""}</div>
+        <div class="lb t">${esc(broken ? c.problem : s ? this.stateText(s, on, un) + (c.locked && !un ? " · protected" : "") : "Device not found")}</div>
+        ${c.show_since && s && !UNAVAILABLE.includes(s.state) ? `<div class="ago t">${esc(since(s.last_changed))}</div>` : ""}</div>
     </div>`;
     this.icon(this.shadowRoot.querySelector(".ic"), c.icon, c.entity);
-    const tap = c.locked && ["toggle", "perform-action", "call-service"].includes((c.tap_action || {}).action) ? { action: "more-info" }
+    const tap = (c.locked || broken) && ["toggle", "perform-action", "call-service"].includes((c.tap_action || {}).action) ? { action: "more-info" }
       : c.confirm && (c.tap_action || {}).action === "toggle" ? { ...c.tap_action, confirmation: { text: `Switch ${this.name(c.entity)} ${on ? "off" : "on"}? Everything on it will be affected.` } } : c.tap_action;
     this.press(this.shadowRoot.querySelector(".card"), () => this.run(tap, c.entity), () => this.run(c.hold_action, c.entity));
   }

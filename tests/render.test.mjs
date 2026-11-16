@@ -26,6 +26,7 @@ const cases = [
   ["roost-tile", { entity: "light.kitchen", animation: "glow", power_entity: "sensor.power" }],
   ["roost-tile", { entity: "light.hall", color: "custom", color_start: [10, 20, 30], color_end: [200, 100, 50], size: "small" }],
   ["roost-tile", { entity: "switch.missing" }],
+  ["roost-tile", { entity: "switch.kettle", problem: "Not working · battery" }],
   ["roost-chips", { entities: ["alarm_control_panel.home", "binary_sensor.front_door", "light.kitchen", "light.hall", "person.sam", "person.ali", "climate.living"] }],
   ["roost-thermostat", { entity: "climate.living", sensor: "sensor.power" }],
   ["roost-thermostat", { entity: "climate.noTemp" }],

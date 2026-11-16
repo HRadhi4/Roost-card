@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.5.1 — 2026-11-16
+**Tiles for things that are broken**
+- **Tiles can say they are not working**: set "Not working? Say why" (for example "Not working · battery"). The tile greys out, shows a battery warning, and a tap opens its details instead of switching it.
+
 ## 0.5.0 — 2026-11-16
 **The look of the original dashboard, with its animations**
 - **Roost Hero** is rebuilt: the sky follows the sun (blue to peach by day, deep purple with twinkling stars at night), a glowing sun or moon floats in the corner, a soft light sweeps across, the date and time sit on top, and the weather reads "26°C · sunny". New **"what's next" pill** with a pulsing dot counts down to the soonest of your times (for example prayer times): "Next prayer **Maghrib** at 5:05 PM · in 3h 36m".
