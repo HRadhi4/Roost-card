@@ -12,6 +12,7 @@ Every card has a **visual editor**: pick the device, colours, size, icon and sha
 | **Roost Hero** | A greeting with a sky that follows the sun (stars at night), the time, date, weather and a "what's next" countdown. |
 | **Roost Row** | A long row with a ring (an AC's temperature or any number), a name, a state line and an arrow. |
 | **Roost Nav** | Icon navigation: a bar at the bottom on phones, a rail at the side on tablets. |
+| **Roost Curtain** | A window with curtains that really slide open and closed, a sky behind them, and Open / Stop / Close buttons. |
 | **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. |
 
 All cards follow Home Assistant's light or dark mode (or stay always light or always dark), and their text is never cut off: it moves to the next line instead.
@@ -212,6 +213,27 @@ auto_colors: true
 swipe: true
 remember: true
 start_room: ""
+```
+
+### Roost Curtain
+```yaml
+type: custom:roost-curtain
+entity: cover.living_room
+name: Curtains          # optional
+color: coral            # fabric colour
+style: pair             # pair, left, right or blind
+height: 150
+radius: 18
+travel_time: 1.4        # seconds the slide takes on screen
+show_sky: true
+show_header: true
+show_buttons: true
+show_percent: true
+tap_action: { action: toggle }
+stop_action:            # optional: what Stop does as well as stopping the curtain
+  action: perform-action
+  perform_action: script.turn_on
+  target: { entity_id: script.curtain_stop }
 ```
 
 ## Keep your Home Assistant up to date automatically

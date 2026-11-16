@@ -16,7 +16,7 @@ const states = Object.fromEntries([
   st("person.sam", "home"), st("person.ali", "not_home"), st("alarm_control_panel.home", "disarmed"),
   st("binary_sensor.front_door", "off", { device_class: "door" }), st("sensor.power", "42", { unit_of_measurement: "W" }),
   st("climate.living", "cool", { hvac_modes: ["off", "cool", "dry", "fan_only", "heat_cool"], temperature: 23, min_temp: 16, max_temp: 30, current_temperature: 27.5 }),
-  st("climate.noTemp", "off", { hvac_modes: ["off", "cool"] }), st("binary_sensor.back_door", "on", { device_class: "door" }), st("sun.sun", "below_horizon"),
+  st("climate.noTemp", "off", { hvac_modes: ["off", "cool"] }), st("cover.curtain", "closed", { current_position: 0 }), st("cover.assumed", "unknown", { assumed_state: true }), st("binary_sensor.back_door", "on", { device_class: "door" }), st("sun.sun", "below_horizon"),
   st("sensor.maghrib", new Date(Date.now() + 3 * 3600e3).toISOString(), { device_class: "timestamp" }), st("scene.movie", "scening"), st("weather.home", "partlycloudy", { temperature: 31, temperature_unit: "°C" }),
 ].map((s) => [s.entity_id, s]));
 const calls = [];
@@ -26,6 +26,10 @@ const cases = [
   ["roost-tile", { entity: "light.kitchen", animation: "glow", power_entity: "sensor.power" }],
   ["roost-tile", { entity: "light.hall", color: "custom", color_start: [10, 20, 30], color_end: [200, 100, 50], size: "small" }],
   ["roost-tile", { entity: "switch.missing" }],
+  ["roost-curtain", { entity: "cover.curtain" }],
+  ["roost-curtain", { entity: "cover.assumed", style: "left", show_buttons: false, show_header: false }],
+  ["roost-curtain", { entity: "cover.curtain", style: "blind", color: "teal", show_sky: false, height: 220 }],
+  ["roost-curtain", { entity: "cover.missing" }],
   ["roost-tile", { entity: "switch.kettle", problem: "Not working · battery" }],
   ["roost-tile", { entity: "light.kitchen", fill: "glass", glow: "strong", icon_shape: "circle", icon_size: 30, name_size: 20, align: "center", animation: "pulse" }],
   ["roost-tile", { entity: "light.kitchen", fill: "outline", glow: "none", icon_shape: "none", off_tint: false, show_state: false }],

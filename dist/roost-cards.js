@@ -2,11 +2,11 @@
  * Roost Cards — beautiful, fully customisable dashboard cards for Home Assistant.
  * Phones and tablets, light and dark. One file, no build step.
  *
- * Cards: roost-tile, roost-chips, roost-thermostat, roost-scene, roost-hero, roost-nav, roost-rooms, roost-row
+ * Cards: roost-tile, roost-chips, roost-thermostat, roost-scene, roost-hero, roost-nav, roost-rooms, roost-row, roost-curtain
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.7.0";
+const ROOST_VERSION = "0.8.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1421,6 +1421,175 @@ class RoostRooms extends RoostBase {
   getCardSize() { return 6; }
 }
 
+// ------------------------------------------------------------------ Roost Curtain
+// A window with a sky that follows the sun and curtains that really slide open and closed.
+// While the curtain moves, the fabric ripples and a small note says "Opening" or "Closing".
+class RoostCurtain extends RoostBase {
+  static get defaults() {
+    return { color: "coral", style: "pair", height: 150, radius: 18, show_sky: true, show_header: true, show_buttons: true, show_percent: true,
+      travel_time: 1.4, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
+  }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a curtain or blind (cover)"); }
+
+  watched() { return [this._config.entity, this._config.sun || "sun.sun"]; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: { domain: "cover" } } },
+        { name: "name", selector: { text: {} } },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+          ...colourFields("color", "Fabric colour"),
+          { name: "style", label: "Kind", selector: pick([["pair", "Two curtains that meet in the middle"], ["left", "One curtain, opens to the left"], ["right", "One curtain, opens to the right"], ["blind", "Roller blind (up and down)"]]) },
+          { type: "grid", name: "", schema: [{ name: "height", label: "Window height", selector: slider(90, 280, 10) }, { name: "radius", selector: slider(0, 32, 2) }] },
+          { type: "grid", name: "", schema: [{ name: "travel_time", label: "Slide time", selector: slider(0.4, 4, 0.2, "s") }, { name: "show_sky", label: "Sky behind the window", selector: { boolean: {} } }] },
+          THEME_FIELD,
+        ] },
+        { type: "expandable", name: "", title: "What it shows", icon: "mdi:eye-outline", schema: [
+          { type: "grid", name: "", schema: [{ name: "show_header", label: "Name and state above", selector: { boolean: {} } }, { name: "show_buttons", label: "Open, Stop and Close buttons", selector: { boolean: {} } }] },
+          { name: "show_percent", label: "Show how far open (%)", selector: { boolean: {} } },
+        ] },
+        { type: "expandable", name: "", title: "Tap and hold", icon: "mdi:gesture-tap", schema: [ACTION_FIELD("tap_action"), ACTION_FIELD("hold_action"),
+          { name: "stop_action", label: "Stop button does (empty = stop the curtain)", selector: { ui_action: {} } }] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("cover.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
+
+  position(s) {
+    if (!s || UNAVAILABLE.includes(s.state)) return 0;
+    const pos = s.attributes.current_position;
+    if (pos != null) return Math.max(0, Math.min(100, pos));
+    return s.state === "open" || s.state === "opening" ? 100 : s.state === "closed" || s.state === "closing" ? 0 : 50;
+  }
+
+  // how much of the window each curtain covers, in % of the window
+  cover(pos) { return this._config.style === "pair" ? 50 - 43 * pos / 100 : 100 - 88 * pos / 100; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, s = this.st(), p = this.p;
+    const key = `${this.dark}|${JSON.stringify(c)}|${!!s}`;
+    if (key !== this._key) { this._key = key; this.build(); }
+    this.update();
+  }
+
+  build() {
+    const c = this._config, p = this.p, g = this.colour();
+    const frame = this.dark ? "#1C2142" : "#DDE1F0", rod = this.dark ? "#3A3F70" : "#C3C9E6";
+    const a = `color-mix(in srgb, ${g[1]} 55%, ${g[0]})`, b = `color-mix(in srgb, ${g[0]} 80%, ${g[1]})`;
+    const blind = c.style === "blind";
+    const fabric = (dir) => `repeating-linear-gradient(${blind ? 180 : 90}deg,${dir ? a : b} 0 9px,${dir ? b : a} 9px 18px)`;
+    let stars = "";
+    [[18, 22, 2], [62, 30, 3], [42, 58, 2], [30, 40, 2], [78, 62, 2], [8, 70, 2]].forEach((q, i) => {
+      stars += `<span class="star" style="left:${q[0]}%;top:${q[1]}%;width:${q[2]}px;height:${q[2]}px;animation-duration:${3 + i * 0.5}s;animation-delay:${i * 0.4}s"></span>`;
+    });
+    const panels = c.style === "pair" ? '<span class="cl"></span><span class="cr"></span>' : c.style === "right" ? '<span class="cr"></span>' : blind ? '<span class="bl"></span>' : '<span class="cl"></span>';
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      @keyframes roost-ripple{to{background-position:36px 0}}
+      @keyframes roost-ripple-v{to{background-position:0 36px}}
+      @keyframes roost-sway{0%,100%{transform:skewX(0)}50%{transform:skewX(1.2deg)}}
+      .head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 2px 10px}
+      .nm{font-size:15px;font-weight:600;color:${p.text}}
+      .stt{font-size:13px;color:${p.muted}}
+      .win{position:relative;height:${c.height}px;border-radius:${c.radius}px;overflow:hidden;border:6px solid ${frame};box-sizing:border-box;cursor:pointer;-webkit-tap-highlight-color:transparent;
+        background:${p.inset}}
+      .sky{position:absolute;inset:0}
+      .star{position:absolute;border-radius:50%;background:#fff;animation:roost-twinkle 3s ease-in-out infinite}
+      .orb{position:absolute;right:18%;top:18%;border-radius:50%;animation:roost-float 6s ease-in-out infinite}
+      .mull{position:absolute;left:50%;top:0;bottom:0;width:4px;margin-left:-2px;background:${frame}}
+      .rod{position:absolute;left:0;right:0;top:0;height:6px;background:${rod};z-index:2}
+      .cl,.cr,.bl{position:absolute;top:0;z-index:1;will-change:width,height}
+      .cl{left:0;bottom:0;background:${fabric(1)};box-shadow:6px 0 18px rgba(0,0,0,.3);transform-origin:left top}
+      .cr{right:0;bottom:0;background:${fabric(0)};box-shadow:-6px 0 18px rgba(0,0,0,.3);transform-origin:right top}
+      .bl{left:0;right:0;background:${fabric(1)};box-shadow:0 6px 18px rgba(0,0,0,.3)}
+      .win.moving .cl,.win.moving .cr{animation:roost-ripple .9s linear infinite,roost-sway 1.2s ease-in-out infinite}
+      .win.moving .bl{animation:roost-ripple-v .9s linear infinite}
+      .note{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:3;display:none;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;
+        background:rgba(10,8,40,.55);color:#fff;font-size:12px;font-weight:600;white-space:nowrap}
+      .win.moving .note{display:flex}
+      .note ha-icon{--mdc-icon-size:16px;animation:roost-breathe 1s ease-in-out infinite}
+      .btns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+      .btn{min-height:44px;border-radius:14px;border:1px solid ${p.border};background:${p.panel};color:${p.text};font:inherit;font-size:14px;font-weight:600;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .btn:active{transform:scale(.96)}
+      .btn.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 10px 22px -10px ${g[2]}}
+      .btn ha-icon{--mdc-icon-size:18px}
+    </style>
+    ${c.show_header ? '<div class="head"><span class="nm t"></span><span class="stt t"></span></div>' : ""}
+    <div class="win" role="button" tabindex="0">
+      ${c.show_sky ? `<div class="sky"></div>${stars}<span class="orb"></span>` : ""}${c.style === "pair" ? '<span class="mull"></span>' : ""}
+      <span class="rod"></span>${panels}
+      <span class="note"><ha-icon></ha-icon><span class="nt"></span></span>
+    </div>
+    ${c.show_buttons ? `<div class="btns">
+      <button class="btn" data-a="open"><ha-icon icon="${blind ? "mdi:arrow-up" : "mdi:arrow-expand-horizontal"}"></ha-icon>Open</button>
+      <button class="btn" data-a="stop"><ha-icon icon="mdi:stop"></ha-icon>Stop</button>
+      <button class="btn" data-a="close"><ha-icon icon="${blind ? "mdi:arrow-down" : "mdi:arrow-collapse-horizontal"}"></ha-icon>Close</button></div>` : ""}`;
+    this._shown = null;
+    const win = this.shadowRoot.querySelector(".win");
+    this.press(win, () => this.run(c.tap_action, c.entity), () => this.run(c.hold_action, c.entity));
+    this.shadowRoot.querySelectorAll(".btn").forEach((el) => el.addEventListener("click", () => {
+      this.vibrate();
+      const a = el.dataset.a;
+      if (a === "stop" && c.stop_action && c.stop_action.action && c.stop_action.action !== "none") { this.run(c.stop_action, c.entity); this.call("cover", "stop_cover", { entity_id: c.entity }); return; }
+      this._moveUntil = Date.now() + c.travel_time * 1000 + 300;
+      this.call("cover", `${a}_cover`, { entity_id: c.entity });
+    }));
+  }
+
+  update() {
+    const c = this._config, s = this.st(), root = this.shadowRoot;
+    const pos = this.position(s);
+    const day = (this.st(c.sun || "sun.sun") || {}).state !== "below_horizon";
+    const sky = root.querySelector(".sky");
+    if (sky) {
+      sky.style.background = day ? "linear-gradient(180deg,#60A5FA,#BFDBFE)" : "linear-gradient(180deg,#131848,#2C2472)";
+      root.querySelectorAll(".star").forEach((el) => { el.style.display = day ? "none" : "block"; });
+      const orb = root.querySelector(".orb");
+      orb.style.cssText += day ? ";width:30px;height:30px;background:radial-gradient(circle,#FFF7D6,#FDE047 60%,#F59E0B);box-shadow:0 0 26px 8px rgba(253,224,71,.45)"
+        : ";width:26px;height:26px;background:radial-gradient(circle at 36% 34%,#FFFBEA,#E2C273);box-shadow:0 0 22px 6px rgba(255,234,170,.25)";
+    }
+    const un = !s || UNAVAILABLE.includes(s.state);
+    const word = !s ? "Device not found" : un ? (s.attributes.assumed_state ? "Ready" : "Offline") : s.state.charAt(0).toUpperCase() + s.state.slice(1);
+    const pct = c.show_percent && s?.attributes.current_position != null && pos > 0 && pos < 100 ? ` · ${pos}%` : "";
+    const nm = root.querySelector(".nm"), stt = root.querySelector(".stt");
+    if (nm) nm.textContent = this.name(c.entity);
+    if (stt) stt.textContent = word + pct;
+    root.querySelectorAll(".btn").forEach((b) => b.classList.toggle("on", (b.dataset.a === "open" && s?.state === "open") || (b.dataset.a === "close" && s?.state === "closed")));
+    // slide the fabric from where it is to where it should be
+    const amount = this.cover(pos), blind = c.style === "blind";
+    const dur = Math.max(200, (Number(c.travel_time) || 1.4) * 1000);
+    root.querySelectorAll(".cl,.cr,.bl").forEach((el) => {
+      const prop = blind ? "height" : "width";
+      const to = `${amount}%`;
+      if (this._shown == null) { el.style[prop] = to; return; }
+      if (el.style[prop] === to) return;
+      const from = getComputedStyle(el)[prop];
+      el.style[prop] = to;
+      try { el.animate([{ [prop]: from }, { [prop]: to }], { duration: dur, easing: "cubic-bezier(.6,0,.2,1)" }); } catch (e) { /* old browser: it just jumps */ }
+      this._moveUntil = Math.max(this._moveUntil || 0, Date.now() + dur);
+    });
+    this._shown = pos;
+    // ripple while it moves
+    const moving = s && (s.state === "opening" || s.state === "closing" || (this._moveUntil || 0) > Date.now());
+    const win = root.querySelector(".win");
+    win.classList.toggle("moving", !!moving);
+    const goingUp = s?.state === "opening" || (s?.state !== "closing" && pos >= 50);
+    root.querySelector(".nt").textContent = goingUp ? "Opening" : "Closing";
+    root.querySelector(".note ha-icon").setAttribute("icon", blind ? (goingUp ? "mdi:arrow-up" : "mdi:arrow-down") : goingUp ? "mdi:arrow-expand-horizontal" : "mdi:arrow-collapse-horizontal");
+    clearTimeout(this._stopTimer);
+    if (moving && s.state !== "opening" && s.state !== "closing") this._stopTimer = setTimeout(() => { this._sig = null; this.update(); }, Math.max(50, this._moveUntil - Date.now() + 20));
+  }
+
+  getCardSize() { return 4; }
+}
+
 // ------------------------------------------------------------------ register
 const CARDS = [
   ["roost-tile", RoostTile, "Roost Tile", "A big tile with a switch, colour, icon and how long it has been on."],
@@ -1431,6 +1600,7 @@ const CARDS = [
   ["roost-nav", RoostNav, "Roost Nav", "Icon navigation: a bar on phones and a side rail on tablets."],
   ["roost-row", RoostRow, "Roost Row", "A long row with a ring (an AC's temperature or any number), a name, a state line and an arrow."],
   ["roost-rooms", RoostRooms, "Roost Rooms", "A room switcher: tap a room pill to show that room's cards. Switching is instant."],
+  ["roost-curtain", RoostCurtain, "Roost Curtain", "A window with curtains that really slide open and closed, with a sky behind them."],
 ];
 window.customCards = window.customCards || [];
 for (const [, cls] of CARDS) {

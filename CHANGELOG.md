@@ -2,6 +2,13 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.8.0 — 2026-11-16
+**New: Roost Curtain**
+- A window with a sky that follows the sun (sun by day, moon and twinkling stars at night) and curtains that **really slide** open and closed.
+- While the curtain moves, the fabric ripples and sways, and a small note says "Opening" or "Closing".
+- Kinds: two curtains that meet in the middle, one curtain (left or right), or a roller blind that goes up and down.
+- Settings: fabric colour, window height, roundness, slide time, sky on or off, the name and state line, Open / Stop / Close buttons, the percentage, what a tap or hold does, and what the Stop button does (for curtains whose remote has its own stop command).
+
 ## 0.7.0 — 2026-11-16
 **A much more flexible room card, a hero you can shape, and an easier bottom bar**
 - **Roost Rooms**
