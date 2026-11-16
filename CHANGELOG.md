@@ -2,6 +2,17 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.3.0 — 2026-11-16
+**Follows the design rules (now in `DESIGN_RULES.md`)**
+- Status chips share the width equally in one row that never wraps; on very narrow phones the door chip shows only its icon. A TV chip appears only while the TV is on, and light groups no longer count as lights.
+- The chosen room, page or button uses the selected purple (#6D4BFF → #8B6CFF).
+- Space Grotesk for headings and numbers, Inter for text (when installed).
+- Every movement is 0.12 s or quicker.
+- The thermostat never shows "—": with no room sensor, that line is simply hidden.
+- Tiles can be **locked** (for things that must stay on) or **ask before switching** (for things that affect many devices).
+- Fits phones as narrow as 300 px without cutting or overflowing.
+- The rules are checked automatically before every release.
+
 ## 0.2.0 — 2026-11-16
 **New: Roost Rooms**
 - A room switcher: a row of room pills, and the chosen room's cards below. Switching is instant.

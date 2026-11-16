@@ -3,10 +3,10 @@
  * Phones and tablets, light and dark. One file, no build step.
  *
  * Cards: roost-tile, roost-chips, roost-thermostat, roost-scene, roost-hero, roost-nav, roost-rooms
- * Every card has a visual editor (colours, size, icon, shape…).
+ * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.2.0";
+const ROOST_VERSION = "0.3.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -33,7 +33,11 @@ const COLORS = {
   pink: ["#DB2777", "#F9A8D4", "rgba(236,72,153,.5)", "#FFFFFF"],
   slate: ["#475569", "#94A3B8", "rgba(100,116,139,.5)", "#FFFFFF"],
 };
-const COLOR_OPTIONS = [...Object.keys(COLORS).map((k) => ({ value: k, label: k[0].toUpperCase() + k.slice(1) })), { value: "custom", label: "My own colours" }];
+// The one colour for "this is the chosen / active one" (design rule 1).
+const ACTIVE = ["#6D4BFF", "#8B6CFF", "rgba(109,75,255,.55)", "#FFFFFF"];
+const FONT_TEXT = "Inter, var(--ha-font-family-body, Roboto), system-ui, sans-serif";
+const FONT_NUM = "'Space Grotesk', Inter, var(--ha-font-family-body, Roboto), system-ui, sans-serif";
+const COLOR_OPTIONS = [{ value: "active", label: "Selected purple" }, ...Object.keys(COLORS).map((k) => ({ value: k, label: k[0].toUpperCase() + k.slice(1) })), { value: "custom", label: "My own colours" }];
 const SIZES = { small: 128, medium: 152, large: 176 };
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -103,6 +107,7 @@ class RoostBase extends HTMLElement {
   /** The card's colour: a preset name, or the two custom colours. */
   colour(key = "color") {
     const c = this._config;
+    if (c[key] === "active" || c[key] == null && key === "color" && this.constructor.activeByDefault) return ACTIVE;
     if (c[key] === "custom") {
       const a = rgb(c[`${key}_start`]) || COLORS.purple[0];
       const b = rgb(c[`${key}_end`]) || a;
@@ -141,6 +146,10 @@ class RoostBase extends HTMLElement {
   /** Run a tap/hold action from the card's settings. */
   async run(action, entityId) {
     const a = typeof action === "string" ? { action } : action || { action: "more-info" };
+    if (a.confirmation && a.action !== "none" && a.action !== "more-info") {
+      const text = typeof a.confirmation === "object" && a.confirmation.text ? a.confirmation.text : "Are you sure?";
+      if (!window.confirm(text)) return undefined;
+    }
     this.vibrate();
     switch (a.action) {
       case "toggle": return this.call("homeassistant", "toggle", { entity_id: entityId });
@@ -189,7 +198,8 @@ class RoostBase extends HTMLElement {
 
   baseCss() {
     const p = this.p;
-    return `:host{display:block;--roost-text:${p.text};--roost-muted:${p.muted};font-family:var(--ha-font-family-body,Roboto,system-ui,sans-serif)}
+    return `:host{display:block;--roost-text:${p.text};--roost-muted:${p.muted};font-family:${FONT_TEXT}}
+      .num,svg text{font-family:${FONT_NUM}}
       *{box-sizing:border-box}
       .t{white-space:normal;overflow-wrap:break-word;word-break:normal;overflow:visible;text-overflow:clip}
       ${KEYFRAMES}`;
@@ -224,7 +234,7 @@ const computeLabel = (s) => s.label || LABELS[s.name] || s.name;
 // ------------------------------------------------------------------ Roost Tile
 class RoostTile extends RoostBase {
   static get defaults() {
-    return { color: "purple", size: "large", radius: 22, show_switch: true, show_since: true, animation: "none", tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
+    return { color: "purple", size: "large", radius: 22, show_switch: true, show_since: true, animation: "none", locked: false, confirm: false, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
   }
 
   validate(c) { if (!c.entity) throw new Error("Choose a device (entity)"); }
@@ -251,6 +261,10 @@ class RoostTile extends RoostBase {
           { name: "show_switch", selector: { boolean: {} } },
           { name: "show_since", selector: { boolean: {} } },
           { name: "power_entity", selector: { entity: { domain: "sensor" } } },
+        ] },
+        { type: "expandable", name: "", title: "Safety", icon: "mdi:shield-lock-outline", schema: [
+          { name: "locked", label: "Locked: can't be switched from here (for things that must stay on)", selector: { boolean: {} } },
+          { name: "confirm", label: "Ask before switching (for things that affect many devices)", selector: { boolean: {} } },
         ] },
         { type: "expandable", name: "", title: "Tap and hold", icon: "gesture-tap", schema: [ACTION_FIELD("tap_action"), ACTION_FIELD("hold_action")] },
       ],
@@ -288,18 +302,19 @@ class RoostTile extends RoostBase {
     const on = !un && !OFF_STATES.includes(s.state);
     const h = SIZES[c.size] || SIZES.large;
     const togglable = s && ["light", "switch", "fan", "input_boolean", "automation", "media_player", "climate", "cover", "humidifier", "siren", "lock"].includes(s.entity_id.split(".")[0]);
-    const showSwitch = c.show_switch && togglable && !un;
+    const showSwitch = c.show_switch && togglable && !un && !c.locked;
     const anim = on && c.animation === "spin" ? "animation:roost-spin 1.3s linear infinite" : on && c.animation === "glow" ? "animation:roost-glow 2s ease-in-out infinite" : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{position:relative;min-height:${h}px;height:100%;border-radius:${c.radius}px;padding:16px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
-        display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden;transition:transform .12s, box-shadow .3s;
+        display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden;transition:transform .12s;
         background:${on ? `linear-gradient(135deg,${g[0]} 0%,${g[1]} 100%)` : p.off};color:${on ? g[3] : p.text};
         border:1px solid ${on ? "transparent" : p.border};box-shadow:${on ? `0 18px 36px -14px ${g[2]}` : "none"};opacity:${un ? 0.55 : 1}}
       .card:active{transform:scale(.96)}
       .ic{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:${on ? "rgba(255,255,255,.24)" : p.inset};color:${on ? "inherit" : p.muted};flex:none}
       .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:22px;${anim}}
       .sw{position:absolute;top:16px;right:14px;width:42px;height:24px;border-radius:999px;background:${on ? "rgba(255,255,255,.38)" : p.track}}
-      .sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:${on ? "#fff" : p.knob};transform:translateX(${on ? 18 : 0}px);transition:transform .35s cubic-bezier(.3,1.4,.5,1)}
+      .sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:${on ? "#fff" : p.knob};transform:translateX(${on ? 18 : 0}px);transition:transform .12s}
+      .lk{position:absolute;top:18px;right:16px;opacity:.8;--mdc-icon-size:18px}
       .nm{font-size:${h < 140 ? 14 : 15}px;font-weight:600;line-height:1.2}
       .lb{font-size:12px;line-height:1.3;opacity:.85;margin-top:2px;color:${on ? "inherit" : p.muted}}
       .ago{font-size:11px;opacity:.65;margin-top:4px;color:${on ? "inherit" : p.muted}}
@@ -307,12 +322,15 @@ class RoostTile extends RoostBase {
     <div class="card" role="button" tabindex="0" aria-label="${esc(this.name(c.entity))}">
       <div class="ic"></div>
       ${showSwitch ? '<span class="sw" aria-hidden="true"></span>' : ""}
+      ${c.locked ? '<ha-icon class="lk" icon="mdi:lock" aria-label="Locked"></ha-icon>' : ""}
       <div><div class="nm t">${esc(this.name(c.entity))}</div>
-        <div class="lb t">${esc(s ? this.stateText(s, on, un) : "Device not found")}</div>
+        <div class="lb t">${esc(s ? this.stateText(s, on, un) + (c.locked && !un ? " · protected" : "") : "Device not found")}</div>
         ${c.show_since && s && !un ? `<div class="ago t">${esc(since(s.last_changed))}</div>` : ""}</div>
     </div>`;
     this.icon(this.shadowRoot.querySelector(".ic"), c.icon, c.entity);
-    this.press(this.shadowRoot.querySelector(".card"), () => this.run(c.tap_action, c.entity), () => this.run(c.hold_action, c.entity));
+    const tap = c.locked && ["toggle", "perform-action", "call-service"].includes((c.tap_action || {}).action) ? { action: "more-info" }
+      : c.confirm && (c.tap_action || {}).action === "toggle" ? { ...c.tap_action, confirmation: { text: `Switch ${this.name(c.entity)} ${on ? "off" : "on"}? Everything on it will be affected.` } } : c.tap_action;
+    this.press(this.shadowRoot.querySelector(".card"), () => this.run(tap, c.entity), () => this.run(c.hold_action, c.entity));
   }
 }
 
@@ -353,7 +371,7 @@ class RoostChips extends RoostBase {
     const lights = [], people = [], singles = [];
     for (const id of this.ids()) {
       const d = id.split(".")[0];
-      if (d === "light") lights.push(id);
+      if (d === "light") { if (!Array.isArray(this.st(id)?.attributes.entity_id)) lights.push(id); } // light groups are not lights
       else if (d === "person" || d === "device_tracker") people.push(id);
       else singles.push(id);
     }
@@ -374,7 +392,7 @@ class RoostChips extends RoostBase {
     if (d === "binary_sensor" && ["door", "window", "garage_door", "opening"].includes(cls)) {
       const open = s.state === "on";
       const icon = cls === "window" ? (open ? "mdi:window-open-variant" : "mdi:window-closed-variant") : (open ? "mdi:door-open" : "mdi:door-closed");
-      return { icon, colour: open ? "#FF9A3D" : this.p.muted, text: open ? "Open" : "Closed" };
+      return { icon, colour: open ? "#FF9A3D" : this.p.muted, text: open ? "Open" : "Closed", word: true };
     }
     if (d === "climate") {
       const on = s.state !== "off";
@@ -393,7 +411,10 @@ class RoostChips extends RoostBase {
     const h = { small: 40, medium: 48, large: 56 }[c.size] || 48;
     const lightsOn = lights.filter((id) => this.st(id)?.state === "on").length;
     const chips = [];
-    singles.forEach((id) => chips.push({ key: id, ...this.chipFor(id), entity: id }));
+    singles.forEach((id) => {
+      if (id.startsWith("media_player.") && OFF_STATES.concat(UNAVAILABLE).includes(this.st(id)?.state)) return; // a TV chip only while it is on
+      chips.push({ key: id, ...this.chipFor(id), entity: id });
+    });
     if (lights.length) chips.push({ key: "__lights", icon: lightsOn ? "mdi:lightbulb-on" : "mdi:lightbulb-outline", colour: lightsOn ? "#FCD34D" : p.muted, text: lightsOn ? String(lightsOn) : "", group: "lights" });
     if (people.length) chips.push({ key: "__people", people: true, group: "people" });
     const open = this._open;
@@ -404,10 +425,13 @@ class RoostChips extends RoostBase {
     };
     const list = open === "lights" ? lights : open === "people" ? people : [];
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .row{display:flex;flex-wrap:${c.align === "stretch" ? "nowrap" : "wrap"};gap:${c.align === "stretch" ? 6 : 8}px;justify-content:${c.align === "start" ? "flex-start" : "center"}}
-      .chip{flex:${c.align === "stretch" ? "1 1 auto" : "0 0 auto"};min-width:max-content;white-space:nowrap;height:${h}px;padding:0 ${c.align === "stretch" ? 6 : 14}px;border-radius:999px;border:1px solid ${p.border};background:${p.panel};
+      .row{${c.align === "stretch" ? "display:grid;grid-auto-flow:column;grid-auto-columns:minmax(max-content,1fr);gap:6px"
+    : `display:flex;flex-wrap:wrap;gap:8px;justify-content:${c.align === "start" ? "flex-start" : "center"}`}}
+      .chip{min-width:max-content;white-space:nowrap;height:${h}px;padding:0 ${c.align === "stretch" ? 6 : 14}px;border-radius:999px;border:1px solid ${p.border};background:${p.panel};
         color:${p.text};display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font:inherit;font-size:14px;font-weight:600;-webkit-tap-highlight-color:transparent}
       .chip:active{transform:scale(.95)}
+      :host{container-type:inline-size}
+      @container (max-width: 340px){.row{gap:4px}.chip{padding:0 6px;gap:4px}.chip .word{display:none}.av{width:${h - 20}px;height:${h - 20}px}}
       .chip.on{outline:2px solid #8B6CFF}
       .chip ha-icon{--mdc-icon-size:${h > 48 ? 24 : 20}px}
       .av{width:${h - 16}px;height:${h - 16}px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;border:2px solid ${p.panel};overflow:hidden;position:relative}
@@ -418,14 +442,14 @@ class RoostChips extends RoostBase {
       .it .n{flex:1;min-width:0;font-size:14px;color:${p.text}}
       .it .s{font-size:12px;color:${p.muted}}
       .tog{flex:none;width:48px;height:28px;border-radius:999px;border:0;background:${p.track};position:relative;cursor:pointer}
-      .tog::after{content:"";position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:${p.knob};transition:left .15s}
+      .tog::after{content:"";position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:${p.knob};transition:left .12s}
       .tog.on{background:linear-gradient(135deg,#6D4BFF,#38BDF8)}.tog.on::after{left:24px;background:#fff}
     </style>
     <div class="row">${chips.map((ch) => ch.people
       ? `<button class="chip ${open === "people" ? "on" : ""}" data-g="people" aria-label="People">${people.map(avatar).join("")}</button>`
       : `<button class="chip ${open && open === ch.group ? "on" : ""}" ${ch.group ? `data-g="${ch.group}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(ch.entity ? this.name(ch.entity) : "Lights")}">
           ${ch.icon ? `<ha-icon icon="${ch.icon}" style="color:${ch.colour}"></ha-icon>` : `<span class="ent" data-icon="${esc(ch.entity)}" style="color:${ch.colour};display:flex"></span>`}
-          ${ch.text ? `<span>${esc(ch.text)}</span>` : ""}</button>`).join("")}</div>
+          ${ch.text ? `<span class="${ch.word ? "word" : "num"}">${esc(ch.text)}</span>` : ""}</button>`).join("")}</div>
     ${list.length ? `<div class="list">${list.map((id) => {
       const s = this.st(id), isOn = s?.state === "on" || s?.state === "home";
       return `<div class="it"><span class="n t">${esc(s?.attributes.friendly_name || id)}<br><span class="s">${open === "people" ? (isOn ? "Home" : "Away") : isOn ? "On" : "Off"}</span></span>
@@ -503,7 +527,7 @@ class RoostThermostat extends RoostBase {
     }
     const rs = c.sensor ? this.st(c.sensor) : null;
     const roomV = rs && !isNaN(parseFloat(rs.state)) ? parseFloat(rs.state) : a.current_temperature;
-    const room = roomV != null && !isNaN(roomV) ? Number(roomV).toFixed(1) : "—";
+    const room = roomV != null && !isNaN(roomV) ? Number(roomV).toFixed(1) : null; // never show "—"
     const noTemp = !un && set == null;
     const modeName = { cool: "Cool", heat: "Heat", dry: "Dry", fan_only: "Fan", heat_cool: "Auto", auto: "Auto" };
     const status = un ? "Offline" : on ? `${modeName[s.state] || s.state} · running` : "Off";
@@ -533,9 +557,9 @@ class RoostThermostat extends RoostBase {
         <circle id="arc" cx="125" cy="125" r="${R}" fill="none" stroke="url(#${on ? "gon" : "goff"})" stroke-width="16" stroke-linecap="round" stroke-dasharray="${(L * f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 125 125)"/>
         ${noTemp ? "" : `<circle id="knob" cx="${(125 + R * Math.cos(th)).toFixed(1)}" cy="${(125 + R * Math.sin(th)).toFixed(1)}" r="11" fill="#fff" stroke="rgba(255,255,255,.25)" stroke-width="6"/>`}
         <circle cx="125" cy="125" r="70" fill="${p.dial}"/>
-        <text id="lab" x="125" y="104" text-anchor="middle" font-size="10" letter-spacing="1.5" fill="${p.muted}">${un ? "OFFLINE" : noTemp ? "ROOM" : "SET TO"}</text>
-        <text id="val" x="125" y="146" text-anchor="middle" font-size="44" font-weight="700" fill="${p.text}">${un ? "—" : noTemp ? `${room}°` : `${shown}°`}</text>
-        <text x="125" y="168" text-anchor="middle" font-size="12" fill="${p.muted}">${noTemp ? "" : `Room ${room}°`}</text>
+        <text id="lab" x="125" y="104" text-anchor="middle" font-size="10" letter-spacing="1.5" fill="${p.muted}">${un ? "" : noTemp ? (room != null ? "ROOM" : "") : "SET TO"}</text>
+        <text id="val" x="125" y="146" text-anchor="middle" font-size="${un || (noTemp && room == null) ? 22 : 44}" font-weight="700" fill="${p.text}">${un ? "Offline" : noTemp ? (room != null ? `${room}°` : "No setting") : `${shown}°`}</text>
+        <text x="125" y="168" text-anchor="middle" font-size="12" fill="${p.muted}">${noTemp || room == null ? "" : `Room ${room}°`}</text>
       </svg>
       ${c.show_power || (c.show_plus_minus && !noTemp) ? `<div class="ctl">
         ${c.show_plus_minus && !noTemp ? '<button class="rb mi" data-d="-1" aria-label="Lower"><ha-icon icon="mdi:minus"></ha-icon></button>' : "<span></span>"}
@@ -742,10 +766,10 @@ class RoostHero extends RoostBase {
       .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
       .hi{font-size:26px;font-weight:700;line-height:1.15}
       .sub{font-size:14px;opacity:.85;margin-top:6px;line-height:1.35}
-      .clock{font-size:15px;font-weight:600;opacity:.9;flex:none}
+      .clock{font-size:15px;font-weight:600;opacity:.9;flex:none;font-family:${FONT_NUM}}
       .wx{display:flex;align-items:center;gap:10px;margin-top:18px;cursor:${w ? "pointer" : "default"}}
       .wx ha-icon{--mdc-icon-size:34px}
-      .wx .tp{font-size:30px;font-weight:700}
+      .wx .tp{font-size:30px;font-weight:700;font-family:${FONT_NUM}}
       .wx .cd{font-size:14px;opacity:.85;text-transform:capitalize}
     </style>
     <div class="card"><div class="top"><div><div class="hi t">${esc(part)}${who ? `, ${esc(who)}` : ""}</div>
@@ -759,7 +783,7 @@ class RoostHero extends RoostBase {
 // ------------------------------------------------------------------ Roost Nav
 // A bottom bar on phones and a side rail on tablets ("auto"), or always one of them.
 class RoostNav extends RoostBase {
-  static get defaults() { return { items: [], layout: "auto", show_labels: false, fixed: true, color: "purple", theme: "auto" }; }
+  static get defaults() { return { items: [], layout: "auto", show_labels: false, fixed: true, color: "active", theme: "auto" }; }
 
   validate(c) { if (!Array.isArray(c.items) || !c.items.length) throw new Error("Add at least one button"); }
 
@@ -823,10 +847,11 @@ class RoostNav extends RoostBase {
         background:${p.panel};border:1px solid ${p.border};backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 18px 40px -16px rgba(0,0,0,.5);
         width:max-content;max-width:calc(100vw - 24px);${c.fixed ? "" : "margin:0 auto"}}
       a{min-width:${c.show_labels ? 64 : 56}px;min-height:${c.show_labels ? 60 : 52}px;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-        color:${p.muted};text-decoration:none;font-size:11px;font-weight:600;-webkit-tap-highlight-color:transparent;padding:4px 8px;transition:background .15s}
+        color:${p.muted};text-decoration:none;font-size:11px;font-weight:600;-webkit-tap-highlight-color:transparent;padding:4px 8px;transition:background .12s}
       a.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -10px ${g[2]}}
       a:active{transform:scale(.94)}
       a ha-icon{--mdc-icon-size:24px}
+      @media (max-width: 360px){nav{gap:2px;padding:6px}a{min-width:48px;padding:4px 2px}}
     </style>
     <nav aria-label="Navigation">${c.items.map((it, i) => `<a href="${esc(it.path)}" data-i="${i}" class="${this.active(it.path) ? "on" : ""}" aria-label="${esc(it.name || it.path)}">
       <ha-icon icon="${esc(it.icon || "mdi:circle")}"></ha-icon>${c.show_labels && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</a>`).join("")}</nav>`;
@@ -846,7 +871,7 @@ class RoostNav extends RoostBase {
 // ------------------------------------------------------------------ Roost Rooms
 // A row of room pills; the chosen room's cards show below. Switching is instant (all rooms are built once).
 class RoostRooms extends RoostBase {
-  static get defaults() { return { rooms: [], columns: 2, color: "purple", show_names: "active", theme: "auto" }; }
+  static get defaults() { return { rooms: [], columns: 2, color: "active", show_names: "active", theme: "auto" }; }
 
   validate(c) { if (!Array.isArray(c.rooms) || !c.rooms.length) throw new Error("Add at least one room"); }
 

@@ -14,6 +14,7 @@ Every card has a **visual editor**: pick the device, colours, size, icon and sha
 | **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. |
 
 All cards follow Home Assistant's light or dark mode (or stay always light or always dark), and their text is never cut off: it moves to the next line instead.
+Every card follows the [design rules](DESIGN_RULES.md), and the most important ones are checked automatically before each release.
 
 ---
 
@@ -53,6 +54,8 @@ animation: glow        # none, glow or spin
 show_switch: true
 show_since: true       # "for 5 min"
 power_entity: sensor.kitchen_power   # optional
+locked: false          # true: no switch, shows a lock (for things that must stay on)
+confirm: false         # true: asks before switching (for things that affect many devices)
 tap_action: { action: toggle }
 hold_action: { action: more-info }
 ```
@@ -69,7 +72,7 @@ entities:
   - person.sam           # all people become bubbles
   - person.ali
 size: medium             # small, medium or large
-align: stretch           # stretch (one row, equal sizes), center or start
+align: stretch           # stretch (one row, equal sizes; default), center or start
 ```
 
 ### Roost Thermostat
@@ -121,7 +124,7 @@ items:
 type: custom:roost-rooms
 columns: 2               # cards per row
 show_names: active       # active (only the chosen room), all, or none (icons only)
-color: purple
+color: active            # the selected purple; or any colour
 rooms:
   - name: Living
     icon: mdi:sofa

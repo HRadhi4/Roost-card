@@ -43,7 +43,8 @@ for (const dark of [true, false]) {
       el.hass = hass(dark);
       const html = el.shadowRoot.innerHTML;
       if (!html || html.length < 200) throw new Error("rendered nothing");
-      if (/undefined|NaN|\[object Object\]/.test(html.replace(/<style>[\s\S]*?<\/style>/g, ""))) throw new Error(`bad text in output: ${html.match(/.{40}(undefined|NaN|\[object Object\]).{20}/)?.[0]}`);
+      const text = html.replace(/<style>[\s\S]*?<\/style>/g, "");
+      if (/undefined|NaN|\bnull\b|—|\[object Object\]/.test(text)) throw new Error(`bad text in output (design rule 7): ${text.match(/.{40}(undefined|NaN|\bnull\b|—|\[object Object\]).{20}/)?.[0]}`);
       const form = customElements.get(tag).getConfigForm();
       if (!form.schema?.length) throw new Error("no editor");
       el.remove();
@@ -54,7 +55,7 @@ for (const dark of [true, false]) {
 const chips = document.createElement("roost-chips");
 chips.setConfig({ entities: ["light.kitchen", "light.hall", "person.sam"] });
 document.body.appendChild(chips); chips.hass = hass(true);
-if (!/mdi:lightbulb-on/.test(chips.shadowRoot.innerHTML) || !/<span>1<\/span>/.test(chips.shadowRoot.innerHTML)) { fails++; console.error("FAIL chips light count"); }
+if (!/mdi:lightbulb-on/.test(chips.shadowRoot.innerHTML) || !/<span class="num">1<\/span>/.test(chips.shadowRoot.innerHTML)) { fails++; console.error("FAIL chips light count"); }
 chips._open = "lights"; chips.render();
 if ((chips.shadowRoot.innerHTML.match(/class="tog/g) || []).length !== 2) { fails++; console.error("FAIL chips list"); }
 // Rooms: pills switch the room instantly, and the room's cards get Home Assistant.
