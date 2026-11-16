@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.2.6 — 2026-11-17
+- **Bottom bar fixed**: Home Assistant's pop-up messages (for example "Starting broadlink" while an integration starts) sat on top of the bar and caught the taps, so the buttons seemed dead. The messages now appear above the bar.
+- Room lines show power and light level as whole numbers ("Plug 42 W").
+- The card guide explains the new options (small media player, alarm pills, room lines, room readings under a title).
+
 ## 1.2.5 — 2026-11-17
 **More of the original phone dashboard**
 - **Roost Media** has a small look ("TV & sound"): name, state and volume buttons; it turns purple while the TV is on, and a tap switches it.
