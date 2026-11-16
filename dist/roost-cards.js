@@ -38,8 +38,17 @@ const COLORS = {
 };
 // The one colour for "this is the chosen / active one" (design rule 1).
 const ACTIVE = ["#6D4BFF", "#8B6CFF", "rgba(109,75,255,.55)", "#FFFFFF"];
-const FONT_TEXT = "Inter, var(--ha-font-family-body, Roboto), system-ui, sans-serif";
-const FONT_NUM = "'Space Grotesk', Inter, var(--ha-font-family-body, Roboto), system-ui, sans-serif";
+const FONT_TEXT = "Inter, -apple-system, 'Segoe UI', Roboto, sans-serif";
+// Load Inter and Space Grotesk once, the same fonts the original dashboard uses.
+try {
+  if (typeof document !== "undefined" && !document.getElementById("roost-fonts") && !document.getElementById("nest-fonts")) {
+    const l = document.createElement("link");
+    l.id = "roost-fonts"; l.rel = "stylesheet";
+    l.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap";
+    document.head.appendChild(l);
+  }
+} catch (e) { /* fonts fall back to the system font */ }
+const FONT_NUM = "'Space Grotesk', Inter, -apple-system, 'Segoe UI', Roboto, sans-serif";
 const COLOR_OPTIONS = [{ value: "active", label: "Selected purple" }, ...Object.keys(COLORS).map((k) => ({ value: k, label: k[0].toUpperCase() + k.slice(1) })), { value: "custom", label: "My own colours" }];
 const SIZES = { small: 128, medium: 152, large: 176 };
 // Ready-made skies for the hero card: [gradient, name in the editor]
@@ -519,7 +528,7 @@ class RoostTile extends RoostBase {
       .sw::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:${on ? "#fff" : p.knob};transform:translateX(${on ? 18 : 0}px);transition:transform .12s}
       .lk{position:absolute;top:18px;right:16px;opacity:.8;--mdc-icon-size:18px}
       .nm{font-size:${nsz}px;font-weight:600;line-height:1.2}
-      .lb{font-size:12px;line-height:1.3;opacity:.85;margin-top:3px;color:${on ? "inherit" : p.muted}}
+      .lb{font-size:12px;line-height:1.3;opacity:.85;color:${on ? "inherit" : p.muted}}
       .ago{font-size:11px;opacity:.65;margin-top:4px;color:${on ? "inherit" : p.muted}}
     </style>
     <div class="card" role="button" tabindex="0" aria-label="${esc(this.name(c.entity))}">
@@ -598,13 +607,13 @@ class RoostChips extends RoostBase {
     if (un) return { icon: "mdi:help-circle-outline", colour: this.p.muted, text: "" };
     if (d === "alarm_control_panel") {
       const armed = s.state.startsWith("armed") || s.state === "triggered";
-      return { icon: armed ? "mdi:shield-check" : "mdi:shield-off-outline", colour: s.state === "triggered" ? "#FF5C7A" : armed ? "#3DD68C" : "#FF5C7A", text: "" };
+      return { icon: armed ? "mdi:shield-check" : "mdi:shield-off", colour: s.state === "triggered" ? "#F43F6B" : armed ? "#34D399" : "#F43F6B", text: "" };
     }
     if (d === "lock") return { icon: s.state === "locked" ? "mdi:lock" : "mdi:lock-open-variant", colour: s.state === "locked" ? "#3DD68C" : "#FF9A3D", text: "" };
     if (d === "binary_sensor" && ["door", "window", "garage_door", "opening"].includes(cls)) {
       const open = s.state === "on";
       const icon = cls === "window" ? (open ? "mdi:window-open-variant" : "mdi:window-closed-variant") : (open ? "mdi:door-open" : "mdi:door-closed");
-      return { icon, colour: open ? "#FF9A3D" : "#3DD68C", text: this._config.show_words ? (open ? "Open" : "Closed") : "", word: true };
+      return { icon, colour: open ? "#FF9F6B" : "#34D399", text: this._config.show_words ? (open ? "Open" : "Closed") : "", word: true };
     }
     if (d === "climate") {
       const on = s.state !== "off";
@@ -620,7 +629,7 @@ class RoostChips extends RoostBase {
     if (!this._hass || !this._config) return;
     const p = this.p, c = this._config;
     const { lights, people, singles, doors, climates } = this.groups();
-    const h = { small: 40, medium: 48, large: 56 }[c.size] || 48;
+    const h = { small: 34, medium: 40, large: 48 }[c.size] || 40;
     const lightsOn = lights.filter((id) => this.st(id)?.state === "on").length;
     const chips = [];
     singles.forEach((id) => {
@@ -629,19 +638,20 @@ class RoostChips extends RoostBase {
     });
     if (doors.length) {
       const open = doors.filter((id) => this.st(id)?.state === "on").length;
-      chips.unshift({ key: "__doors", icon: open ? "mdi:door-open" : "mdi:door-closed", colour: open ? "#FF9A3D" : "#3DD68C", text: open ? String(open) : "", group: "doors", label: "Doors" });
+      chips.unshift({ key: "__doors", icon: open ? "mdi:door-open" : "mdi:door-closed", colour: open ? "#FF9F6B" : "#34D399", text: open ? String(open) : "", group: "doors", label: "Doors" });
     }
+    if (lights.length) chips.push({ key: "__lights", icon: lightsOn ? "mdi:lightbulb-on" : "mdi:lightbulb-outline", colour: lightsOn ? "#F5B94A" : p.muted, text: lightsOn ? String(lightsOn) : "", group: "lights" });
     if (climates.length) {
       const on = climates.filter((id) => this.st(id) && !OFF_STATES.concat(UNAVAILABLE).includes(this.st(id).state)).length;
       chips.push({ key: "__climates", icon: "mdi:snowflake", colour: on ? "#38BDF8" : p.muted, text: on ? String(on) : "", group: "climates", label: "Air conditioners" });
     }
-    if (lights.length) chips.push({ key: "__lights", icon: lightsOn ? "mdi:lightbulb-on" : "mdi:lightbulb-outline", colour: lightsOn ? "#FCD34D" : p.muted, text: lightsOn ? String(lightsOn) : "", group: "lights" });
     if (people.length) chips.push({ key: "__people", people: true, group: "people" });
     const open = this._open;
     const initials = (id) => (this.st(id)?.attributes.friendly_name || id.split(".")[1]).split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+    const AVG = ["linear-gradient(135deg,#38BDF8,#6D4BFF)", "linear-gradient(135deg,#FF5577,#FF9F6B)", "linear-gradient(135deg,#10B981,#6EE7B7)", "linear-gradient(135deg,#F59E0B,#FDE68A)", "linear-gradient(135deg,#8B6CFF,#D6C4FF)"];
     const avatar = (id, i) => {
       const s = this.st(id), home = s?.state === "home", pic = s?.attributes.entity_picture;
-      return `<span class="av" style="z-index:${10 - i};margin-left:${i ? -10 : 0}px;${home ? "" : "filter:grayscale(1);opacity:.55;"}background:${home ? "linear-gradient(135deg,#6D4BFF,#38BDF8)" : p.track}">${pic ? `<img src="${esc(pic)}" alt="">` : esc(initials(id))}</span>`;
+      return `<span class="av" style="z-index:${10 - i};margin-left:${i ? -10 : 0}px;color:${home ? "#fff" : "#A3A9CF"};${pic && !home ? "filter:grayscale(1);opacity:.6;" : ""}background:${home ? AVG[i % AVG.length] : "#3A4070"}">${pic ? `<img src="${esc(pic)}" alt="">` : esc(initials(id).slice(0, 1))}</span>`;
     };
     const list = { lights, people, doors, climates }[open] || [];
     const stateWord = (id, s) => {
@@ -652,18 +662,18 @@ class RoostChips extends RoostBase {
       return s.state === "on" ? "On" : "Off";
     };
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .row{${c.align === "stretch" ? "display:grid;grid-auto-flow:column;grid-auto-columns:minmax(max-content,1fr);gap:6px"
+      .row{${c.align === "stretch" ? "display:grid;grid-auto-flow:column;grid-auto-columns:minmax(max-content,1fr);gap:8px"
     : `display:flex;flex-wrap:wrap;gap:8px;justify-content:${c.align === "start" ? "flex-start" : "center"}`}}
       .chip{min-width:max-content;white-space:nowrap;height:${h}px;padding:0 ${c.align === "stretch" ? 6 : 14}px;border-radius:${c.chip_shape === "square" ? 10 : c.chip_shape === "rounded" ? 16 : 999}px;
-        border:1px solid ${c.background === "none" ? "transparent" : p.border};background:${c.background === "none" ? "transparent" : c.background === "glass" ? "color-mix(in srgb, " + p.panel + " 60%, transparent);backdrop-filter:blur(14px)" : p.panel};
-        color:${p.text};display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font:inherit;font-size:14px;font-weight:600;-webkit-tap-highlight-color:transparent}
+        border:1px solid ${c.background === "none" ? "transparent" : p.border};background:${c.background === "none" ? "transparent" : c.background === "glass" ? "color-mix(in srgb, " + p.panel + " 60%, transparent);backdrop-filter:blur(14px)" : p.off};
+        color:${p.text};display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer;font:inherit;font-size:${h > 44 ? 14 : 12}px;font-weight:600;-webkit-tap-highlight-color:transparent}
       .chip:active{transform:scale(.95)}
       :host{container-type:inline-size}
       @container (max-width: 340px){:host .row{gap:4px}:host .chip{padding:0 6px;gap:4px}:host .chip .word{display:none}:host .av{width:${h - 20}px;height:${h - 20}px}}
       @container (max-width: 260px){:host .row{overflow-x:auto;scrollbar-width:none;justify-content:start}:host .row::-webkit-scrollbar{display:none}}
       .chip.on{outline:2px solid #8B6CFF}
-      .chip ha-icon{--mdc-icon-size:${h > 48 ? 24 : 20}px}
-      .av{width:${h - 16}px;height:${h - 16}px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;border:2px solid ${p.panel};overflow:hidden;position:relative}
+      .chip ha-icon{--mdc-icon-size:${h > 44 ? 22 : 18}px;display:flex}
+      .av{width:${h - 14}px;height:${h - 14}px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid ${p.off};overflow:hidden;position:relative;flex:none}
       .av img{width:100%;height:100%;object-fit:cover}
       .list{margin-top:10px;border-radius:20px;border:1px solid ${p.border};background:${p.panel};padding:6px 14px}
       .it{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid ${p.border}}
@@ -678,7 +688,7 @@ class RoostChips extends RoostBase {
       ? `<button class="chip ${open === "people" ? "on" : ""}" data-g="people" aria-label="People">${people.map(avatar).join("")}</button>`
       : `<button class="chip ${open && open === ch.group ? "on" : ""}" data-pop="${esc(`${ch.text || ""}${ch.colour || ""}${ch.icon || ""}`)}" data-popkey="${esc(ch.key || ch.entity || ch.group || "")}" ${ch.group ? `data-g="${ch.group}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(ch.entity ? this.name(ch.entity) : ch.label || "Lights")}">
           ${ch.icon ? `<ha-icon icon="${ch.icon}" style="color:${ch.colour}"></ha-icon>` : `<span class="ent" data-icon="${esc(ch.entity)}" style="color:${ch.colour};display:flex"></span>`}
-          ${ch.text ? `<span class="${ch.word ? "word" : "num"}">${esc(ch.text)}</span>` : ""}</button>`).join("")}</div>
+          ${ch.text ? `<span class="${ch.word ? "word" : "cnt"}"${ch.word ? "" : ` style="color:${ch.colour}"`}>${esc(ch.text)}</span>` : ""}</button>`).join("")}</div>
     ${list.length ? `<div class="list">${list.map((id) => {
       const s = this.st(id), isOn = s?.state === "on" || s?.state === "home";
       return `<div class="it" ${open === "climates" || open === "doors" ? `data-m="${esc(id)}" style="cursor:pointer"` : ""}><span class="n t">${esc(s?.attributes.friendly_name || id)}<br><span class="s">${esc(stateWord(id, s))}</span></span>
@@ -931,16 +941,16 @@ class RoostScene extends RoostBase {
     const look = fillLook(c.fill, c.glow, g, p), bs = Math.max(36, Number(c.button_size) || 58);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{position:relative;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;transition:transform .12s;
-        ${round ? `display:flex;flex-direction:column;align-items:center;gap:7px;padding:2px;color:${p.text}`
+        ${round ? `display:flex;flex-direction:column;align-items:center;gap:8px;padding:2px;color:${p.text}`
     : `min-height:${h}px;height:100%;border-radius:${c.radius}px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;
-          background:${look.bg};color:${look.fg};border:${c.fill === "outline" ? 2 : 1}px solid ${look.border};box-shadow:${look.shadow};${look.blur ? "backdrop-filter:blur(14px);" : ""}`}}
+          background:${look.bg};color:${look.light ? "#fff" : look.fg};border:${c.fill === "outline" ? 2 : 1}px solid ${look.border};box-shadow:${(c.glow || "soft") === "soft" && c.fill !== "outline" ? `0 14px 30px -14px ${g[2]}` : look.shadow};${look.blur ? "backdrop-filter:blur(14px);" : ""}`}}
       .card:active{transform:scale(.95)}
       .ic{display:flex;align-items:center;justify-content:center;flex:none;
-        ${round ? `width:${bs}px;height:${bs}px;border-radius:${shapeRadius(c.shape, bs)};background:${look.bg};color:${look.light ? look.fg : g[this.dark ? 1 : 0]};
-          border:${c.fill === "outline" ? 2 : 1}px solid ${look.border};box-shadow:${look.shadow};${look.blur ? "backdrop-filter:blur(14px);" : ""}`
+        ${round ? `width:${bs}px;height:${bs}px;border-radius:${shapeRadius(c.shape, bs)};background:${look.bg};color:${look.light ? "#fff" : g[this.dark ? 1 : 0]};
+          border:${c.fill === "outline" || c.fill === "glass" ? `${c.fill === "outline" ? 2 : 1}px solid ${look.border}` : "0"};box-shadow:${c.glow === "none" ? "none" : c.glow === "strong" ? look.shadow : c.fill === "outline" ? look.shadow : `0 12px 24px -10px ${g[2]}`};${look.blur ? "backdrop-filter:blur(14px);" : ""}`
     : `width:34px;height:34px;border-radius:12px;background:${look.light ? "rgba(255,255,255,.22)" : `color-mix(in srgb, ${g[0]} 30%, transparent)`}`}}
       .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:${round ? Math.round(bs * 0.4) : 18}px}
-      .nm{font-size:${round ? 11 : 14}px;font-weight:${round ? 600 : 700};line-height:1.2;text-align:${round ? "center" : "left"}${round ? ";margin:0 -6px;letter-spacing:-.1px" : ""}}
+      .nm{font-size:${round ? 11 : 14}px;font-weight:600;line-height:1.2;text-align:${round ? "center" : "left"}${round ? ";margin:0 -6px" : ""}}
       .done{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:#3DD68C;display:none;align-items:center;justify-content:center;color:#fff}
       .done.show{display:flex;animation:roost-tick 1.6s ease-out forwards}
     </style>
@@ -960,7 +970,7 @@ class RoostScene extends RoostBase {
 // a soft light sweep, the date and time, the weather, and an optional "what's next" pill.
 class RoostHero extends RoostBase {
   static get defaults() { return { sky: "auto", sun: "sun.sun", show_date: true, show_clock: true, show_orb: true, show_stars: true, show_sheen: true, min_height: 180, upcoming: [], upcoming_title: "Next", radius: 26, theme: "auto",
-    greeting: "", show_greeting: true, show_name: true, greeting_size: 27, align: "left", show_weather: true, info: [], orb_size: 56, pill_style: "glass", tap_action: { action: "none" } }; }
+    greeting: "", show_greeting: true, show_name: true, greeting_size: 25, align: "left", show_weather: true, info: [], orb_size: 56, pill_style: "glass", tap_action: { action: "none" } }; }
 
   watched() { return [this._config.weather, this._config.sun, ...(this._config.upcoming || []).map((u) => u.entity), ...(this._config.info || []).map((u) => u.entity)].filter(Boolean); }
 
@@ -1039,6 +1049,7 @@ class RoostHero extends RoostBase {
     const part = c.greeting ? c.greeting : hr < 5 ? "Good night" : hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
     const who = c.show_name ? c.title || (this._hass.user?.name || "").split(" ")[0] : "";
     const os = Math.max(20, Number(c.orb_size) || 56);
+    const osz = os !== 56 ? os : day ? 56 : 52; // the moon is a little smaller, as on the original
     const info = (c.info || []).map((it) => {
       const st = this.st(it.entity);
       if (!st || UNAVAILABLE.includes(st.state)) return "";
@@ -1057,7 +1068,7 @@ class RoostHero extends RoostBase {
     const orb = day ? "background:radial-gradient(circle at 40% 40%,#FFF7D6,#FDE047 55%,#F59E0B);box-shadow:0 0 50px 16px rgba(253,224,71,.45)"
       : "background:radial-gradient(circle at 36% 34%,#FFFBEA 0%,#F6E3A6 62%,#E2C273 100%);box-shadow:0 0 40px 12px rgba(255,234,170,.28)";
     const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    const date = now.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+    const date = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
     const top = [c.show_date ? date : "", c.show_clock ? time : ""].filter(Boolean).join(" · ");
     const nx = this.nextUp();
     let pill = "";
@@ -1065,24 +1076,24 @@ class RoostHero extends RoostBase {
       const dm = Math.max(0, Math.round((nx.t - now.getTime()) / 60000));
       const left = `${Math.floor(dm / 60) ? `${Math.floor(dm / 60)}h ` : ""}${dm % 60}m`;
       const at = new Date(nx.t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-      pill = `<div class="pill"><span class="dot"><span></span></span><span class="t" style="flex:1">${esc(c.upcoming_title || "Next")} <b>${esc(nx.name)}</b> at ${esc(at)}</span><b class="num">in ${esc(left)}</b></div>`;
+      pill = `<div class="pill"><span class="dot"><span></span></span><span class="t" style="flex:1">${esc(c.upcoming_title || "Next")} <b>${esc(nx.name)}</b> at ${esc(at)}</span><b class="cd">in ${esc(left)}</b></div>`;
     }
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{position:relative;overflow:hidden;border-radius:${c.radius}px;padding:20px;min-height:${Number(c.min_height) || 180}px;color:#fff;background:${sky}}
       .star{position:absolute;border-radius:50%;background:#fff;animation:roost-twinkle 3s ease-in-out infinite}
       .sheen{position:absolute;top:0;bottom:0;left:0;width:70px;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.12),rgba(255,255,255,0));animation:roost-sheen 8s ease-in-out 1s infinite;pointer-events:none}
-      @container (max-width: 300px){:host .orb{width:34px;height:34px;right:14px;top:14px}:host .hi{padding:0;font-size:min(${Number(c.greeting_size) || 27}px,13cqw)}:host .top{padding:0 44px 0 0}:host .card{padding:16px}}
-      .orb{position:absolute;right:24px;top:22px;width:${os}px;height:${os}px;border-radius:50%;${orb};animation:roost-float 6s ease-in-out infinite}
+      @container (max-width: 300px){:host .orb{width:34px;height:34px;right:14px;top:14px}:host .hi{padding:0;font-size:min(${Number(c.greeting_size) || 25}px,13cqw)}:host .top{padding:0 44px 0 0}:host .card{padding:16px}}
+      .orb{position:absolute;right:24px;top:22px;width:${osz}px;height:${osz}px;border-radius:50%;${orb};animation:roost-float 6s ease-in-out infinite}
       .body{position:relative;display:flex;flex-direction:column;gap:8px;${c.align === "center" ? "align-items:center;text-align:center;" : ""}}
       .infos{display:flex;flex-wrap:wrap;gap:6px;${c.align === "center" ? "justify-content:center;" : ""}}
       .inf{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;padding:4px 10px;border-radius:999px;background:rgba(10,8,40,.25);cursor:pointer}
       .inf ha-icon{--mdc-icon-size:15px}
       .top{font-size:13px;opacity:.85;${c.show_orb ? `padding:0 ${os + 12}px 0 ${c.align === "center" ? os + 12 : 0}px` : ""}}
-      .hi{font-size:${Number(c.greeting_size) || 27}px;font-weight:700;letter-spacing:-.4px;line-height:1.15;padding:0 ${c.show_orb ? os + 12 : 0}px 0 ${c.show_orb && c.align === "center" ? os + 12 : 0}px;font-family:${FONT_NUM}}
+      .hi{font-size:${Number(c.greeting_size) || 25}px;font-weight:700;letter-spacing:-.4px;line-height:1.15;padding:0 ${c.show_orb ? os + 12 : 0}px 0 ${c.show_orb && c.align === "center" ? os + 12 : 0}px;font-family:${FONT_NUM}}
       .wx{font-size:14px;line-height:1.5;opacity:.9;cursor:${w ? "pointer" : "default"}}
-      .pill{display:flex;align-items:center;gap:10px;background:${c.pill_style === "none" ? "transparent" : c.pill_style === "light" ? "rgba(255,255,255,.22)" : "rgba(10,8,40,.3)"};${c.align === "center" ? "align-self:stretch;" : ""}border-radius:16px;padding:10px 12px;margin-top:6px;font-size:13px;line-height:1.35}
-      .pill b.num{font-size:14px;flex:none}
-      @container (max-width: 260px){:host .pill{flex-wrap:wrap}:host .pill b.num{flex-basis:100%;padding-left:22px}}
+      .pill{display:flex;align-items:center;gap:10px;background:${c.pill_style === "none" ? "transparent" : c.pill_style === "light" ? "rgba(255,255,255,.22)" : "rgba(10,8,40,.3)"};${c.align === "center" ? "align-self:stretch;" : ""}border-radius:16px;padding:10px 12px;margin-top:6px;font-size:13px}
+      .pill b.cd{font-size:14px;flex:none}
+      @container (max-width: 260px){:host .pill{flex-wrap:wrap}:host .pill b.cd{flex-basis:100%;padding-left:22px}}
       .dot{position:relative;width:10px;height:10px;border-radius:50%;background:#E9E2FF;flex:none}
       .dot span{position:absolute;inset:0;border-radius:50%;background:#E9E2FF;animation:roost-ping 1.8s ease-out infinite}
     </style>
@@ -1108,7 +1119,7 @@ class RoostHero extends RoostBase {
 // ------------------------------------------------------------------ Roost Nav
 // A bottom bar on phones and a side rail on tablets ("auto"), or always one of them.
 class RoostNav extends RoostBase {
-  static get defaults() { return { items: [], layout: "auto", show_labels: true, fixed: true, color: "active", active_style: "filled", background: "glass", bar_height: 54, icon_size: 22, radius: 26, theme: "auto" }; }
+  static get defaults() { return { items: [], layout: "auto", show_labels: true, fixed: true, color: "active", active_style: "filled", background: "glass", bar_height: 54, icon_size: 21, radius: 26, theme: "auto" }; }
 
   validate(c) { if (!Array.isArray(c.items) || !c.items.length) throw new Error("Add at least one button"); }
 
@@ -1147,6 +1158,7 @@ class RoostNav extends RoostBase {
           name: { label: "Name", selector: { text: {} } },
           icon: { label: "Icon", required: true, selector: { icon: {} } },
           path: { label: "Opens (for example /dashboard-home/0 or #rooms)", required: true, selector: { text: {} } },
+          users: { label: "Only for these people (empty = everyone)", selector: { select: { multiple: true, custom_value: true, options: [] } } },
         } } } },
         { type: "grid", name: "", schema: [
           { name: "layout", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Bar on phones, rail on tablets" }, { value: "bar", label: "Always a bottom bar" }, { value: "rail", label: "Always a side rail" }] } } },
@@ -1186,18 +1198,20 @@ class RoostNav extends RoostBase {
     const editing = this.editing();
     const rail = !editing && (c.layout === "rail" || (c.layout === "auto" && window.innerWidth >= 768));
     const fixed = c.fixed && !editing;
+    const uid = this._hass.user?.id;
+    const shown = c.items.map((it, i) => ({ it, i })).filter(({ it }) => editing || !Array.isArray(it.users) || !it.users.length || it.users.includes(uid));
     const pos = fixed ? (rail ? "position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:4" : "position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4") : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       :host{${fixed ? (rail ? "height:0;" : "height:calc(76px + env(safe-area-inset-bottom));") : ""}display:block}
       .edit{font-size:12px;color:${p.muted};text-align:center;margin:0 0 6px}
-      nav{${pos};display:${rail ? "flex" : "grid"};${rail ? "flex-direction:column" : `grid-template-columns:repeat(${c.items.length},minmax(0,1fr))`};gap:${rail ? 12 : 4}px;padding:${rail ? "14px 10px" : "7px"};border-radius:${Number(c.radius) + (rail ? 2 : 0)}px;
+      nav{${pos};display:${rail ? "flex" : "grid"};${rail ? "flex-direction:column" : `grid-template-columns:repeat(${shown.length},minmax(0,1fr))`};gap:${rail ? 12 : 7}px;padding:${rail ? "14px 10px" : "8px"};border-radius:${Number(c.radius) + (rail ? 2 : 0)}px;
         ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};box-shadow:0 18px 40px -16px rgba(0,0,0,.5);`
-    : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[0]}47;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 18px 40px -12px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;`}
+    : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 18px 40px -12px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;`}
         ${rail ? "width:max-content" : `width:${fixed ? "calc(100vw - 24px)" : "100%"};max-width:536px`};${fixed ? "" : "margin:0 auto"}}
       a{position:relative;min-width:${rail ? 56 : 0}px;min-height:${Number(c.bar_height) || 54}px;border-radius:${c.active_style === "pill" ? 999 : Math.max(8, Number(c.radius) - 8)}px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-        color:${p.muted};text-decoration:none;font-size:10.5px;font-weight:600;-webkit-tap-highlight-color:transparent;padding:4px 6px;transition:background .12s}
+        color:${p.muted};text-decoration:none;font-size:clamp(8.5px, 2.7vw, 10.5px);font-weight:600;-webkit-tap-highlight-color:transparent;padding:4px 6px;transition:background .12s}
       ${{
-    filled: `a.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 22px -8px ${g[2]}}`,
+    filled: `a.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -8px color-mix(in srgb, ${g[0]} 95%, transparent), inset 0 1px 0 rgba(255,255,255,.35)}`,
     pill: `a.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 22px -8px ${g[2]}}`,
     soft: `a.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]}}`,
     line: `a.on{color:${g[this.dark ? 1 : 0]}}a.on::after{content:"";position:absolute;bottom:3px;left:30%;right:30%;height:3px;border-radius:3px;background:linear-gradient(90deg,${g[0]},${g[1]})}`,
@@ -1207,10 +1221,10 @@ class RoostNav extends RoostBase {
       a:active{transform:scale(.94)}
       a ha-icon{--mdc-icon-size:${Number(c.icon_size) || 22}px}
       a{min-width:0}
-      @container (max-width: ${c.items.length * 64}px){:host a span{display:none}:host a{padding:4px 2px}:host nav{padding:5px;gap:2px}}
+      @container (max-width: ${shown.length * 64}px){:host a span{display:none}:host a{padding:4px 2px}:host nav{padding:5px;gap:2px}}
       @media (max-width: 360px){nav{gap:2px;padding:6px}a{padding:4px 2px}}
     </style>
-    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${c.items.map((it, i) => `<a href="${esc(it.path)}" data-i="${i}" class="${this.active(it.path) ? "on" : ""}" aria-label="${esc(it.name || it.path)}">
+    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${shown.map(({ it, i }) => `<a href="${esc(it.path)}" data-i="${i}" class="${this.active(it.path) ? "on" : ""}" aria-label="${esc(it.name || it.path)}">
       <ha-icon icon="${esc(it.icon || "mdi:circle")}"></ha-icon>${c.show_labels && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</a>`).join("")}</nav>`;
     this.shadowRoot.querySelectorAll("a").forEach((a) => a.addEventListener("click", (ev) => {
       const it = c.items[+a.dataset.i];
@@ -1276,21 +1290,21 @@ class RoostRow extends RoostBase {
     const r = s && !un ? this.reading(s) : { value: null, text: null, line: s ? "Offline" : "Device not found" };
     const mn = r.min ?? c.min, mx = r.max ?? c.max;
     const f = r.value == null ? 0 : Math.max(0, Math.min(1, (r.value - mn) / (mx - mn || 1)));
-    const rs = Math.max(40, Number(c.ring_size) || 64), rw = Math.max(2, Number(c.ring_width) || 6);
+    const rs = Math.max(40, Number(c.ring_size) || 58), rw = Math.max(2, Number(c.ring_width) || 6);
     const R = 32 - rw / 2 - 3, C = 2 * Math.PI * R, L = C * 0.75;
     const on = s && !un && !OFF_STATES.includes(s.state);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      @container (max-width: 280px){:host .row{gap:10px;padding:12px}:host .ring{width:min(${Math.max(40, Number(c.ring_size) || 64)}px,30cqw);height:min(${Math.max(40, Number(c.ring_size) || 64)}px,30cqw)}:host .ring .v{font-size:min(${Math.round(Math.max(40, Number(c.ring_size) || 64) * 0.3)}px,9cqw)}:host .ch{display:none}:host .n{font-size:15px}}
+      @container (max-width: 280px){:host .row{gap:10px;padding:12px}:host .ring{width:min(${Math.max(40, Number(c.ring_size) || 58)}px,30cqw);height:min(${Math.max(40, Number(c.ring_size) || 58)}px,30cqw)}:host .ring .v{font-size:min(${Math.round(Math.max(40, Number(c.ring_size) || 58) * 0.3)}px,9cqw)}:host .ch{display:none}:host .n{font-size:15px}}
       @container (max-width: 220px){:host .row{flex-wrap:wrap}:host .tx{flex:1 1 100%}}
-      .row{display:flex;align-items:center;gap:16px;padding:14px 18px 14px 14px;border-radius:${c.radius}px;background:${p.panel};border:1px solid ${p.border};color:${p.text};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s;opacity:${un ? 0.55 : 1}}
+      .row{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:${c.radius}px;background:${p.panel};border:1px solid ${p.border};color:${p.text};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s;opacity:${un ? 0.55 : 1}}
       .row:active{transform:scale(.98)}
       .ring{position:relative;width:${rs}px;height:${rs}px;flex:none;display:flex;align-items:center;justify-content:center}
       .ring svg{position:absolute;inset:0}
-      .ring .v{font-size:${Math.round(rs * 0.3)}px;font-weight:700;font-family:${FONT_NUM}}
+      .ring .v{font-size:${Math.round(rs * 0.295)}px;font-weight:700;font-family:${FONT_NUM}}
       .ring ha-icon{--mdc-icon-size:24px;color:${on ? g[1] : p.muted}}
       .tx{flex:1;min-width:0}
-      .n{font-size:17px;font-weight:600;line-height:1.25}
-      .l{font-size:13.5px;color:${p.muted};margin-top:3px;line-height:1.3}
+      .n{font-size:15px;font-weight:600;line-height:1.25}
+      .l{font-size:12px;color:${p.muted};margin-top:3px;line-height:1.3}
       .ch{flex:none;color:${p.muted};--mdc-icon-size:22px}
     </style>
     <div class="row" role="button" tabindex="0" aria-label="${esc(this.name(c.entity))}">
@@ -1314,8 +1328,8 @@ class RoostRow extends RoostBase {
 // A row of room pills; the chosen room's cards show below. Switching is instant (all rooms are built once).
 class RoostRooms extends RoostBase {
   static get defaults() {
-    return { rooms: [], columns: 2, gap: 12, color: "active", show_names: "active", active_style: "filled", background: "solid",
-      pill_shape: "pill", pill_height: 44, pill_icon_size: 22, pill_align: "spread", show_count: false,
+    return { rooms: [], columns: 2, gap: 8, color: "active", show_names: "active", active_style: "filled", background: "solid",
+      pill_shape: "pill", pill_height: 40, pill_icon_size: 20, pill_align: "spread", show_count: false,
       tile_size: "large", tile_fill: "gradient", tile_glow: "soft", tile_radius: 22, auto_colors: true,
       swipe: true, remember: true, start_room: "", theme: "auto" };
   }
@@ -1461,22 +1475,22 @@ class RoostRooms extends RoostBase {
     const showName = (i) => c.show_names === "all" || (c.show_names === "active" && i === this._active);
     const room = c.rooms[this._active] || {};
     const g = room.color && room.color !== "custom" ? (room.color === "active" ? ACTIVE : COLORS[room.color] || this.colour()) : this.colour();
-    const ph = Math.max(28, Number(c.pill_height) || 44);
+    const ph = Math.max(28, Number(c.pill_height) || 40);
     const rad = c.pill_shape === "square" ? 10 : c.pill_shape === "rounded" ? Math.round(ph * 0.34) : 999;
     const counts = c.show_count ? c.rooms.map((r) => this.onCount(r)) : [];
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .bar{border-radius:${c.pill_shape === "pill" ? 999 : rad + 4}px;border:1px solid ${c.background === "none" ? "transparent" : p.border};background:${c.background === "none" ? "transparent" : c.background === "glass" ? `color-mix(in srgb, ${p.panel} 60%, transparent);backdrop-filter:blur(14px)` : p.panel};padding:4px;margin-bottom:12px}
+      .bar{border-radius:${c.pill_shape === "pill" ? 999 : rad + 4}px;border:1px solid ${c.background === "none" ? "transparent" : p.border};background:${c.background === "none" ? "transparent" : c.background === "glass" ? `color-mix(in srgb, ${p.panel} 60%, transparent);backdrop-filter:blur(14px)` : p.panel};padding:5px;margin-bottom:16px}
       .pills{display:flex;gap:2px;justify-content:${c.pill_align === "start" ? "flex-start" : c.pill_align === "center" ? "center" : "space-between"};overflow-x:auto;scrollbar-width:none}
       .pills::-webkit-scrollbar{display:none}
       .pill{position:relative;flex:0 0 auto;min-height:${ph}px;min-width:${ph + 8}px;border-radius:${rad}px;border:0;background:transparent;color:${p.muted};
-        display:flex;align-items:center;justify-content:center;gap:8px;padding:0 14px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+        display:flex;align-items:center;justify-content:center;gap:6px;padding:0 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
       ${c.active_style === "soft" ? `.pill.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]}}`
     : c.active_style === "line" ? `.pill.on{color:${g[this.dark ? 1 : 0]}}.pill.on::after{content:"";position:absolute;bottom:4px;left:28%;right:28%;height:3px;border-radius:3px;background:linear-gradient(90deg,${g[0]},${g[1]})}`
-      : `.pill.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -12px ${g[2]}}`}
+      : `.pill.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 8px 20px -8px color-mix(in srgb, ${g[0]} 90%, transparent)}`}
       .pill:active{transform:scale(.95)}
-      .pill ha-icon{--mdc-icon-size:${Number(c.pill_icon_size) || 22}px}
+      .pill ha-icon{--mdc-icon-size:${Number(c.pill_icon_size) || 20}px}
       .cnt{position:absolute;top:3px;right:4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#FCD34D;color:#2A1800;font-size:10px;font-weight:700;line-height:16px;text-align:center}
-      .room{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:${Number(c.gap) || 12}px;touch-action:pan-y}
+      .room{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:${Number(c.gap) || 8}px;touch-action:pan-y}
       @container (max-width: 300px){:host .room{grid-template-columns:minmax(0,1fr)}}
       .room[hidden]{display:none}
       .room > *{min-width:0}
@@ -3944,6 +3958,74 @@ const RoostFull = {
 
 RoostFull.start();
 
+// ------------------------------------------------------------------ Roost Page
+// A phone page laid out exactly like the original dashboard: 14 px at the sides, 16 px between cards,
+// at most 560 px wide, and room at the bottom for the navigation bar. Put it in a "Panel" view.
+// A card can sit next to others with `type: grid` (8 px between them, as on the original).
+class RoostPage extends RoostBase {
+  static get defaults() { return { cards: [], gap: 16, side: 14, top: 16, bottom: 130, max_width: 560, background: true, theme: "auto" }; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { type: "grid", name: "", schema: [{ name: "gap", label: "Space between cards", selector: slider(0, 32) }, { name: "side", label: "Space at the sides", selector: slider(0, 32) }] },
+        { type: "grid", name: "", schema: [{ name: "top", label: "Space at the top", selector: slider(0, 48) }, { name: "bottom", label: "Space at the bottom (for the bar)", selector: slider(0, 200, 10) }] },
+        { type: "grid", name: "", schema: [{ name: "max_width", label: "Widest it gets", selector: slider(320, 1200, 10) }, { name: "background", label: "Night-sky background", selector: { boolean: {} } }] },
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return { cards: [{ type: "custom:roost-hero" }] }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
+
+  set hass(hass) {
+    this._hass = hass;
+    (this._cards || []).forEach((el) => { el.hass = hass; });
+    const sig = `${this.dark ? 1 : 0}|${this._built ? 1 : 0}`;
+    if (sig === this._sig) return;
+    this._sig = sig;
+    this.render();
+  }
+
+  setConfig(config) { this._built = false; this._cards = null; super.setConfig(config); }
+
+  async build() {
+    const helpers = window.loadCardHelpers ? await window.loadCardHelpers() : null;
+    this._cards = (this._config.cards || []).map((cfg) => {
+      let el;
+      try {
+        el = helpers ? helpers.createCardElement(cfg) : document.createElement(String(cfg.type || "").replace(/^custom:/, ""));
+        if (!helpers) el.setConfig?.(cfg);
+      } catch (e) { el = document.createElement("div"); el.textContent = `Card problem: ${e.message}`; }
+      if (this._hass) el.hass = this._hass;
+      return el;
+    });
+    this._built = true;
+    this._sig = null;
+    if (this._hass) this.hass = this._hass;
+  }
+
+  render() {
+    if (!this._config) return;
+    if (!this._built) { if (!this._building) { this._building = true; this.build().finally(() => { this._building = false; }); } return; }
+    const c = this._config, n = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+    const bg = this.dark ? "radial-gradient(1000px 620px at 15% -10%, #2A1F6B 0%, transparent 60%), radial-gradient(800px 600px at 100% 100%, #0E2A4A 0%, transparent 60%), #0B0D17"
+      : "radial-gradient(1000px 620px at 15% -10%, #E2D9FF 0%, transparent 60%), radial-gradient(800px 600px at 100% 100%, #D6EBFF 0%, transparent 60%), #EEF1FA";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      :host{${c.background ? `background:${bg};min-height:100vh;` : ""}--grid-card-gap:8px;--vertical-stack-card-gap:8px;--horizontal-stack-card-gap:8px}
+      .page{display:grid;grid-template-columns:minmax(0,1fr);gap:${n(c.gap, 16)}px;padding:${n(c.top, 16)}px ${n(c.side, 14)}px ${n(c.bottom, 130)}px;max-width:${n(c.max_width, 560)}px;margin:0 auto;align-content:start}
+      .page > *{min-width:0}
+    </style><div class="page"></div>`;
+    const page = this.shadowRoot.querySelector(".page");
+    this._cards.forEach((el) => { const w = document.createElement("div"); w.appendChild(el); page.appendChild(w); });
+  }
+
+  getCardSize() { return 10; }
+}
+
 // Any card's tap can switch full screen: { action: fire-dom-event, roost_fullscreen: toggle }.
 window.addEventListener("ll-custom", (ev) => {
   const d = ev.detail || {};
@@ -4090,6 +4172,7 @@ const CARDS = [
   ["roost-camera", RoostCamera, "Roost Camera", "A camera picture or live video, with a banner when someone rings the doorbell."],
   ["roost-sensors", RoostSensors, "Roost Sensors", "Many small readings in neat squares, orange when out of range."],
   ["roost-buttons", RoostButtons, "Roost Buttons", "Several small actions in one rounded bar."],
+  ["roost-page", RoostPage, "Roost Page", "A phone page laid out like the original dashboard: even spacing, the night-sky background and room for the bottom bar."],
   ["roost-fullscreen", RoostFullscreen, "Roost Full Screen", "Full screen without Home Assistant's top bar and sidebar: by itself, or as a button that maximizes and minimizes."],
 ];
 window.customCards = window.customCards || [];

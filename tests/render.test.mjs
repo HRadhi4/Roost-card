@@ -167,7 +167,7 @@ for (const dark of [true, false]) {
 const chips = document.createElement("roost-chips");
 chips.setConfig({ entities: ["light.kitchen", "light.hall", "person.sam"] });
 document.body.appendChild(chips); chips.hass = hass(true);
-if (!/mdi:lightbulb-on/.test(chips.shadowRoot.innerHTML) || !/<span class="num">1<\/span>/.test(chips.shadowRoot.innerHTML)) { fails++; console.error("FAIL chips light count"); }
+if (!/mdi:lightbulb-on/.test(chips.shadowRoot.innerHTML) || !/<span class="cnt"[^>]*>1<\/span>/.test(chips.shadowRoot.innerHTML)) { fails++; console.error("FAIL chips light count"); }
 chips._open = "lights"; chips.render();
 if ((chips.shadowRoot.innerHTML.match(/class="tog/g) || []).length !== 2) { fails++; console.error("FAIL chips list"); }
 // Two doors share one door chip (1 open), two ACs share one snowflake (1 on); the list opens on tap.
