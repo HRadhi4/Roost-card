@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.9.0 — 2026-11-16
+**Roost Curtain: choose what is behind the window**
+- **Sky that follows the sun** (as before), **your own picture** (for example a photo of your view, with an optional night photo), **live weather**, or nothing.
+- **Live weather** is animated: the sun's rays turn, clouds drift, rain and snow fall, storms flash and fog rolls by, with the temperature in the corner. The sky turns grey when it is overcast.
+- Everything behind the window rests while the curtain is fully closed, and moves again as soon as it opens.
+
 ## 0.8.1 — 2026-11-16
 - **Reverse for curtains**: for curtains that report open and closed the wrong way round (99% open when they are really 1% open). Turn on "Reverse" on the Roost Curtain card or on a curtain tile: the picture, the words and the percentage are flipped, and Open, Close and a tap send the command the motor understands.
 - When a curtain reports its position, the position now decides whether it says "Open" or "Closed", because some integrations mix the two up.

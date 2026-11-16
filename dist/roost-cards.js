@@ -6,7 +6,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.8.1";
+const ROOST_VERSION = "0.9.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1447,23 +1447,30 @@ class RoostRooms extends RoostBase {
 class RoostCurtain extends RoostBase {
   static get defaults() {
     return { color: "coral", style: "pair", height: 150, radius: 18, show_sky: true, show_header: true, show_buttons: true, show_percent: true,
-      travel_time: 1.4, reverse: false, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
+      travel_time: 1.4, reverse: false, background: "sky", image: "", image_night: "", weather: "", show_weather_text: true, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
   }
 
   validate(c) { if (!c.entity) throw new Error("Choose a curtain or blind (cover)"); }
 
-  watched() { return [this._config.entity, this._config.sun || "sun.sun"]; }
+  watched() { return [this._config.entity, this._config.sun || "sun.sun", this._config.weather].filter(Boolean); }
 
   static getConfigForm() {
     return {
       schema: [
         { name: "entity", required: true, selector: { entity: { domain: "cover" } } },
+        { type: "expandable", name: "", title: "Behind the window", icon: "mdi:window-open-variant", schema: [
+          { name: "background", label: "What you see when it is open", selector: pick([["sky", "Sky that follows the sun"], ["weather", "Live weather, animated"], ["picture", "My own picture"], ["none", "Nothing (plain)"]]) },
+          { name: "weather", label: "Weather (for live weather)", selector: { entity: { domain: "weather" } } },
+          { name: "show_weather_text", label: "Show the temperature in the window", selector: { boolean: {} } },
+          { name: "image", label: "Picture (for example /local/view.jpg or a web address)", selector: { text: {} } },
+          { name: "image_night", label: "Night picture (optional)", selector: { text: {} } },
+        ] },
         { name: "name", selector: { text: {} } },
         { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
           ...colourFields("color", "Fabric colour"),
           { name: "style", label: "Kind", selector: pick([["pair", "Two curtains that meet in the middle"], ["left", "One curtain, opens to the left"], ["right", "One curtain, opens to the right"], ["blind", "Roller blind (up and down)"]]) },
           { type: "grid", name: "", schema: [{ name: "height", label: "Window height", selector: slider(90, 280, 10) }, { name: "radius", selector: slider(0, 32, 2) }] },
-          { type: "grid", name: "", schema: [{ name: "travel_time", label: "Slide time", selector: slider(0.4, 4, 0.2, "s") }, { name: "show_sky", label: "Sky behind the window", selector: { boolean: {} } }] },
+          { name: "travel_time", label: "Slide time", selector: slider(0.4, 4, 0.2, "s") },
           THEME_FIELD,
         ] },
         { type: "expandable", name: "", title: "What it shows", icon: "mdi:eye-outline", schema: [
@@ -1517,6 +1524,24 @@ class RoostCurtain extends RoostBase {
       @keyframes roost-ripple{to{background-position:36px 0}}
       @keyframes roost-ripple-v{to{background-position:0 36px}}
       @keyframes roost-sway{0%,100%{transform:skewX(0)}50%{transform:skewX(1.2deg)}}
+      @keyframes roost-drift{from{transform:translateX(-40%)}to{transform:translateX(140%)}}
+      @keyframes roost-rain{from{transform:translateY(-20px)}to{transform:translateY(${c.height}px)}}
+      @keyframes roost-snow{from{transform:translate(0,-10px)}to{transform:translate(14px,${c.height}px)}}
+      @keyframes roost-flash{0%,92%,100%{opacity:0}94%,97%{opacity:.75}}
+      @keyframes roost-rays{to{transform:rotate(360deg)}}
+      .pic{position:absolute;inset:0;background-size:cover;background-position:center}
+      .wx{position:absolute;inset:0;overflow:hidden}
+      .wx > *{position:absolute}
+      .cloud{width:70px;height:22px;border-radius:999px;background:rgba(255,255,255,.85);filter:blur(.5px);animation:roost-drift linear infinite}
+      .cloud::before{content:"";position:absolute;left:14px;top:-12px;width:30px;height:30px;border-radius:50%;background:inherit}
+      .cloud::after{content:"";position:absolute;left:34px;top:-7px;width:22px;height:22px;border-radius:50%;background:inherit}
+      .drop{width:2px;height:12px;border-radius:2px;background:rgba(220,235,255,.85);animation:roost-rain linear infinite}
+      .flake{width:5px;height:5px;border-radius:50%;background:#fff;animation:roost-snow linear infinite}
+      .flash{inset:0;background:#fff;animation:roost-flash 5s linear infinite}
+      .fog{left:-10%;right:-10%;height:18px;border-radius:999px;background:rgba(255,255,255,.35);filter:blur(6px);animation:roost-drift linear infinite}
+      .rays{width:70px;height:70px;right:calc(18% - 20px);top:calc(18% - 20px);border-radius:50%;background:repeating-conic-gradient(rgba(253,224,71,.35) 0 8deg,transparent 8deg 24deg);animation:roost-rays 14s linear infinite}
+      .temp{position:absolute;left:calc(${c.style === "pair" || c.style === "left" ? 12 : 0}% + 8px);bottom:10px;padding:3px 9px;border-radius:999px;background:rgba(10,8,40,.35);color:#fff;font-size:12px;font-weight:600}
+      .win.shut .wx *,.win.shut .star,.win.shut .orb{animation-play-state:paused}
       .head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 2px 10px}
       .nm{font-size:15px;font-weight:600;color:${p.text}}
       .stt{font-size:13px;color:${p.muted}}
@@ -1546,7 +1571,7 @@ class RoostCurtain extends RoostBase {
     </style>
     ${c.show_header ? '<div class="head"><span class="nm t"></span><span class="stt t"></span></div>' : ""}
     <div class="win" role="button" tabindex="0">
-      ${c.show_sky ? `<div class="sky"></div>${stars}<span class="orb"></span>` : ""}${c.style === "pair" ? '<span class="mull"></span>' : ""}
+      ${c.background === "picture" ? '<div class="pic"></div>' : c.background === "none" || c.show_sky === false ? "" : `<div class="sky"></div>${stars}${c.background === "weather" ? '<div class="wx"></div>' : ""}<span class="orb"></span>${c.background === "weather" && c.show_weather_text ? '<span class="temp t"></span>' : ""}`}${c.style === "pair" ? '<span class="mull"></span>' : ""}
       <span class="rod"></span>${panels}
       <span class="note"><ha-icon></ha-icon><span class="nt"></span></span>
     </div>
@@ -1579,6 +1604,14 @@ class RoostCurtain extends RoostBase {
       orb.style.cssText += day ? ";width:30px;height:30px;background:radial-gradient(circle,#FFF7D6,#FDE047 60%,#F59E0B);box-shadow:0 0 26px 8px rgba(253,224,71,.45)"
         : ";width:26px;height:26px;background:radial-gradient(circle at 36% 34%,#FFFBEA,#E2C273);box-shadow:0 0 22px 6px rgba(255,234,170,.25)";
     }
+    const pic = root.querySelector(".pic");
+    if (pic) {
+      const src = !day && c.image_night ? c.image_night : c.image;
+      if (src) pic.style.backgroundImage = `url("${String(src).replace(/["\\]/g, "")}")`;
+      else pic.style.background = day ? "linear-gradient(180deg,#60A5FA,#BFDBFE)" : "linear-gradient(180deg,#131848,#2C2472)";
+    }
+    const wx = root.querySelector(".wx");
+    if (wx) this.weather(wx, day, sky);
     const un = !s || UNAVAILABLE.includes(s.state);
     const v = this.view(s);
     const word = !s ? "Device not found" : un ? (s.attributes.assumed_state ? "Ready" : "Offline") : v.state.charAt(0).toUpperCase() + v.state.slice(1);
@@ -1605,11 +1638,44 @@ class RoostCurtain extends RoostBase {
     const moving = s && (v.state === "opening" || v.state === "closing" || (this._moveUntil || 0) > Date.now());
     const win = root.querySelector(".win");
     win.classList.toggle("moving", !!moving);
+    win.classList.toggle("shut", pos === 0 && !moving); // weather and stars rest while nothing can be seen
     const goingUp = v.state === "opening" || (v.state !== "closing" && pos >= 50);
     root.querySelector(".nt").textContent = goingUp ? "Opening" : "Closing";
     root.querySelector(".note ha-icon").setAttribute("icon", blind ? (goingUp ? "mdi:arrow-up" : "mdi:arrow-down") : goingUp ? "mdi:arrow-expand-horizontal" : "mdi:arrow-collapse-horizontal");
     clearTimeout(this._stopTimer);
     if (moving && v.state !== "opening" && v.state !== "closing") this._stopTimer = setTimeout(() => { this._sig = null; this.update(); }, Math.max(50, this._moveUntil - Date.now() + 20));
+  }
+
+  // Live weather behind the window: clouds drift, rain and snow fall, storms flash, the sun's rays turn.
+  weather(box, day, sky) {
+    const c = this._config, w = this.st(c.weather), cond = w ? w.state : "sunny";
+    const grey = /rain|pour|light|cloudy|fog|snow|hail/.test(cond) && cond !== "partlycloudy";
+    if (sky && grey) sky.style.background = day ? "linear-gradient(180deg,#7C8BA6,#C7D0DE)" : "linear-gradient(180deg,#1A1F3D,#33395E)";
+    const orb = this.shadowRoot.querySelector(".orb");
+    if (orb) orb.style.display = grey ? "none" : "block";
+    if (box.dataset.cond === `${cond}|${day}`) return this.weatherText(w);
+    box.dataset.cond = `${cond}|${day}`;
+    let h = "";
+    const rnd = (i, m) => ((i * 37 + 13) % m);
+    if (day && (cond === "sunny" || cond === "partlycloudy")) h += '<span class="rays"></span>';
+    const clouds = { partlycloudy: 2, cloudy: 4, rainy: 3, pouring: 4, "lightning-rainy": 4, lightning: 3, snowy: 3, "snowy-rainy": 3, hail: 3, windy: 3, "windy-variant": 3 }[cond] || 0;
+    for (let i = 0; i < clouds; i++) h += `<span class="cloud" style="top:${8 + rnd(i, 40)}%;animation-duration:${18 + i * 7}s;animation-delay:-${i * 6}s;${grey ? "background:rgba(225,230,240,.9);" : ""}"></span>`;
+    const drops = { rainy: 18, pouring: 32, "lightning-rainy": 26, "snowy-rainy": 10, hail: 14 }[cond] || 0;
+    for (let i = 0; i < drops; i++) h += `<span class="drop" style="left:${rnd(i * 3, 100)}%;top:0;animation-duration:${(0.6 + (i % 4) * 0.12).toFixed(2)}s;animation-delay:-${((i % 7) * 0.13).toFixed(2)}s"></span>`;
+    const flakes = { snowy: 18, "snowy-rainy": 8 }[cond] || 0;
+    for (let i = 0; i < flakes; i++) h += `<span class="flake" style="left:${rnd(i * 5, 100)}%;top:0;animation-duration:${(3 + (i % 5) * 0.6).toFixed(1)}s;animation-delay:-${((i % 9) * 0.5).toFixed(1)}s"></span>`;
+    if (/lightning/.test(cond)) h += '<span class="flash"></span>';
+    if (cond === "fog") for (let i = 0; i < 3; i++) h += `<span class="fog" style="top:${25 + i * 22}%;animation-duration:${22 + i * 6}s;animation-delay:-${i * 7}s"></span>`;
+    box.innerHTML = h;
+    return this.weatherText(w);
+  }
+
+  weatherText(w) {
+    const t = this.shadowRoot.querySelector(".temp");
+    if (!t) return;
+    const temp = w?.attributes.temperature;
+    t.style.display = w && temp != null ? "block" : "none";
+    if (w && temp != null) t.textContent = `${Math.round(temp)}${(w.attributes.temperature_unit || "°C").replace(/^°?/, "°")} · ${w.state.replace("partlycloudy", "partly cloudy").replace("clear-night", "clear").replace(/-/g, " ")}`;
   }
 
   getCardSize() { return 4; }

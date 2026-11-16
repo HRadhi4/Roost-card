@@ -225,7 +225,11 @@ style: pair             # pair, left, right or blind
 height: 150
 radius: 18
 travel_time: 1.4        # seconds the slide takes on screen
-show_sky: true
+background: sky         # sky, weather, picture or none
+weather: weather.home   # for background: weather
+image: /local/view.jpg  # for background: picture
+image_night: ""         # optional night picture
+show_weather_text: true
 show_header: true
 show_buttons: true
 show_percent: true
