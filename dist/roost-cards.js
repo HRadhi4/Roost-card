@@ -8,7 +8,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.1.0";
+const ROOST_VERSION = "1.1.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1449,7 +1449,7 @@ class RoostRooms extends RoostBase {
 class RoostCurtain extends RoostBase {
   static get defaults() {
     return { color: "coral", style: "pair", height: 150, radius: 18, show_sky: true, show_header: true, show_buttons: true, show_percent: true,
-      travel_time: 1.4, reverse: false, background: "sky", image: "", image_night: "", weather: "", show_weather_text: true, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
+      travel_time: 1.4, reverse: false, frame: true, background: "sky", image: "", image_night: "", weather: "", show_weather_text: true, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
   }
 
   validate(c) { if (!c.entity) throw new Error("Choose a curtain or blind (cover)"); }
@@ -1472,7 +1472,7 @@ class RoostCurtain extends RoostBase {
           ...colourFields("color", "Fabric colour"),
           { name: "style", label: "Kind", selector: pick([["pair", "Two curtains that meet in the middle"], ["left", "One curtain, opens to the left"], ["right", "One curtain, opens to the right"], ["blind", "Roller blind (up and down)"]]) },
           { type: "grid", name: "", schema: [{ name: "height", label: "Window height", selector: slider(90, 280, 10) }, { name: "radius", selector: slider(0, 32, 2) }] },
-          { name: "travel_time", label: "Slide time", selector: slider(0.4, 4, 0.2, "s") },
+          { type: "grid", name: "", schema: [{ name: "travel_time", label: "Slide time", selector: slider(0.4, 4, 0.2, "s") }, { name: "frame", label: "Card background", selector: { boolean: {} } }] },
           THEME_FIELD,
         ] },
         { type: "expandable", name: "", title: "What it shows", icon: "mdi:eye-outline", schema: [
@@ -1544,6 +1544,7 @@ class RoostCurtain extends RoostBase {
       .rays{width:70px;height:70px;right:calc(18% - 20px);top:calc(18% - 20px);border-radius:50%;background:repeating-conic-gradient(rgba(253,224,71,.35) 0 8deg,transparent 8deg 24deg);animation:roost-rays 14s linear infinite}
       .temp{position:absolute;left:calc(${c.style === "pair" || c.style === "left" ? 12 : 0}% + 8px);bottom:10px;padding:3px 9px;border-radius:999px;background:rgba(10,8,40,.35);color:#fff;font-size:12px;font-weight:600}
       .win.shut .wx *,.win.shut .star,.win.shut .orb{animation-play-state:paused}
+      .card{${c.frame ? `${panelCss(p, c.radius + 6)};padding:14px` : ""}}
       .head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 2px 10px}
       .nm{font-size:15px;font-weight:600;color:${p.text}}
       .stt{font-size:13px;color:${p.muted}}
@@ -1571,7 +1572,7 @@ class RoostCurtain extends RoostBase {
       .btn.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 10px 22px -10px ${g[2]}}
       .btn ha-icon{--mdc-icon-size:18px}
     </style>
-    ${c.show_header ? '<div class="head"><span class="nm t"></span><span class="stt t"></span></div>' : ""}
+    <div class="card">${c.show_header ? '<div class="head"><span class="nm t"></span><span class="stt t"></span></div>' : ""}
     <div class="win" role="button" tabindex="0">
       ${c.background === "picture" ? '<div class="pic"></div>' : c.background === "none" || c.show_sky === false ? "" : `<div class="sky"></div>${stars}${c.background === "weather" ? '<div class="wx"></div>' : ""}<span class="orb"></span>${c.background === "weather" && c.show_weather_text ? '<span class="temp t"></span>' : ""}`}${c.style === "pair" ? '<span class="mull"></span>' : ""}
       <span class="rod"></span>${panels}
@@ -1580,7 +1581,7 @@ class RoostCurtain extends RoostBase {
     ${c.show_buttons ? `<div class="btns">
       <button class="btn" data-a="open"><ha-icon icon="${blind ? "mdi:arrow-up" : "mdi:arrow-expand-horizontal"}"></ha-icon>Open</button>
       <button class="btn" data-a="stop"><ha-icon icon="mdi:stop"></ha-icon>Stop</button>
-      <button class="btn" data-a="close"><ha-icon icon="${blind ? "mdi:arrow-down" : "mdi:arrow-collapse-horizontal"}"></ha-icon>Close</button></div>` : ""}`;
+      <button class="btn" data-a="close"><ha-icon icon="${blind ? "mdi:arrow-down" : "mdi:arrow-collapse-horizontal"}"></ha-icon>Close</button></div>` : ""}</div>`;
     this._shown = null;
     const win = this.shadowRoot.querySelector(".win");
     this.press(win, () => this.run(c.tap_action, c.entity), () => this.run(c.hold_action, c.entity));
@@ -2143,6 +2144,8 @@ class RoostMedia extends RoostBase {
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px;opacity:${un ? 0.6 : 1}}
       .top{display:flex;align-items:center;gap:12px}
+      :host{container-type:inline-size}
+      @container (max-width: 240px){.top{flex-wrap:wrap}}
       .ic{position:relative;width:48px;height:48px;border-radius:16px;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden;
         background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? g[3] : p.muted};box-shadow:${on ? `0 10px 22px -10px ${g[2]}` : "none"};cursor:pointer}
       .ic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -2434,6 +2437,8 @@ class RoostLight extends RoostBase {
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}${switchCss(p, g)}
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px;opacity:${un ? 0.6 : 1}}
       .top{display:flex;align-items:center;gap:12px}
+      :host{container-type:inline-size}
+      @container (max-width: 240px){.top{flex-wrap:wrap}}
       .ic{position:relative;width:48px;height:48px;border-radius:16px;flex:none;display:flex;align-items:center;justify-content:center;background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? g[3] : p.muted};cursor:pointer;
         box-shadow:${on ? `0 0 ${10 + pct / 3}px ${Math.round(pct / 12)}px ${tint}66` : "none"}}
       .ic ha-icon{--mdc-icon-size:24px;${on ? "animation:roost-glow 2.4s ease-in-out infinite" : ""}}
@@ -2918,7 +2923,7 @@ class RoostPresence extends RoostBase {
     <div class="card">
       <div class="top"><span class="n t">${esc(c.name || this._hass.devices?.[c.device]?.name_by_user || this._hass.devices?.[c.device]?.name || "Presence")}</span>
         <span class="l t">${n ? `${n} ${n > 1 ? "people" : "person"} here` : occ?.state === "on" ? "Someone is still" : "Nobody here"}</span></div>
-      <svg viewBox="${-R * s60 - 200} -300 ${2 * R * s60 + 400} ${R + 500}">
+      <svg viewBox="${-R * s60 - 300} -300 ${2 * R * s60 + 1300} ${R + 500}">
         <defs><radialGradient id="fov" cx="0.5" cy="0" r="1"><stop offset="0" stop-color="${g[0]}" stop-opacity=".28"/><stop offset="1" stop-color="${g[1]}" stop-opacity=".04"/></radialGradient>
           <radialGradient id="dg"><stop offset="0" stop-color="#fff"/><stop offset=".45" stop-color="${g[1]}"/><stop offset="1" stop-color="${g[0]}" stop-opacity="0"/></radialGradient></defs>
         <path d="M0 0 L${R * s60} ${R * c60} A${R} ${R} 0 0 1 ${-R * s60} ${R * c60} Z" fill="url(#fov)" stroke="${g[0]}" stroke-opacity=".35" stroke-width="25"/>
@@ -3237,8 +3242,10 @@ class RoostFan extends RoostBase {
     const modes = a.preset_modes || [];
     const dur = on ? Math.max(0.25, 2.2 - (pct / 100) * 1.9).toFixed(2) : 0;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      :host{container-type:inline-size}
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px}
       .top{display:flex;align-items:center;gap:14px}
+      @container (max-width: 260px){.top{flex-direction:column;align-items:flex-start;gap:10px}}
       .ic{width:64px;height:64px;border-radius:20px;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;
         background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? g[3] : p.muted};box-shadow:${on ? `0 12px 26px -12px ${g[2]}` : "none"}}
       .ic ha-icon{--mdc-icon-size:36px;${on ? `animation:roost-spin ${dur}s linear infinite` : ""}}
@@ -3305,6 +3312,8 @@ class RoostLock extends RoostBase {
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px}
       .top{display:flex;align-items:center;gap:14px}
+      :host{container-type:inline-size}
+      @container (max-width: 240px){.top{flex-wrap:wrap}}
       .ic{width:60px;height:60px;border-radius:20px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 12px 26px -12px ${g[2]}}
       .ic ha-icon{--mdc-icon-size:30px;${busy ? "animation:roost-pulse .9s ease-in-out infinite" : jam ? "animation:roost-wiggle .6s ease-in-out infinite" : ""}}
       .n{font-size:16px;font-weight:600}

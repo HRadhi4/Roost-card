@@ -1,7 +1,32 @@
 # Roost Cards
 
-Beautiful dashboard cards for Home Assistant, made for **phones and tablets**.
-Every card has a **visual editor**: pick the device, colours, size, icon and shape. No code needed.
+Beautiful, animated dashboard cards for Home Assistant, made for **phones and tablets**.
+**33 cards**, and every one has a **visual editor**: pick the device, colours, size, icon and shape. No code needed.
+
+![Roost home screen in dark and light mode](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/home.png)
+
+<details>
+<summary><b>More screenshots</b> (tap to open)</summary>
+
+**Air conditioner, curtains and lights**
+![Thermostat, curtain and light cards](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/control.png)
+
+**TV and sound, and the remote**
+![Media and remote cards](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/media.png)
+
+**Readings, graph and energy**
+![Gauge, graph, energy and sensor cards](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/insight.png)
+
+**Security**
+![Alerts, alarm, lock and people cards](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/security.png)
+
+**Your day**
+![Clock, weather, agenda, timer and fan cards](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/day.png)
+
+**Rooms and lists**
+![Room, presence map, to-do and automation cards](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/rooms.png)
+
+</details>
 
 | Card | What it is |
 |---|---|
