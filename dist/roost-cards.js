@@ -3,11 +3,12 @@
  * Phones and tablets, light and dark. One file, no build step.
  *
  * Cards: roost-tile, roost-chips, roost-thermostat, roost-scene, roost-hero, roost-nav, roost-rooms, roost-row, roost-curtain,
- *        roost-gauge, roost-automations, roost-clock, roost-title, roost-theme, roost-media, roost-room, roost-alarm, roost-light, roost-graph, roost-people, roost-alerts
+ *        roost-gauge, roost-automations, roost-clock, roost-title, roost-theme, roost-media, roost-room, roost-alarm, roost-light, roost-graph, roost-people, roost-alerts,
+ *        roost-remote, roost-presence, roost-weather, roost-energy, roost-timer, roost-fan, roost-lock, roost-agenda, roost-todo, roost-camera, roost-sensors, roost-buttons
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.0.0";
+const ROOST_VERSION = "1.1.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -2717,6 +2718,980 @@ class RoostAlerts extends ticking(RoostBase, 60000) {
   getCardSize() { return this.style.display === "none" ? 0 : 2; }
 }
 
+// ------------------------------------------------------------------ helpers for the cards below
+// all entities of one device (the frontend keeps a small registry in hass.entities)
+const deviceEntities = (hass, deviceId) => Object.values(hass?.entities || {}).filter((e) => e.device_id === deviceId).map((e) => e.entity_id);
+const findBySuffix = (ids, suffix) => ids.find((id) => id.endsWith(suffix));
+
+// ------------------------------------------------------------------ Roost Remote
+// A real remote-control pad. Works with an Athom Hub remote (its buttons), a "remote" entity, or a TV (media player).
+const REMOTE_RULES = [
+  [["power", "on"], "power_on"], [["power", "off"], "power_off"], [["power"], "power"],
+  [["vol", "up"], "vol_up"], [["volume", "up"], "vol_up"], [["vol", "+"], "vol_up"], [["vol", "down"], "vol_down"], [["volume", "down"], "vol_down"], [["vol", "-"], "vol_down"],
+  [["mute"], "mute"], [["ch", "up"], "ch_up"], [["channel", "up"], "ch_up"], [["ch", "down"], "ch_down"], [["channel", "down"], "ch_down"],
+  [["up"], "up"], [["down"], "down"], [["left"], "left"], [["right"], "right"], [["ok"], "ok"], [["enter"], "ok"], [["select"], "ok"],
+  [["back"], "back"], [["return"], "back"], [["home"], "home"], [["menu"], "menu"], [["input"], "source"], [["source"], "source"],
+  [["play", "pause"], "play_pause"], [["play"], "play"], [["pause"], "pause"], [["info"], "info"],
+];
+const roleOfName = (name) => {
+  const words = String(name).toLowerCase().replace(/[^a-z0-9+\-]+/g, " ").split(" ").filter(Boolean);
+  const digit = words.find((w) => /^[0-9]$/.test(w));
+  if (digit && words.length <= 3) return `n${digit}`;
+  for (const [need, role] of REMOTE_RULES) if (need.every((w) => words.includes(w))) return role;
+  return null;
+};
+
+class RoostRemote extends RoostBase {
+  static get defaults() { return { color: "purple", show_numbers: false, show_extra: true, radius: 26, theme: "auto" }; }
+
+  validate(c) { if (!c.athom_remote && !c.entity && !(c.buttons || []).length) throw new Error("Choose an Athom Hub remote, a remote, or a TV"); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "athom_remote", label: "Athom Hub remote (its name)", selector: { text: {} } },
+        { name: "entity", label: "Or a remote / TV entity", selector: { entity: { domain: ["remote", "media_player"] } } },
+        { name: "buttons", label: "Or pick buttons (named Power, Up, OK, Vol up and so on)", selector: { entity: { multiple: true, domain: "button" } } },
+        { name: "name", selector: { text: {} } },
+        { type: "grid", name: "", schema: [{ name: "show_numbers", label: "Number keys", selector: { boolean: {} } }, { name: "show_extra", label: "Back, home, menu", selector: { boolean: {} } }] },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [...colourFields("color"), { name: "radius", selector: slider(0, 40, 2) }, THEME_FIELD] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) {
+    const b = Object.values(hass.states).find((s) => s.entity_id.startsWith("button.") && s.attributes.remote);
+    return b ? { athom_remote: b.attributes.remote } : { entity: Object.keys(hass.states).find((id) => id.startsWith("media_player.")) || "" };
+  }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  // role -> button entity
+  map() {
+    const c = this._config, h = this._hass, out = {};
+    let ids = c.buttons || [];
+    if (c.athom_remote) ids = Object.keys(h.states).filter((id) => id.startsWith("button.") && h.states[id].attributes.remote === c.athom_remote);
+    for (const id of ids) {
+      const r = roleOfName((h.states[id]?.attributes.friendly_name || id).replace(c.athom_remote || "", ""));
+      if (r && !out[r]) out[r] = id;
+    }
+    return out;
+  }
+
+  watched() { return [this._config.entity].filter(Boolean); }
+
+  signature() { return `${this.dark}|${this._config.entity ? JSON.stringify(this.st()?.attributes || {}) + this.st()?.state : Object.keys(this._hass?.states || {}).length}`; }
+
+  has(role, map) {
+    if (map[role]) return true;
+    const c = this._config, d = (c.entity || "").split(".")[0];
+    if (d === "remote") return true;
+    if (d === "media_player") return ["power", "vol_up", "vol_down", "mute", "ch_up", "ch_down", "play_pause", "source"].includes(role);
+    return false;
+  }
+
+  press_(role, map) {
+    const c = this._config;
+    this.vibrate(10);
+    if (map[role]) return this.call("button", "press", { entity_id: map[role] });
+    const d = (c.entity || "").split(".")[0];
+    if (d === "remote") {
+      const cmd = { power: "power", vol_up: "volume_up", vol_down: "volume_down", ch_up: "channel_up", ch_down: "channel_down", play_pause: "play_pause", ok: "select" }[role] || role.replace(/^n/, "");
+      return this.call("remote", "send_command", { entity_id: c.entity, command: cmd });
+    }
+    if (d === "media_player") {
+      const s = this.st();
+      const svc = { power: s && s.state !== "off" ? "turn_off" : "turn_on", vol_up: "volume_up", vol_down: "volume_down", ch_up: "media_next_track", ch_down: "media_previous_track", play_pause: "media_play_pause" }[role];
+      if (role === "mute") return this.call("media_player", "volume_mute", { entity_id: c.entity, is_volume_muted: !s?.attributes.is_volume_muted });
+      if (svc) return this.call("media_player", svc, { entity_id: c.entity });
+    }
+    return undefined;
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), map = this.map();
+    const k = (role, icon, cls = "") => `<button class="k ${cls} ${this.has(role, map) ? "" : "no"}" data-r="${role}" aria-label="${role.replace("_", " ")}"${this.has(role, map) ? "" : " disabled"}>${icon.startsWith("mdi:") ? `<ha-icon icon="${icon}"></ha-icon>` : `<span>${icon}</span>`}</button>`;
+    const title = c.name || c.athom_remote || (c.entity ? this.name(c.entity) : "Remote");
+    const pw = map.power ? "power" : map.power_on ? "power_on" : "power";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      :host{container-type:inline-size}
+      .card{${panelCss(p, c.radius)};padding:18px;display:flex;flex-direction:column;gap:16px;align-items:center;--k:min(56px,15cqw)}
+      .top{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px}
+      .n{font-size:16px;font-weight:600}
+      .k{width:var(--k);height:var(--k);border-radius:50%;border:1px solid ${p.border};background:${p.off};color:${p.text};cursor:pointer;display:flex;align-items:center;justify-content:center;font:inherit;font-size:18px;font-weight:600;
+        -webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s}
+      .k:active{transform:scale(.88);background:${g[0]}33}
+      .k{padding:0;flex:none;overflow:hidden}
+      .k ha-icon{--mdc-icon-size:calc(var(--k) * .43);width:calc(var(--k) * .43);height:calc(var(--k) * .43)}
+      .k.no{opacity:.28;cursor:default}
+      .k.pw{width:48px;height:48px;flex:none;background:linear-gradient(135deg,#F43F6B,#FF8F6B);color:#fff;border-color:transparent;box-shadow:0 10px 22px -10px rgba(244,63,107,.7)}
+      .pad{position:relative;width:min(190px,62cqw);aspect-ratio:1;border-radius:50%;background:${p.inset};border:1px solid ${p.border}}
+      .pad .k{position:absolute;background:transparent;border:0;transform:translate(-50%,-50%)}
+      .pad .k:active{transform:translate(-50%,-50%) scale(.88)}
+      .pad .up{left:50%;top:17%}.pad .down{left:50%;top:83%}.pad .left{left:17%;top:50%}.pad .right{left:83%;top:50%}
+      .pad .ok{left:50%;top:50%;width:38%;height:38%;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 12px 26px -10px ${g[2]}}
+      .row{display:flex;gap:min(14px,3cqw);justify-content:center;width:100%;flex-wrap:wrap}
+      .rock{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;border-radius:999px;background:${p.inset};border:1px solid ${p.border}}
+      .rock .k{background:transparent;border:0;width:min(48px,13cqw);height:min(48px,13cqw)}
+      .rock small{font-size:10px;color:${p.muted};letter-spacing:1px}
+      .mid{display:flex;flex-direction:column;gap:10px;justify-content:center}
+      .nums{display:grid;grid-template-columns:repeat(3,var(--k));gap:10px}
+    </style>
+    <div class="card">
+      <div class="top"><span class="n t">${esc(title)}</span>${k(pw, "mdi:power", "pw")}</div>
+      <div class="pad">${k("up", "mdi:chevron-up", "up")}${k("left", "mdi:chevron-left", "left")}${k("ok", "OK", "ok")}${k("right", "mdi:chevron-right", "right")}${k("down", "mdi:chevron-down", "down")}</div>
+      ${c.show_extra ? `<div class="row">${k("back", "mdi:arrow-u-left-top")}${k("home", "mdi:home-outline")}${k("menu", "mdi:menu")}${k("source", "mdi:import")}</div>` : ""}
+      <div class="row"><div class="rock">${k("vol_up", "mdi:plus")}<small>VOL</small>${k("vol_down", "mdi:minus")}</div>
+        <div class="mid">${k("mute", "mdi:volume-off")}${k("play_pause", "mdi:play-pause")}</div>
+        <div class="rock">${k("ch_up", "mdi:chevron-up")}<small>CH</small>${k("ch_down", "mdi:chevron-down")}</div></div>
+      ${c.show_numbers ? `<div class="nums">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => k(`n${n}`, String(n))).join("")}<span></span>${k("n0", "0")}</div>` : ""}
+    </div>`;
+    this.shadowRoot.querySelectorAll(".k:not(.no)").forEach((b) => b.addEventListener("click", () => this.press_(b.dataset.r, map)));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Presence map
+// The room from above as a presence radar (for example the LD2450 in an Athom presence sensor) sees it: people as moving dots, and its zones.
+const ZONE_COLOURS = ["#8B6CFF", "#2BC4A8", "#FF8F6B"];
+class RoostPresence extends RoostBase {
+  static get defaults() { return { range: 6, show_zones: true, show_grid: true, radius: 22, color: "active", theme: "auto" }; }
+
+  validate(c) { if (!c.device) throw new Error("Choose the presence sensor (device)"); }
+
+  ids() { return deviceEntities(this._hass, this._config.device); }
+
+  watched() { return this._hass ? this.ids().filter((id) => /target_\d_[xy]$|zone_\d_|presence|occupancy|target_count/.test(id)) : []; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "device", label: "Presence sensor", required: true, selector: { device: {} } },
+        { name: "name", selector: { text: {} } },
+        { type: "grid", name: "", schema: [{ name: "range", label: "Room depth to show (metres)", selector: slider(2, 8, 0.5, "m") }, { name: "radius", selector: slider(0, 40, 2) }] },
+        { type: "grid", name: "", schema: [{ name: "show_zones", label: "Zones", selector: { boolean: {} } }, { name: "show_grid", label: "Metre lines", selector: { boolean: {} } }] },
+        ...colourFields("color", "Dot colour"),
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) {
+    const e = Object.values(hass.entities || {}).find((x) => /target_1_x$/.test(x.entity_id));
+    return { device: e?.device_id || "" };
+  }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  val(ids, suffix) { const id = findBySuffix(ids, suffix); return id ? num(this.st(id)?.state) : null; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), ids = this.ids();
+    const R = c.range * 1000, s60 = Math.sin(Math.PI / 3), c60 = Math.cos(Math.PI / 3);
+    const targets = [1, 2, 3].map((n) => ({ n, x: this.val(ids, `target_${n}_x`), y: this.val(ids, `target_${n}_y`) })).filter((t) => t.x != null && t.y != null && !(t.x === 0 && t.y === 0)).map((t) => ({ ...t, y: Math.abs(t.y) }));
+    const occ = ids.map((id) => this.st(id)).find((s) => s && s.entity_id.startsWith("binary_sensor.") && ["occupancy", "presence"].includes(s.attributes.device_class));
+    const zones = c.show_zones ? [1, 2, 3].map((n) => {
+      const z = { x1: this.val(ids, `zone_${n}_x1`), y1: this.val(ids, `zone_${n}_y1`), x2: this.val(ids, `zone_${n}_x2`), y2: this.val(ids, `zone_${n}_y2`) };
+      if ([z.x1, z.x2, z.y1, z.y2].some((v) => v == null) || (!z.x1 && !z.x2 && !z.y1 && !z.y2)) return "";
+      const cnt = this.val(ids, `zone_${n}_all_target_count`) ?? this.val(ids, `zone_${n}_target_count`);
+      const x = Math.min(z.x1, z.x2) * (Math.abs(z.x1) < 20 ? 1000 : 1), y = Math.min(z.y1, z.y2) * (Math.abs(z.y1) < 20 ? 1000 : 1);
+      const w = Math.abs(z.x2 - z.x1) * (Math.abs(z.x1) < 20 ? 1000 : 1), hgt = Math.abs(z.y2 - z.y1) * (Math.abs(z.y1) < 20 ? 1000 : 1);
+      const on = cnt > 0;
+      return `<rect x="${x}" y="${y}" width="${w}" height="${hgt}" rx="120" fill="${ZONE_COLOURS[n - 1]}" fill-opacity="${on ? 0.3 : 0.1}" stroke="${ZONE_COLOURS[n - 1]}" stroke-width="${on ? 50 : 25}"/>
+        <text x="${x + 140}" y="${y + 340}" font-size="280" font-weight="700" fill="${ZONE_COLOURS[n - 1]}">${n}${cnt ? ` · ${cnt}` : ""}</text>`;
+    }).join("") : "";
+    let grid = "";
+    if (c.show_grid) for (let d = 1000; d <= R; d += 1000) grid += `<path d="M${-d * s60} ${d * c60} A${d} ${d} 0 0 0 ${d * s60} ${d * c60}" fill="none" stroke="${p.text}" stroke-opacity=".08" stroke-width="22"/><text x="${d * s60 + 120}" y="${d * c60}" font-size="230" fill="${p.muted}">${d / 1000} m</text>`;
+    const n = targets.length;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:10px}
+      .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+      .n{font-size:16px;font-weight:600}
+      .l{font-size:13px;font-weight:600;color:${n ? g[this.dark ? 1 : 0] : p.muted}}
+      svg{display:block;width:100%;height:auto}
+      .dot{transition:transform .12s linear}
+      .sweep{transform-origin:0 0;animation:roost-spin 6s linear infinite}
+    </style>
+    <div class="card">
+      <div class="top"><span class="n t">${esc(c.name || this._hass.devices?.[c.device]?.name_by_user || this._hass.devices?.[c.device]?.name || "Presence")}</span>
+        <span class="l t">${n ? `${n} ${n > 1 ? "people" : "person"} here` : occ?.state === "on" ? "Someone is still" : "Nobody here"}</span></div>
+      <svg viewBox="${-R * s60 - 200} -300 ${2 * R * s60 + 400} ${R + 500}">
+        <defs><radialGradient id="fov" cx="0.5" cy="0" r="1"><stop offset="0" stop-color="${g[0]}" stop-opacity=".28"/><stop offset="1" stop-color="${g[1]}" stop-opacity=".04"/></radialGradient>
+          <radialGradient id="dg"><stop offset="0" stop-color="#fff"/><stop offset=".45" stop-color="${g[1]}"/><stop offset="1" stop-color="${g[0]}" stop-opacity="0"/></radialGradient></defs>
+        <path d="M0 0 L${R * s60} ${R * c60} A${R} ${R} 0 0 1 ${-R * s60} ${R * c60} Z" fill="url(#fov)" stroke="${g[0]}" stroke-opacity=".35" stroke-width="25"/>
+        ${grid}${zones}
+        <rect x="-260" y="-200" width="520" height="200" rx="60" fill="${g[0]}"/>
+        ${targets.map((t) => `<g class="dot" style="transform:translate(${t.x}px,${t.y}px)"><circle r="520" fill="url(#dg)" opacity=".55"><animate attributeName="r" values="380;620;380" dur="2s" repeatCount="indefinite"/></circle><circle r="170" fill="${g[1]}" stroke="#fff" stroke-width="45"/></g>`).join("")}
+      </svg>
+    </div>`;
+  }
+}
+
+// ------------------------------------------------------------------ Roost Weather
+// Now, with an animated picture of the sky, and the next days or hours.
+const WX_ICON = { "clear-night": "mdi:weather-night", cloudy: "mdi:weather-cloudy", exceptional: "mdi:alert-circle-outline", fog: "mdi:weather-fog", hail: "mdi:weather-hail", lightning: "mdi:weather-lightning",
+  "lightning-rainy": "mdi:weather-lightning-rainy", partlycloudy: "mdi:weather-partly-cloudy", pouring: "mdi:weather-pouring", rainy: "mdi:weather-rainy", snowy: "mdi:weather-snowy",
+  "snowy-rainy": "mdi:weather-snowy-rainy", sunny: "mdi:weather-sunny", windy: "mdi:weather-windy", "windy-variant": "mdi:weather-windy-variant" };
+const wxWord = (s) => String(s || "").replace("partlycloudy", "partly cloudy").replace("clear-night", "clear").replace(/-/g, " ");
+class RoostWeather extends RoostBase {
+  static get defaults() { return { forecast: "daily", count: 5, show_details: true, radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose the weather"); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: { domain: "weather" } } },
+        { name: "name", selector: { text: {} } },
+        { type: "grid", name: "", schema: [{ name: "forecast", selector: pick([["daily", "Next days"], ["hourly", "Next hours"], ["none", "No forecast"]]) }, { name: "count", label: "How many", selector: { number: { min: 3, max: 10, mode: "box" } } }] },
+        { type: "grid", name: "", schema: [{ name: "show_details", label: "Humidity and wind", selector: { boolean: {} } }, { name: "radius", selector: slider(0, 40, 2) }] },
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("weather.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  extraSignature() { return JSON.stringify(this._fc || []); }
+
+  subscribe() {
+    const c = this._config, conn = this._hass?.connection;
+    const key = `${c.entity}|${c.forecast}`;
+    if (!conn?.subscribeMessage || c.forecast === "none" || this._subKey === key) return;
+    this._unsub?.then?.((u) => u()).catch(() => {});
+    this._subKey = key;
+    this._unsub = conn.subscribeMessage((m) => { this._fc = m.forecast || []; this._sig = null; this.hass = this._hass; }, { type: "weather/subscribe_forecast", forecast_type: c.forecast, entity_id: c.entity });
+    this._unsub.catch?.(() => { this._fc = this.st()?.attributes.forecast || []; });
+  }
+
+  disconnectedCallback() { this._unsub?.then?.((u) => u()).catch(() => {}); this._subKey = null; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, s = this.st();
+    this.subscribe();
+    const a = s?.attributes || {}, cond = s?.state || "", unit = (a.temperature_unit || "°C").replace(/^°?C$/, "°").replace(/^°?F$/, "°");
+    const day = cond !== "clear-night" && (this.st("sun.sun")?.state ?? "above_horizon") !== "below_horizon";
+    const grey = /rain|pour|light|cloudy|fog|snow|hail/.test(cond) && cond !== "partlycloudy";
+    const sky = !day ? "linear-gradient(135deg,#1B1E52,#38287E)" : grey ? "linear-gradient(135deg,#64748B,#94A3B8)" : "linear-gradient(135deg,#2563EB,#60A5FA 60%,#FDBA74)";
+    const fc = (this._fc || a.forecast || []).slice(0, c.count);
+    const hourly = c.forecast === "hourly";
+    let fx = "";
+    const r = (i, m) => ((i * 37 + 13) % m);
+    if (/rain|pour/.test(cond)) for (let i = 0; i < 16; i++) fx += `<i class="drop" style="left:${r(i * 3, 100)}%;animation-duration:${(0.6 + (i % 4) * 0.12).toFixed(2)}s;animation-delay:-${((i % 7) * 0.13).toFixed(2)}s"></i>`;
+    if (/snow/.test(cond)) for (let i = 0; i < 14; i++) fx += `<i class="flake" style="left:${r(i * 5, 100)}%;animation-duration:${(3 + (i % 5) * 0.6).toFixed(1)}s;animation-delay:-${((i % 9) * 0.5).toFixed(1)}s"></i>`;
+    if (/cloud|rain|pour|lightning|snow/.test(cond)) for (let i = 0; i < 3; i++) fx += `<i class="cloud" style="top:${10 + i * 16}%;animation-duration:${20 + i * 8}s;animation-delay:-${i * 7}s"></i>`;
+    if (/lightning/.test(cond)) fx += '<i class="flash"></i>';
+    if (!day && !grey) for (let i = 0; i < 8; i++) fx += `<i class="star" style="left:${r(i * 7, 95)}%;top:${r(i * 11, 70)}%;animation-delay:${(i * 0.4).toFixed(1)}s"></i>`;
+    const orb = !grey ? `<span class="orb ${day ? "sun" : "moon"}"></span>` : "";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      @keyframes roost-drift{from{transform:translateX(-60px)}to{transform:translateX(420px)}}
+      @keyframes roost-rain{from{transform:translateY(-20px)}to{transform:translateY(190px)}}
+      @keyframes roost-snow{from{transform:translate(0,-10px)}to{transform:translate(14px,190px)}}
+      @keyframes roost-flash{0%,92%,100%{opacity:0}94%,97%{opacity:.6}}
+      .card{${panelCss(p, c.radius)};overflow:hidden}
+      .now{position:relative;overflow:hidden;padding:18px;min-height:150px;background:${sky};color:#fff}
+      .now > i{position:absolute;display:block}
+      .cloud{left:0;width:80px;height:24px;border-radius:999px;background:rgba(255,255,255,.75);animation:roost-drift linear infinite}
+      .cloud::before{content:"";position:absolute;left:16px;top:-14px;width:34px;height:34px;border-radius:50%;background:inherit}
+      .drop{top:0;width:2px;height:12px;border-radius:2px;background:rgba(220,235,255,.85);animation:roost-rain linear infinite}
+      .flake{top:0;width:5px;height:5px;border-radius:50%;background:#fff;animation:roost-snow linear infinite}
+      .flash{inset:0;background:#fff;animation:roost-flash 5s linear infinite}
+      .star{width:2px;height:2px;border-radius:50%;background:#fff;animation:roost-twinkle 3s ease-in-out infinite}
+      .orb{position:absolute;right:20px;top:18px;width:58px;height:58px;border-radius:50%;animation:roost-float 6s ease-in-out infinite}
+      .sun{background:radial-gradient(circle at 38% 36%,#FFF7D6,#FDE047 55%,#F59E0B);box-shadow:0 0 40px 10px rgba(253,224,71,.45)}
+      .moon{background:radial-gradient(circle at 36% 34%,#FFFBEA,#E2C273);box-shadow:0 0 30px 6px rgba(255,234,170,.25)}
+      .info{position:relative;z-index:1;padding-right:76px;text-shadow:0 1px 6px rgba(10,8,40,.35)}
+      .nm{font-size:13px;opacity:.85}
+      .tmp{font-size:52px;font-weight:700;line-height:1;margin-top:4px;letter-spacing:-1px}
+      .cd{font-size:15px;font-weight:600;text-transform:capitalize;margin-top:4px}
+      .dt{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+      .dt span{font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(10,8,40,.25)}
+      .fc{display:grid;grid-template-columns:repeat(${Math.max(1, fc.length)},minmax(0,1fr));gap:4px;padding:12px 10px}
+      .d{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;color:${p.text}}
+      .d small{font-size:11.5px;color:${p.muted}}
+      .d ha-icon{--mdc-icon-size:24px;color:${p.text}}
+      .d b{font-size:14px}
+      .d em{font-style:normal;font-size:12px;color:${p.muted}}
+    </style>
+    <div class="card">
+      <div class="now" role="button" tabindex="0">${fx}${orb}
+        <div class="info"><div class="nm t">${esc(c.name || a.friendly_name || "Weather")}</div>
+          <div class="tmp num">${a.temperature != null ? `${Math.round(a.temperature)}${unit}` : ""}</div><div class="cd t">${esc(s ? wxWord(cond) : "Not found")}</div>
+          ${c.show_details ? `<div class="dt">${a.humidity != null ? `<span>Humidity ${Math.round(a.humidity)}%</span>` : ""}${a.wind_speed != null ? `<span>Wind ${Math.round(a.wind_speed)} ${esc(a.wind_speed_unit || "km/h")}</span>` : ""}${a.apparent_temperature != null ? `<span>Feels ${Math.round(a.apparent_temperature)}${unit}</span>` : ""}</div>` : ""}</div></div>
+      ${c.forecast !== "none" && fc.length ? `<div class="fc">${fc.map((f) => {
+        const d = new Date(f.datetime);
+        const lab = hourly ? d.toLocaleTimeString([], { hour: "numeric" }) : d.toLocaleDateString(undefined, { weekday: "short" });
+        return `<div class="d"><small>${esc(lab)}</small><ha-icon icon="${WX_ICON[f.condition] || "mdi:weather-cloudy"}"></ha-icon><b class="num">${f.temperature != null ? Math.round(f.temperature) + unit : ""}</b>${!hourly && f.templow != null ? `<em class="num">${Math.round(f.templow)}${unit}</em>` : ""}</div>`;
+      }).join("")}</div>` : ""}
+    </div>`;
+    this.shadowRoot.querySelector(".now").addEventListener("click", () => this.moreInfo(c.entity));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Energy
+// Power now (all chosen plugs added up), today against yesterday, and the hungriest devices.
+class RoostEnergy extends ticking(RoostBase, 300000) {
+  static get defaults() { return { devices: [], color: "green", count: 5, radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!c.energy && !(c.devices || []).length) throw new Error("Choose a daily energy reading or some power readings"); }
+
+  watched() { return [this._config.energy, ...(this._config.devices || [])].filter(Boolean); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "energy", label: "Energy used (kWh, a meter that counts up)", selector: { entity: { domain: "sensor" } } },
+        { name: "devices", label: "Power readings of devices (W)", selector: { entity: { multiple: true, domain: "sensor" } } },
+        { type: "grid", name: "", schema: [{ name: "count", label: "Devices to show", selector: { number: { min: 1, max: 15, mode: "box" } } }, { name: "radius", selector: slider(0, 40, 2) }] },
+        ...colourFields("color"),
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) {
+    const ids = Object.keys(hass.states);
+    return { energy: ids.find((id) => hass.states[id].attributes.device_class === "energy") || "", devices: ids.filter((id) => hass.states[id].attributes.device_class === "power").slice(0, 5) };
+  }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  extraSignature() { return JSON.stringify(this._days || {}); }
+
+  async loadDays() {
+    const c = this._config, h = this._hass;
+    if (!c.energy || !h?.callWS || this._loading) return;
+    if (this._loadedAt && Date.now() - this._loadedAt < 290000 && this._loadedFor === c.energy) return;
+    this._loading = true;
+    try {
+      const get = (offset) => h.callWS({ type: "recorder/statistic_during_period", statistic_id: c.energy, calendar: { period: "day", offset }, types: ["change"] });
+      const [t, y] = await Promise.all([get(0), get(-1)]);
+      this._days = { today: t?.change, yesterday: y?.change };
+    } catch (e) { this._days = {}; }
+    this._loading = false; this._loadedAt = Date.now(); this._loadedFor = c.energy;
+    this._sig = null; this.hass = this._hass;
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    this.loadDays();
+    const devs = (c.devices || []).map((id) => ({ id, s: this.st(id) })).filter((d) => d.s).map((d) => ({ ...d, w: num(d.s.state) ?? 0 }));
+    const total = devs.reduce((a, d) => a + d.w, 0);
+    const top = [...devs].sort((a, b) => b.w - a.w).slice(0, c.count);
+    const max = Math.max(1, ...top.map((d) => d.w));
+    const { today, yesterday } = this._days || {};
+    const diff = today != null && yesterday ? Math.round(((today - yesterday) / yesterday) * 100) : null;
+    const kw = (w) => (w >= 1000 ? `${(w / 1000).toFixed(1)} kW` : `${Math.round(w)} W`);
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px}
+      .top{display:flex;gap:10px}
+      .box{flex:1;padding:12px 14px;border-radius:16px;background:${p.inset}}
+      .box small{display:block;font-size:12px;color:${p.muted}}
+      .box b{display:block;font-size:24px;font-weight:700;margin-top:2px}
+      .box em{font-style:normal;font-size:12px;font-weight:600}
+      .bolt{animation:roost-pulse 1.6s ease-in-out infinite;--mdc-icon-size:18px;color:${g[1]};vertical-align:-3px}
+      .dv{display:flex;flex-direction:column;gap:9px}
+      .row{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;cursor:pointer}
+      .row span{font-size:13.5px;font-weight:600;color:${p.text}}
+      .row b{font-size:13px;color:${p.muted}}
+      .bar{grid-column:1/3;height:6px;border-radius:999px;background:${p.track};overflow:hidden}
+      .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,${g[0]},${g[1]})}
+    </style>
+    <div class="card">
+      <div class="top">
+        ${devs.length ? `<div class="box"><small>Using now</small><b class="num"><ha-icon class="bolt" icon="mdi:flash"></ha-icon> ${kw(total)}</b></div>` : ""}
+        ${c.energy ? `<div class="box"><small>Today</small><b class="num">${today != null ? `${today.toFixed(1)} kWh` : "Loading"}</b>${diff != null ? `<em style="color:${diff > 0 ? "#FF9F6B" : "#3DD68C"}">${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)}% vs yesterday</em>` : yesterday != null ? `<em style="color:${p.muted}">Yesterday ${yesterday.toFixed(1)} kWh</em>` : ""}</div>` : ""}
+      </div>
+      ${top.length ? `<div class="dv">${top.map((d) => `<div class="row" data-e="${esc(d.id)}"><span class="t">${esc(d.s.attributes.friendly_name || d.id)}</span><b class="num">${kw(d.w)}</b><span class="bar"><i style="width:${((d.w / max) * 100).toFixed(0)}%"></i></span></div>`).join("")}</div>` : ""}
+    </div>`;
+    this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Timer
+// A countdown ring for a Home Assistant timer (kettle, washing), with start, pause, cancel and quick times.
+class RoostTimer extends RoostBase {
+  static get defaults() { return { presets: [1, 3, 5, 10], color: "coral", radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a timer (Settings → Helpers → Timer)"); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: { domain: "timer" } } },
+        { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "icon", selector: { icon: {} } }] },
+        { name: "presets", label: "Quick times (minutes)", selector: { select: { multiple: true, custom_value: true, mode: "dropdown", options: ["1", "2", "3", "4", "5", "10", "15", "20", "30", "45", "60"] } } },
+        ...colourFields("color"),
+        { type: "grid", name: "", schema: [{ name: "radius", selector: slider(0, 40, 2) }, THEME_FIELD] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("timer.")) || "" }; }
+
+  getGridOptions() { return { columns: 6, rows: "auto", min_columns: 4 }; }
+
+  connectedCallback() { this._t = setInterval(() => { if (this.st()?.state === "active") this.paint(); }, 1000); }
+
+  disconnectedCallback() { clearInterval(this._t); }
+
+  secs(v) { if (v == null) return 0; if (typeof v === "number") return v; const [h, m, s] = String(v).split(":").map(Number); return (h || 0) * 3600 + (m || 0) * 60 + (s || 0); }
+
+  left() {
+    const s = this.st(); if (!s) return 0;
+    if (s.state === "active" && s.attributes.finishes_at) return Math.max(0, Math.round((new Date(s.attributes.finishes_at) - Date.now()) / 1000));
+    if (s.state === "paused") return this.secs(s.attributes.remaining);
+    return this.secs(s.attributes.duration);
+  }
+
+  paint() {
+    const v = this.shadowRoot.querySelector(".v"), arc = this.shadowRoot.querySelector(".arc"), s = this.st();
+    if (!v || !s) return;
+    const left = this.left(), tot = this.secs(s.attributes.duration) || 1, f = s.state === "idle" ? 1 : left / tot;
+    const m = Math.floor(left / 60), sec = left % 60;
+    v.textContent = `${m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}` : m}:${String(sec).padStart(2, "0")}`;
+    const L = 2 * Math.PI * 80 * 0.75, C = 2 * Math.PI * 80;
+    if (arc) { arc.setAttribute("stroke-dasharray", `${(L * Math.max(0.0001, f)).toFixed(1)} ${C.toFixed(1)}`); arc.setAttribute("opacity", f > 0 ? 1 : 0); }
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), s = this.st();
+    const state = s?.state || "missing";
+    const word = { active: "Running", paused: "Paused", idle: "Ready", missing: "Timer not found" }[state] || state;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px}
+      .n{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+      .n ha-icon{--mdc-icon-size:20px;color:${g[this.dark ? 1 : 0]};${state === "active" ? "animation:roost-wiggle 1.2s ease-in-out infinite" : ""}}
+      .ring{position:relative;width:100%;max-width:200px}
+      .ring svg{display:block;width:100%}
+      .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+      .v{font-size:38px;font-weight:700}
+      .w{font-size:12px;color:${state === "active" ? g[this.dark ? 1 : 0] : p.muted}}
+      .btns{display:flex;gap:10px}
+      .b{width:52px;height:52px;border-radius:50%;border:1px solid ${p.border};background:${p.off};color:${p.text};cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .12s}
+      .b:active{transform:scale(.9)}
+      .b.main{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 10px 22px -10px ${g[2]}}
+      .b ha-icon{--mdc-icon-size:24px}
+      .q{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+      .q button{height:32px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+    </style>
+    <div class="card">
+      <div class="n t"><ha-icon icon="${esc(c.icon || "mdi:timer-outline")}"></ha-icon>${esc(this.name(c.entity, "Timer"))}</div>
+      <div class="ring">${ringSvg({ f: 1, track: p.track, from: g[0], to: g[1], id: "tg", inner: 58, innerFill: p.dial })}<div class="in"><span class="v num"></span><span class="w t">${esc(word)}</span></div></div>
+      ${s ? `<div class="btns">${state === "active" ? '<button class="b main" data-a="pause" aria-label="Pause"><ha-icon icon="mdi:pause"></ha-icon></button>' : '<button class="b main" data-a="start" aria-label="Start"><ha-icon icon="mdi:play"></ha-icon></button>'}
+        ${state !== "idle" ? '<button class="b" data-a="cancel" aria-label="Cancel"><ha-icon icon="mdi:stop"></ha-icon></button>' : ""}</div>
+      <div class="q">${(c.presets || []).map((m) => `<button data-m="${esc(m)}">${esc(m)} min</button>`).join("")}</div>` : ""}
+    </div>`;
+    this.paint();
+    this.shadowRoot.querySelectorAll("[data-a]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("timer", b.dataset.a, { entity_id: c.entity }); }));
+    this.shadowRoot.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => {
+      this.vibrate();
+      const m = Number(b.dataset.m);
+      this.call("timer", "start", { entity_id: c.entity, duration: `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}:00` });
+    }));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Fan
+// A fan that spins as fast as it is set, with speed buttons, swing and its modes.
+class RoostFan extends RoostBase {
+  static get defaults() { return { color: "teal", radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a fan"); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: { domain: "fan" } } },
+        { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "radius", selector: slider(0, 40, 2) }] },
+        ...colourFields("color"),
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("fan.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), s = this.st();
+    const on = s?.state === "on", a = s?.attributes || {};
+    const pct = on ? a.percentage ?? 100 : 0;
+    const step = a.percentage_step || 33.34;
+    const speeds = a.percentage != null || a.percentage_step ? Math.min(6, Math.max(1, Math.round(100 / step))) : 0;
+    const oscil = a.oscillating != null;
+    const modes = a.preset_modes || [];
+    const dur = on ? Math.max(0.25, 2.2 - (pct / 100) * 1.9).toFixed(2) : 0;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px}
+      .top{display:flex;align-items:center;gap:14px}
+      .ic{width:64px;height:64px;border-radius:20px;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;
+        background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? g[3] : p.muted};box-shadow:${on ? `0 12px 26px -12px ${g[2]}` : "none"}}
+      .ic ha-icon{--mdc-icon-size:36px;${on ? `animation:roost-spin ${dur}s linear infinite` : ""}}
+      .tx{flex:1;min-width:0}
+      .n{font-size:16px;font-weight:600}
+      .l{font-size:12.5px;color:${p.muted};margin-top:2px}
+      .row{display:flex;gap:8px;flex-wrap:wrap}
+      .b{flex:1;min-width:52px;height:44px;border-radius:14px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+      .b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent}
+      .b ha-icon{--mdc-icon-size:18px}
+    </style>
+    <div class="card">
+      <div class="top"><span class="ic" role="button" tabindex="0" aria-label="On or off"><ha-icon icon="mdi:fan"></ha-icon></span>
+        <span class="tx"><div class="n t">${esc(this.name(c.entity, "Fan"))}</div><div class="l t">${!s ? "Device not found" : UNAVAILABLE.includes(s.state) ? "Offline" : on ? `On${a.percentage != null ? ` · ${Math.round(pct)}%` : ""}${a.preset_mode ? ` · ${esc(a.preset_mode)}` : ""}` : "Off"}</div></span></div>
+      ${speeds > 1 ? `<div class="row"><button class="b ${!on ? "on" : ""}" data-p="0">Off</button>${Array.from({ length: speeds }, (_, i) => {
+        const v = Math.round(Math.min(100, (i + 1) * step));
+        return `<button class="b ${on && Math.abs(pct - v) < step / 2 ? "on" : ""}" data-p="${v}">${speeds === 3 ? ["Low", "Medium", "High"][i] : i + 1}</button>`;
+      }).join("")}</div>` : ""}
+      ${oscil || modes.length ? `<div class="row">${oscil ? `<button class="b ${a.oscillating ? "on" : ""}" data-o="1"><ha-icon icon="mdi:arrow-oscillating"></ha-icon>Swing</button>` : ""}${modes.map((m) => `<button class="b ${a.preset_mode === m ? "on" : ""}" data-m="${esc(m)}">${esc(m)}</button>`).join("")}</div>` : ""}
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelector(".ic").addEventListener("click", () => { this.vibrate(); this.call("fan", "toggle", { entity_id: c.entity }); });
+    r.querySelectorAll("[data-p]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); const v = +b.dataset.p; this.call("fan", v ? "set_percentage" : "turn_off", v ? { entity_id: c.entity, percentage: v } : { entity_id: c.entity }); }));
+    r.querySelectorAll("[data-o]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("fan", "oscillate", { entity_id: c.entity, oscillating: !a.oscillating }); }));
+    r.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("fan", "set_preset_mode", { entity_id: c.entity, preset_mode: b.dataset.m }); }));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Lock
+// A lock (or garage door): slide to open, tap to lock. Says when it is jammed, and can show the door's sensor.
+class RoostLock extends RoostBase {
+  static get defaults() { return { color: "green", radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a lock or a garage door"); }
+
+  watched() { return [this._config.entity, this._config.door].filter(Boolean); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: { domain: ["lock", "cover"] } } },
+        { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "door", label: "Door sensor (optional)", selector: { entity: { domain: "binary_sensor" } } }] },
+        ...colourFields("color", "Colour when locked"),
+        { type: "grid", name: "", schema: [{ name: "radius", selector: slider(0, 40, 2) }, THEME_FIELD] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("lock.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, s = this.st(), cover = c.entity.startsWith("cover.");
+    const st = s?.state || "missing";
+    const shut = cover ? st === "closed" : st === "locked";
+    const busy = ["locking", "unlocking", "opening", "closing"].includes(st);
+    const jam = st === "jammed";
+    const g = jam ? COLORS.coral : shut ? this.colour() : COLORS.amber;
+    const ds = this.st(c.door);
+    const word = !s ? "Not found" : jam ? "Jammed" : { locked: "Locked", unlocked: "Unlocked", locking: "Locking", unlocking: "Unlocking", open: "Open", closed: "Closed", opening: "Opening", closing: "Closing" }[st] || st;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px}
+      .top{display:flex;align-items:center;gap:14px}
+      .ic{width:60px;height:60px;border-radius:20px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 12px 26px -12px ${g[2]}}
+      .ic ha-icon{--mdc-icon-size:30px;${busy ? "animation:roost-pulse .9s ease-in-out infinite" : jam ? "animation:roost-wiggle .6s ease-in-out infinite" : ""}}
+      .n{font-size:16px;font-weight:600}
+      .w{font-size:20px;font-weight:700}
+      .d{font-size:12.5px;color:${p.muted}}
+      .track{position:relative;height:58px;border-radius:999px;background:${p.inset};border:1px solid ${p.border};overflow:hidden;touch-action:none;user-select:none}
+      .hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;color:${p.muted};animation:roost-breathe 2.2s ease-in-out infinite}
+      .knob{position:absolute;left:5px;top:5px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};display:flex;align-items:center;justify-content:center;cursor:grab;box-shadow:0 6px 16px -6px ${g[2]}}
+      .knob ha-icon{--mdc-icon-size:24px}
+      .lockb{height:52px;border-radius:999px;border:0;background:linear-gradient(135deg,${COLORS.green[0]},${COLORS.green[1]});color:${COLORS.green[3]};font:inherit;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+    </style>
+    <div class="card">
+      <div class="top"><span class="ic"><ha-icon icon="${cover ? (shut ? "mdi:garage-variant-lock" : "mdi:garage-open-variant") : shut ? "mdi:lock" : jam ? "mdi:lock-alert" : "mdi:lock-open-variant"}"></ha-icon></span>
+        <span><div class="n t">${esc(this.name(c.entity, "Lock"))}</div><div class="w t">${esc(word)}</div>${ds ? `<div class="d t">Door ${ds.state === "on" ? "open" : "closed"}</div>` : ""}</span></div>
+      ${s && !busy ? (shut ? `<div class="track"><span class="hint">Slide to ${cover ? "open" : "unlock"} ›››</span><span class="knob"><ha-icon icon="mdi:chevron-double-right"></ha-icon></span></div>`
+        : `<button class="lockb"><ha-icon icon="${cover ? "mdi:arrow-down" : "mdi:lock"}"></ha-icon>${cover ? "Close" : "Lock"}</button>`) : ""}
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelector(".lockb")?.addEventListener("click", () => { this.vibrate(); this.call(cover ? "cover" : "lock", cover ? "close_cover" : "lock", { entity_id: c.entity }); });
+    const track = r.querySelector(".track"), knob = r.querySelector(".knob");
+    if (track && knob) {
+      let x0 = null, max = 0;
+      knob.addEventListener("pointerdown", (e) => { knob.setPointerCapture(e.pointerId); x0 = e.clientX; max = track.clientWidth - knob.clientWidth - 10; });
+      knob.addEventListener("pointermove", (e) => { if (x0 == null) return; knob.style.transform = `translateX(${Math.max(0, Math.min(max, e.clientX - x0))}px)`; });
+      knob.addEventListener("pointerup", (e) => {
+        if (x0 == null) return;
+        const d = e.clientX - x0; x0 = null;
+        if (d >= max * 0.85) { this.vibrate(30); this.call(cover ? "cover" : "lock", cover ? "open_cover" : "unlock", { entity_id: c.entity }); }
+        else { try { knob.animate([{ transform: knob.style.transform }, { transform: "translateX(0)" }], { duration: 250, easing: "ease-out" }); } catch (err) { /* jumps back */ } }
+        knob.style.transform = "translateX(0)";
+      });
+    }
+  }
+}
+
+// ------------------------------------------------------------------ Roost Agenda
+// Today's and the next days' events from your calendars. Bin day (or any word you choose) stands out.
+class RoostAgenda extends ticking(RoostBase, 600000) {
+  static get defaults() { return { entities: [], days: 3, highlight: "bin, trash, rubbish, garbage, recycling", max: 8, radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!Array.isArray(c.entities) || !c.entities.length) throw new Error("Pick at least one calendar"); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entities", label: "Calendars", selector: { entity: { multiple: true, domain: "calendar" } } },
+        { type: "grid", name: "", schema: [{ name: "days", label: "Days ahead", selector: { number: { min: 1, max: 14, mode: "box" } } }, { name: "max", label: "Show at most", selector: { number: { min: 1, max: 30, mode: "box" } } }] },
+        { name: "highlight", label: "Words that stand out (for example bin, trash)", selector: { text: {} } },
+        { type: "grid", name: "", schema: [{ name: "radius", selector: slider(0, 40, 2) }, THEME_FIELD] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entities: Object.keys(hass.states).filter((id) => id.startsWith("calendar.")).slice(0, 2) }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  signature() { return `${this.dark}|${JSON.stringify(this._ev || null)}|${new Date().getDate()}`; }
+
+  async load() {
+    const c = this._config, h = this._hass;
+    if (!h?.callApi || this._loading || (this._at && Date.now() - this._at < 590000)) return;
+    this._loading = true;
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const end = new Date(start.getTime() + c.days * 86400e3);
+    const all = [];
+    await Promise.all(c.entities.map(async (id, i) => {
+      try {
+        const evs = await h.callApi("GET", `calendars/${id}?start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`);
+        (evs || []).forEach((e) => all.push({ cal: i, title: e.summary || "", start: e.start?.dateTime || e.start?.date, allDay: !e.start?.dateTime, where: e.location || "" }));
+      } catch (e) { /* calendar not reachable */ }
+    }));
+    all.sort((a, b) => new Date(a.start) - new Date(b.start));
+    this._ev = all; this._at = Date.now(); this._loading = false;
+    this._sig = null; this.hass = this._hass;
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p;
+    this.load();
+    const cols = ["#8B6CFF", "#38BDF8", "#2BC4A8", "#FF8F6B", "#F472B6", "#FCD34D"];
+    const words = String(c.highlight || "").toLowerCase().split(",").map((w) => w.trim()).filter(Boolean);
+    const ev = (this._ev || []).slice(0, c.max);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dayName = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); const n = Math.round((x - today) / 86400e3); return n === 0 ? "Today" : n === 1 ? "Tomorrow" : x.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" }); };
+    let last = "", html = "";
+    for (const e of ev) {
+      const dn = dayName(e.start);
+      if (dn !== last) { html += `<div class="day">${esc(dn)}</div>`; last = dn; }
+      const hot = words.some((w) => e.title.toLowerCase().includes(w));
+      html += `<div class="ev ${hot ? "hot" : ""}"><span class="bar" style="background:${hot ? "#FF8F6B" : cols[e.cal % cols.length]}"></span>
+        <span class="tm num">${e.allDay ? "All day" : esc(new Date(e.start).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}</span>
+        <span class="tx"><b class="t">${hot ? '<ha-icon icon="mdi:trash-can-outline"></ha-icon> ' : ""}${esc(e.title)}</b>${e.where ? `<small class="t">${esc(e.where)}</small>` : ""}</span></div>`;
+    }
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:8px}
+      .day{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${p.muted};margin-top:6px}
+      .day:first-child{margin-top:0}
+      .ev{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:${p.inset}}
+      .ev.hot{background:${this.dark ? "rgba(255,143,107,.14)" : "rgba(255,143,107,.16)"}}
+      .ev.hot ha-icon{--mdc-icon-size:16px;color:#FF8F6B;vertical-align:-3px;animation:roost-bounce 1.6s ease-in-out infinite}
+      .bar{width:4px;align-self:stretch;border-radius:4px;flex:none}
+      .tm{font-size:12.5px;color:${p.muted};min-width:58px}
+      .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+      .tx b{font-size:14px;font-weight:600;color:${p.text}}
+      .tx small{font-size:12px;color:${p.muted}}
+      .empty{font-size:14px;color:${p.muted};text-align:center;padding:14px}
+    </style><div class="card">${this._ev ? html || '<div class="empty t">Nothing planned. Enjoy!</div>' : '<div class="empty t">Loading</div>'}</div>`;
+  }
+}
+
+// ------------------------------------------------------------------ Roost To-do
+// A to-do or shopping list: tick things off, add new ones, clear the ticked ones.
+class RoostTodo extends RoostBase {
+  static get defaults() { return { show_done: false, color: "active", radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a to-do or shopping list"); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: { domain: "todo" } } },
+        { name: "name", selector: { text: {} } },
+        { type: "grid", name: "", schema: [{ name: "show_done", label: "Show ticked items", selector: { boolean: {} } }, { name: "radius", selector: slider(0, 40, 2) }] },
+        ...colourFields("color", "Tick colour"),
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("todo.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  signature() { return `${this.dark}|${JSON.stringify(this._items || null)}`; }
+
+  subscribe() {
+    const c = this._config, conn = this._hass?.connection;
+    if (!conn?.subscribeMessage || this._subFor === c.entity) return;
+    this._unsub?.then?.((u) => u()).catch(() => {});
+    this._subFor = c.entity;
+    this._unsub = conn.subscribeMessage((m) => { this._items = m.items || []; this._sig = null; this.hass = this._hass; }, { type: "todo/item/subscribe", entity_id: c.entity });
+    this._unsub.catch?.(() => { this._items = []; this._sig = null; this.hass = this._hass; });
+  }
+
+  disconnectedCallback() { this._unsub?.then?.((u) => u()).catch(() => {}); this._subFor = null; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    this.subscribe();
+    const items = this._items || [];
+    const open = items.filter((i) => i.status !== "completed"), done = items.filter((i) => i.status === "completed");
+    const row = (i) => `<div class="it ${i.status === "completed" ? "done" : ""}" data-uid="${esc(i.uid)}"><span class="ck">${i.status === "completed" ? '<ha-icon icon="mdi:check"></ha-icon>' : ""}</span><span class="t">${esc(i.summary)}</span></div>`;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:10px}
+      .top{display:flex;justify-content:space-between;align-items:baseline}
+      .n{font-size:16px;font-weight:600}
+      .c{font-size:12.5px;color:${p.muted}}
+      .add{display:flex;gap:8px}
+      .add input{flex:1;min-width:0;height:44px;border-radius:14px;border:1px solid ${p.border};background:${p.inset};color:${p.text};font:inherit;font-size:14px;padding:0 14px;outline:none}
+      .add button{width:44px;height:44px;border-radius:14px;border:0;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};cursor:pointer}
+      .it{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid ${p.border};cursor:pointer;font-size:14.5px;color:${p.text}}
+      .it:last-child{border-bottom:0}
+      .ck{width:24px;height:24px;border-radius:8px;border:2px solid ${p.knob};flex:none;display:flex;align-items:center;justify-content:center}
+      .done .ck{background:linear-gradient(135deg,${g[0]},${g[1]});border-color:transparent;color:${g[3]}}
+      .done .ck ha-icon{--mdc-icon-size:16px;animation:roost-pulse .4s ease-out 1}
+      .done .t{color:${p.muted};text-decoration:line-through}
+      .clr{align-self:flex-start;border:0;background:none;color:${g[this.dark ? 1 : 0]};font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0}
+      .empty{font-size:14px;color:${p.muted};text-align:center;padding:10px}
+    </style>
+    <div class="card">
+      <div class="top"><span class="n t">${esc(this.name(c.entity, "List"))}</span><span class="c">${open.length} to do</span></div>
+      <form class="add"><input placeholder="Add an item" aria-label="Add an item"><button type="submit" aria-label="Add"><ha-icon icon="mdi:plus"></ha-icon></button></form>
+      <div>${open.map(row).join("")}${c.show_done ? done.map(row).join("") : ""}${!open.length && !(c.show_done && done.length) ? `<div class="empty t">${this._items ? "All done" : "Loading"}</div>` : ""}</div>
+      ${done.length ? `<button class="clr">Clear ${done.length} ticked</button>` : ""}
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelectorAll("[data-uid]").forEach((el) => el.addEventListener("click", () => {
+      this.vibrate();
+      const it = items.find((i) => i.uid === el.dataset.uid);
+      this.call("todo", "update_item", { entity_id: c.entity, item: it.uid, status: it.status === "completed" ? "needs_action" : "completed" });
+    }));
+    r.querySelector(".add").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const inp = r.querySelector(".add input"), v = inp.value.trim();
+      if (v) { this.vibrate(); this.call("todo", "add_item", { entity_id: c.entity, item: v }); inp.value = ""; }
+    });
+    r.querySelector(".clr")?.addEventListener("click", () => this.call("todo", "remove_completed_items", { entity_id: c.entity }));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Camera
+// A camera picture that refreshes (or a live stream), and a banner with a ring when someone presses the doorbell.
+class RoostCamera extends RoostBase {
+  static get defaults() { return { refresh: 10, live: false, ring_minutes: 2, radius: 22, aspect: "16/9", theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a camera"); }
+
+  watched() { return [this._config.entity, this._config.doorbell].filter(Boolean); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: { domain: "camera" } } },
+        { name: "name", selector: { text: {} } },
+        { name: "doorbell", label: "Doorbell (button press or ring sensor)", selector: { entity: { domain: ["binary_sensor", "event"] } } },
+        { type: "grid", name: "", schema: [{ name: "live", label: "Live video", selector: { boolean: {} } }, { name: "refresh", label: "New picture every (seconds)", selector: { number: { min: 2, max: 300, mode: "box" } } }] },
+        { type: "grid", name: "", schema: [{ name: "aspect", label: "Shape", selector: pick([["16/9", "Wide"], ["4/3", "Classic"], ["1/1", "Square"], ["3/4", "Tall (doorbell)"]]) }, { name: "radius", selector: slider(0, 40, 2) }] },
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("camera.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  connectedCallback() { this._t = setInterval(() => this.refreshImg(), Math.max(2, this._config?.refresh || 10) * 1000); }
+
+  disconnectedCallback() { clearInterval(this._t); }
+
+  url() { const s = this.st(); return s?.attributes.entity_picture ? `${s.attributes.entity_picture}&t=${Date.now()}` : ""; }
+
+  refreshImg() { const img = this.shadowRoot?.querySelector("img.pic"); if (img && !document.hidden) img.src = this.url(); }
+
+  ringing() {
+    const c = this._config, d = this.st(c.doorbell);
+    if (!d) return false;
+    if (d.entity_id.startsWith("event.")) return !UNAVAILABLE.includes(d.state) && Date.now() - new Date(d.state) < c.ring_minutes * 60000;
+    // ringing now, or rang in the last few minutes
+    return d.state === "on" || (d.state === "off" && Date.now() - new Date(d.last_changed) < c.ring_minutes * 60000);
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, s = this.st();
+    const ring = this.ringing();
+    const live = c.live && customElements.get("ha-camera-stream");
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};overflow:hidden;position:relative;${ring ? "box-shadow:0 0 0 3px #FF8F6B,0 0 30px rgba(255,143,107,.5);animation:roost-breathe 1.2s ease-in-out infinite" : ""}}
+      .view{position:relative;aspect-ratio:${c.aspect};background:${p.inset};cursor:pointer}
+      .view img,.view ha-camera-stream{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+      .tag{position:absolute;left:10px;top:10px;padding:4px 10px;border-radius:999px;background:rgba(10,8,40,.55);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px}
+      .tag i{width:8px;height:8px;border-radius:50%;background:#F43F6B;animation:roost-breathe 1.4s ease-in-out infinite}
+      .ring{position:absolute;left:10px;right:10px;bottom:10px;padding:10px 14px;border-radius:14px;background:linear-gradient(135deg,#F43F6B,#FF8F6B);color:#fff;font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px}
+      .ring ha-icon{animation:roost-wiggle .5s ease-in-out infinite}
+      .off{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:${p.muted};font-size:14px}
+    </style>
+    <div class="card"><div class="view" role="button" tabindex="0">
+      ${!s ? '<div class="off t">Camera not found</div>' : UNAVAILABLE.includes(s.state) ? '<div class="off t">Camera offline</div>' : live ? "" : `<img class="pic" alt="${esc(this.name(c.entity))}" src="${esc(this.url())}">`}
+      <span class="tag"><i></i>${esc(this.name(c.entity, "Camera"))}</span>
+      ${ring ? '<div class="ring"><ha-icon icon="mdi:doorbell-video"></ha-icon><span class="t">Someone is at the door</span></div>' : ""}
+    </div></div>`;
+    if (live && s && !UNAVAILABLE.includes(s.state)) {
+      const el = document.createElement("ha-camera-stream");
+      el.hass = this._hass; el.stateObj = s; el.muted = true; el.controls = false;
+      this.shadowRoot.querySelector(".view").prepend(el);
+    }
+    this.shadowRoot.querySelector(".view").addEventListener("click", () => this.moreInfo(c.entity));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Sensors
+// Many small readings in neat squares, each turning orange when outside the range you set.
+class RoostSensors extends RoostBase {
+  static get defaults() { return { entities: [], columns: 3, radius: 18, theme: "auto" }; }
+
+  validate(c) { if (!Array.isArray(c.entities) || !c.entities.length) throw new Error("Pick some readings"); }
+
+  items() { return this._config.entities.map((e) => (typeof e === "string" ? { entity: e } : e)); }
+
+  watched() { return this.items().map((i) => i.entity); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entities", label: "Readings", selector: { object: { multiple: true, label_field: "name", fields: {
+          entity: { label: "Reading", required: true, selector: { entity: {} } },
+          name: { label: "Name", selector: { text: {} } },
+          icon: { label: "Icon", selector: { icon: {} } },
+          above: { label: "Orange above", selector: { number: { mode: "box" } } },
+          below: { label: "Orange below", selector: { number: { mode: "box" } } },
+        } } } },
+        { type: "grid", name: "", schema: [{ name: "columns", label: "Side by side", selector: { number: { min: 1, max: 6, mode: "box" } } }, { name: "radius", selector: slider(0, 32, 2) }] },
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entities: Object.keys(hass.states).filter((id) => id.startsWith("sensor.") && num(hass.states[id].state) != null).slice(0, 6) }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p;
+    const icons = { temperature: "mdi:thermometer", humidity: "mdi:water-percent", power: "mdi:flash", energy: "mdi:lightning-bolt", battery: "mdi:battery", carbon_dioxide: "mdi:molecule-co2", pm25: "mdi:blur", illuminance: "mdi:brightness-5", pressure: "mdi:gauge", voltage: "mdi:sine-wave", current: "mdi:current-ac" };
+    const tint = { temperature: COLORS.coral, humidity: COLORS.blue, power: COLORS.amber, energy: COLORS.green, battery: COLORS.green, carbon_dioxide: COLORS.slate, pm25: COLORS.purple, illuminance: COLORS.amber };
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .grid{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:8px}
+      .sq{${panelCss(p, c.radius)};padding:12px;display:flex;flex-direction:column;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .sq:active{transform:scale(.96)}
+      .sq ha-icon{--mdc-icon-size:20px}
+      .v{font-size:22px;font-weight:700;line-height:1.1}
+      .v small{font-size:13px;font-weight:600;color:${p.muted}}
+      .n{font-size:12px;color:${p.muted};line-height:1.3}
+      .warn{border-color:#FF9F6B}
+      .warn .v{color:#FF9F6B}
+      .warn ha-icon{animation:roost-breathe 1.6s ease-in-out infinite}
+    </style>
+    <div class="grid">${this.items().map((it) => {
+      const s = this.st(it.entity), v = s ? num(s.state) : null, dc = s?.attributes.device_class;
+      const warn = v != null && ((it.above != null && it.above !== "" && v > it.above) || (it.below != null && it.below !== "" && v < it.below));
+      const g = warn ? COLORS.coral : tint[dc] || COLORS.purple;
+      const unit = s?.attributes.unit_of_measurement || "";
+      return `<div class="sq ${warn ? "warn" : ""}" data-e="${esc(it.entity)}" role="button" tabindex="0">
+        <ha-icon icon="${esc(it.icon || s?.attributes.icon || icons[dc] || "mdi:information-outline")}" style="color:${g[this.dark ? 1 : 0]}"></ha-icon>
+        <span class="v num">${!s ? "?" : v != null ? `${esc(fmt(v))}<small>${unit.length > 2 ? " " : ""}${esc(unit)}</small>` : esc(UNAVAILABLE.includes(s.state) ? "Offline" : s.state)}</span>
+        <span class="n t">${esc(it.name || s?.attributes.friendly_name || it.entity)}</span></div>`;
+    }).join("")}</div>`;
+    this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Buttons
+// Several small actions in one rounded bar. A button lights up when its device is on.
+class RoostButtons extends RoostBase {
+  static get defaults() { return { items: [], show_names: true, color: "active", radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!Array.isArray(c.items) || !c.items.length) throw new Error("Add some buttons"); }
+
+  watched() { return this._config.items.map((i) => i.entity).filter(Boolean); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "items", label: "Buttons", selector: { object: { multiple: true, label_field: "name", fields: {
+          name: { label: "Name", selector: { text: {} } },
+          icon: { label: "Icon", required: true, selector: { icon: {} } },
+          entity: { label: "Device (lights the button when on; tap switches it)", selector: { entity: {} } },
+          tap_action: { label: "Tap does (instead)", selector: { ui_action: {} } },
+        } } } },
+        { type: "grid", name: "", schema: [{ name: "show_names", label: "Names under the icons", selector: { boolean: {} } }, { name: "radius", selector: slider(0, 40, 2) }] },
+        ...colourFields("color", "Colour when on"),
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return { items: [{ name: "Lights", icon: "mdi:lightbulb-group" }, { name: "TV", icon: "mdi:television" }, { name: "AC", icon: "mdi:snowflake" }] }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .bar{${panelCss(p, c.radius)};padding:6px;display:grid;grid-template-columns:repeat(${c.items.length},minmax(0,1fr));gap:4px}
+      .b{min-height:${c.show_names ? 62 : 48}px;border-radius:${Math.max(8, c.radius - 6)}px;border:0;background:transparent;color:${p.muted};font:inherit;font-size:11px;font-weight:600;cursor:pointer;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 2px;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .b:active{transform:scale(.92)}
+      .b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 8px 20px -10px ${g[2]}}
+      .b ha-icon{--mdc-icon-size:22px}
+      .b.done ha-icon{animation:roost-pulse .5s ease-out 1}
+    </style>
+    <div class="bar">${c.items.map((it, i) => {
+      const s = this.st(it.entity), on = s && !UNAVAILABLE.includes(s.state) && !OFF_STATES.includes(s.state);
+      return `<button class="b ${on ? "on" : ""}" data-i="${i}" aria-label="${esc(it.name || it.icon)}"><ha-icon icon="${esc(it.icon)}"></ha-icon>${c.show_names && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</button>`;
+    }).join("")}</div>`;
+    this.shadowRoot.querySelectorAll(".b").forEach((b) => {
+      const it = c.items[+b.dataset.i];
+      this.press(b, () => {
+        b.classList.remove("done"); void b.offsetWidth; b.classList.add("done");
+        if (it.tap_action && it.tap_action.action && it.tap_action.action !== "none") this.run(it.tap_action, it.entity);
+        else if (it.entity) this.run({ action: "toggle" }, it.entity);
+      }, () => it.entity && this.moreInfo(it.entity));
+    });
+  }
+}
+
 // ------------------------------------------------------------------ register
 const CARDS = [
   ["roost-tile", RoostTile, "Roost Tile", "A big tile with a switch, colour, icon and how long it has been on."],
@@ -2740,6 +3715,18 @@ const CARDS = [
   ["roost-graph", RoostGraph, "Roost Graph", "A smooth line of a reading over the last hours, with lowest and highest."],
   ["roost-people", RoostPeople, "Roost People", "Who is home, with a picture and how long they have been home or away."],
   ["roost-alerts", RoostAlerts, "Roost Alerts", "Shows only when something needs you: low battery, offline device, door left open."],
+  ["roost-remote", RoostRemote, "Roost Remote", "A remote-control pad for an Athom Hub remote, a remote or a TV: power, arrows, OK, volume and channels."],
+  ["roost-presence", RoostPresence, "Roost Presence Map", "The room from above as a presence radar sees it: people as moving dots, and its zones."],
+  ["roost-weather", RoostWeather, "Roost Weather", "The weather now with an animated sky, and the next days or hours."],
+  ["roost-energy", RoostEnergy, "Roost Energy", "Power used now, today against yesterday, and the hungriest devices."],
+  ["roost-timer", RoostTimer, "Roost Timer", "A countdown ring for a timer, with start, pause, cancel and quick times."],
+  ["roost-fan", RoostFan, "Roost Fan", "A fan that spins as fast as it is set, with speed buttons, swing and modes."],
+  ["roost-lock", RoostLock, "Roost Lock", "A lock or garage door: slide to open, tap to lock."],
+  ["roost-agenda", RoostAgenda, "Roost Agenda", "Today's and the next days' calendar events. Bin day stands out."],
+  ["roost-todo", RoostTodo, "Roost To-do", "A to-do or shopping list: tick off, add and clear."],
+  ["roost-camera", RoostCamera, "Roost Camera", "A camera picture or live video, with a banner when someone rings the doorbell."],
+  ["roost-sensors", RoostSensors, "Roost Sensors", "Many small readings in neat squares, orange when out of range."],
+  ["roost-buttons", RoostButtons, "Roost Buttons", "Several small actions in one rounded bar."],
 ];
 window.customCards = window.customCards || [];
 for (const [, cls] of CARDS) {

@@ -22,15 +22,55 @@ const states = Object.fromEntries([
   st("sensor.offline", "unavailable"), st("automation.morning", "on", { last_triggered: new Date(Date.now() - 5 * 60000).toISOString() }), st("automation.night", "off", { last_triggered: null }),
   st("media_player.tv", "playing", { volume_level: 0.35, is_volume_muted: false, media_title: "News", app_name: "YouTube", source: "HDMI 1", source_list: ["HDMI 1", "HDMI 2", "YouTube"] }), st("media_player.off_tv", "off"),
   st("light.color", "on", { brightness: 200, supported_color_modes: ["color_temp", "hs"], rgb_color: [255, 180, 90] }), st("light.dim", "off", { supported_color_modes: ["brightness"] }),
-  st("alarm_control_panel.coded", "armed_away", { code_format: "number" }), st("alarm_control_panel.boom", "triggered"), st("scene.movie", "scening"), st("weather.home", "partlycloudy", { temperature: 31, temperature_unit: "°C" }),
+  st("alarm_control_panel.coded", "armed_away", { code_format: "number" }), st("alarm_control_panel.boom", "triggered"),
+  st("button.tv_power", "unknown", { remote: "TV", friendly_name: "TV Power" }), st("button.tv_vol_up", "unknown", { remote: "TV", friendly_name: "TV Vol up" }), st("button.tv_ok", "unknown", { remote: "TV", friendly_name: "TV OK" }),
+  st("remote.box", "on"), st("sensor.radar_target_1_x", "-420"), st("sensor.radar_target_1_y", "1800"), st("sensor.radar_target_2_x", "0"), st("sensor.radar_target_2_y", "0"),
+  st("sensor.radar_zone_1_x1", "-1000"), st("sensor.radar_zone_1_y1", "500"), st("sensor.radar_zone_1_x2", "1000"), st("sensor.radar_zone_1_y2", "2500"), st("sensor.radar_zone_1_all_target_count", "1"),
+  st("weather.storm", "lightning-rainy", { temperature: 22, humidity: 80, wind_speed: 30, wind_speed_unit: "km/h", forecast: [{ datetime: new Date().toISOString(), condition: "rainy", temperature: 24, templow: 18 }] }),
+  st("sensor.energy_today", "12.4", { unit_of_measurement: "kWh", device_class: "energy" }), st("sensor.plug_a", "1500", { unit_of_measurement: "W", device_class: "power" }), st("sensor.plug_b", "60", { unit_of_measurement: "W", device_class: "power" }),
+  st("timer.kettle", "active", { duration: "0:05:00", finishes_at: new Date(Date.now() + 150000).toISOString() }), st("timer.idle", "idle", { duration: "0:03:00" }),
+  st("fan.ceiling", "on", { percentage: 66, percentage_step: 33.33, oscillating: false, preset_modes: ["Breeze", "Sleep"], preset_mode: "Breeze" }), st("fan.plain", "off"),
+  st("lock.front", "locked"), st("lock.jam", "jammed"), st("lock.open", "unlocked"), st("cover.garage", "closed", { device_class: "garage" }),
+  st("calendar.home", "off"), st("todo.shopping", "2"), st("camera.door", "idle", { entity_picture: "/api/camera_proxy/camera.door?token=x" }), st("camera.off", "unavailable"),
+  st("binary_sensor.bell", "on", { device_class: "occupancy" }), st("scene.movie", "scening"), st("weather.home", "partlycloudy", { temperature: 31, temperature_unit: "°C" }),
 ].map((s) => [s.entity_id, s]));
 const calls = [];
-const hass = (dark) => ({ states, themes: { darkMode: dark }, user: { name: "Sam Smith" }, callService: async (...a) => { calls.push(a); } });
+const entities = Object.fromEntries(Object.keys(states).filter((id) => id.startsWith("sensor.radar_")).map((id) => [id, { entity_id: id, device_id: "dev-radar" }]));
+const hass = (dark) => ({ states, entities, devices: { "dev-radar": { name: "Presence sensor" } }, themes: { darkMode: dark }, user: { name: "Sam Smith" }, callService: async (...a) => { calls.push(a); },
+  callApi: async () => [{ summary: "Bin day", start: { date: new Date().toISOString().slice(0, 10) } }, { summary: "Dentist", start: { dateTime: new Date(Date.now() + 3600e3).toISOString() }, location: "Clinic" }],
+  callWS: async (m) => (m.type === "recorder/statistic_during_period" ? { change: m.calendar.offset ? 10 : 12.4 } : {}),
+  connection: { subscribeMessage: async (cb, m) => { setTimeout(() => cb(m.type === "todo/item/subscribe" ? { items: [{ uid: "1", summary: "Milk", status: "needs_action" }, { uid: "2", summary: "Bread", status: "completed" }] } : { forecast: [{ datetime: new Date().toISOString(), condition: "sunny", temperature: 30, templow: 22 }] }), 0); return () => {}; } } });
 
 const cases = [
   ["roost-tile", { entity: "light.kitchen", animation: "glow", power_entity: "sensor.power" }],
   ["roost-tile", { entity: "light.hall", color: "custom", color_start: [10, 20, 30], color_end: [200, 100, 50], size: "small" }],
   ["roost-tile", { entity: "switch.missing" }],
+  ["roost-remote", { athom_remote: "TV", show_numbers: true }],
+  ["roost-remote", { entity: "remote.box" }],
+  ["roost-remote", { entity: "media_player.tv", show_extra: false }],
+  ["roost-presence", { device: "dev-radar" }],
+  ["roost-presence", { device: "dev-none", show_grid: false }],
+  ["roost-weather", { entity: "weather.home" }],
+  ["roost-weather", { entity: "weather.storm", forecast: "hourly" }],
+  ["roost-weather", { entity: "weather.missing", forecast: "none" }],
+  ["roost-energy", { energy: "sensor.energy_today", devices: ["sensor.plug_a", "sensor.plug_b", "sensor.missing"] }],
+  ["roost-energy", { devices: ["sensor.plug_a"] }],
+  ["roost-timer", { entity: "timer.kettle", name: "Kettle", icon: "mdi:kettle" }],
+  ["roost-timer", { entity: "timer.idle" }],
+  ["roost-timer", { entity: "timer.missing" }],
+  ["roost-fan", { entity: "fan.ceiling" }],
+  ["roost-fan", { entity: "fan.plain" }],
+  ["roost-lock", { entity: "lock.front", door: "binary_sensor.front_door" }],
+  ["roost-lock", { entity: "lock.jam" }],
+  ["roost-lock", { entity: "lock.open" }],
+  ["roost-lock", { entity: "cover.garage" }],
+  ["roost-agenda", { entities: ["calendar.home"] }],
+  ["roost-todo", { entity: "todo.shopping", show_done: true }],
+  ["roost-camera", { entity: "camera.door", doorbell: "binary_sensor.bell", aspect: "3/4" }],
+  ["roost-camera", { entity: "camera.off" }],
+  ["roost-sensors", { entities: ["sensor.cabinet", { entity: "sensor.hum", name: "Humidity", below: 50 }, "sensor.offline", "sensor.missing"], columns: 2 }],
+  ["roost-buttons", { items: [{ name: "Kitchen", icon: "mdi:lightbulb", entity: "light.kitchen" }, { name: "Movie", icon: "mdi:movie", tap_action: { action: "perform-action", perform_action: "scene.turn_on", target: { entity_id: "scene.movie" } } }, { icon: "mdi:power" }] }],
+  ["roost-buttons", { items: [{ icon: "mdi:home" }], show_names: false }],
   ["roost-gauge", { entity: "sensor.cabinet", title: "Cabinet", min: 20, max: 45, warn: 32, second: "sensor.hum", second_name: "Humidity" }],
   ["roost-gauge", { entity: "sensor.power", max: 2000, frame: false, show_name: false }],
   ["roost-gauge", { entity: "sensor.offline" }],
@@ -167,6 +207,25 @@ if (!/Too high/.test(ga.shadowRoot.innerHTML)) { fails++; console.error("FAIL ga
 // Room sums up what is on.
 const ro = document.createElement("roost-room"); ro.setConfig({ name: "Living", entities: ["light.kitchen", "climate.living", "cover.curtain"] }); document.body.appendChild(ro); ro.hass = hass(true);
 if (!/1 light on · AC cool 23° · Curtain closed/.test(ro.shadowRoot.innerHTML)) { fails++; console.error("FAIL room summary", ro.shadowRoot.querySelector(".l")?.textContent); }
+// Remote: Athom Hub buttons are matched to keys; keys it does not have are greyed out.
+const rm = document.createElement("roost-remote"); rm.setConfig({ athom_remote: "TV" }); document.body.appendChild(rm); rm.hass = hass(true);
+if (rm.shadowRoot.querySelectorAll(".k:not(.no)").length !== 3) { fails++; console.error("FAIL remote keys", rm.shadowRoot.querySelectorAll(".k:not(.no)").length); }
+// Presence: one person (the 0,0 target is ignored), zone 1 shows its count.
+const pm = document.createElement("roost-presence"); pm.setConfig({ device: "dev-radar" }); document.body.appendChild(pm); pm.hass = hass(true);
+if (!/1 person here/.test(pm.shadowRoot.innerHTML) || !/1 · 1/.test(pm.shadowRoot.innerHTML)) { fails++; console.error("FAIL presence"); }
+// Timer counts down from 2:30.
+const tm = document.createElement("roost-timer"); tm.setConfig({ entity: "timer.kettle" }); document.body.appendChild(tm); tm.hass = hass(true);
+if (!/^2:(29|30)$/.test(tm.shadowRoot.querySelector(".v").textContent)) { fails++; console.error("FAIL timer", tm.shadowRoot.querySelector(".v").textContent); }
+// Agenda and to-do load their items.
+const ag = document.createElement("roost-agenda"); ag.setConfig({ entities: ["calendar.home"] }); document.body.appendChild(ag); ag.hass = hass(true);
+const td = document.createElement("roost-todo"); td.setConfig({ entity: "todo.shopping" }); document.body.appendChild(td); td.hass = hass(true);
+await new Promise((r) => setTimeout(r, 30));
+if (!/ev hot/.test(ag.shadowRoot.innerHTML) || !/Dentist/.test(ag.shadowRoot.innerHTML)) { fails++; console.error("FAIL agenda"); }
+if (!/Milk/.test(td.shadowRoot.innerHTML) || !/1 to do/.test(td.shadowRoot.innerHTML) || !/Clear 1 ticked/.test(td.shadowRoot.innerHTML)) { fails++; console.error("FAIL todo"); }
+// Energy: today against yesterday.
+const en = document.createElement("roost-energy"); en.setConfig({ energy: "sensor.energy_today", devices: ["sensor.plug_a", "sensor.plug_b"] }); document.body.appendChild(en); en.hass = hass(true);
+await new Promise((r) => setTimeout(r, 30));
+if (!/12.4 kWh/.test(en.shadowRoot.innerHTML) || !/24% vs yesterday/.test(en.shadowRoot.innerHTML) || !/1.6 kW/.test(en.shadowRoot.innerHTML)) { fails++; console.error("FAIL energy", en.shadowRoot.querySelector(".top")?.textContent); }
 // Doors say Closed, not Off.
 const dt = document.createElement("roost-tile"); dt.setConfig({ entity: "binary_sensor.front_door" }); document.body.appendChild(dt); dt.hass = hass(true);
 if (!/Closed/.test(dt.shadowRoot.innerHTML)) { fails++; console.error("FAIL door tile word"); }
