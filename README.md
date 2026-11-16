@@ -25,6 +25,18 @@ Every card has a **visual editor**: pick the device, colours, size, icon and sha
 | **Roost Alerts** | Only shows when something needs you: a low battery, a device gone offline, a door left open, or your own rules. |
 | **Roost Title** | A section heading with an optional line under it, a badge and a "See all" link. |
 | **Roost Light/Dark** | A sun / moon button that switches this screen between light and dark. |
+| **Roost Remote** | A remote-control pad (power, arrows, OK, volume, channels, numbers) for an Athom Hub remote, any remote, or a TV. Keys it cannot send are greyed out. |
+| **Roost Presence Map** | The room from above as a presence radar sees it (for example the LD2450 in an Athom sensor): people as glowing moving dots, and its zones with how many are inside. |
+| **Roost Weather** | The weather now on an animated sky (rain falls, clouds drift, storms flash, stars at night), and the next days or hours. |
+| **Roost Energy** | Power used now, today against yesterday, and the hungriest devices as bars. |
+| **Roost Timer** | A countdown ring for a timer (kettle, washing) with start, pause, cancel and quick times. |
+| **Roost Fan** | A fan that spins as fast as it is set, with speed buttons, swing and its modes. |
+| **Roost Lock** | A lock or garage door: slide to unlock, tap to lock; says when it is jammed. |
+| **Roost Agenda** | Today's and the next days' calendar events. Bin day (or any word you choose) stands out. |
+| **Roost To-do** | A to-do or shopping list: tick off, add and clear. |
+| **Roost Camera** | A camera picture or live video, with a banner when someone rings the doorbell. |
+| **Roost Sensors** | Many small readings in neat squares, orange when out of the range you set. |
+| **Roost Buttons** | Several small actions in one rounded bar; a button lights up when its device is on. |
 | **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. |
 
 All cards follow Home Assistant's light or dark mode (or stay always light or always dark), and their text is never cut off: it moves to the next line instead.
@@ -359,6 +371,74 @@ tap_action: { action: navigate, navigation_path: "#devices" }
 ---
 type: custom:roost-theme
 show_label: true
+```
+
+### Roost Remote
+```yaml
+type: custom:roost-remote
+athom_remote: Living room TV    # an Athom Hub remote's name
+# or: entity: remote.living_room_tv   /   entity: media_player.tv
+# or: buttons: [button.tv_power, button.tv_up, button.tv_ok]
+show_numbers: false
+```
+
+### Roost Presence Map
+```yaml
+type: custom:roost-presence
+device: 0123456789abcdef        # the presence sensor (pick it in the editor)
+range: 6                        # metres
+```
+
+### Roost Weather, Energy and Timer
+```yaml
+type: custom:roost-weather
+entity: weather.home
+forecast: daily                 # daily, hourly or none
+---
+type: custom:roost-energy
+energy: sensor.energy_today      # kWh meter that counts up
+devices: [sensor.kettle_power, sensor.tv_power]
+---
+type: custom:roost-timer
+entity: timer.kettle
+presets: [1, 3, 5, 10]
+```
+
+### Roost Fan, Lock, Agenda and To-do
+```yaml
+type: custom:roost-fan
+entity: fan.bedroom
+---
+type: custom:roost-lock
+entity: lock.front_door
+door: binary_sensor.front_door
+---
+type: custom:roost-agenda
+entities: [calendar.family]
+days: 3
+highlight: bin, trash
+---
+type: custom:roost-todo
+entity: todo.shopping_list
+```
+
+### Roost Camera, Sensors and Buttons
+```yaml
+type: custom:roost-camera
+entity: camera.doorbell
+doorbell: binary_sensor.doorbell_ring
+aspect: 3/4
+---
+type: custom:roost-sensors
+columns: 3
+entities:
+  - sensor.living_temperature
+  - { entity: sensor.cabinet_temperature, name: Cabinet, above: 32 }
+---
+type: custom:roost-buttons
+items:
+  - { name: Lights, icon: mdi:lightbulb-group, entity: light.living }
+  - { name: Movie, icon: mdi:movie, tap_action: { action: perform-action, perform_action: scene.turn_on, target: { entity_id: scene.movie } } }
 ```
 
 ## Keep your Home Assistant up to date automatically

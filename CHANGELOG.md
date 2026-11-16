@@ -2,6 +2,21 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.1.0 — 2026-11-16
+**Twelve more cards**
+- **Roost Remote**: a remote-control pad with power, arrows and OK, back / home / menu / input, volume and channel rockers, mute, play / pause and number keys. Works with an Athom Hub remote (its buttons are matched to the keys by name), any remote entity, or a TV. Keys it cannot send are greyed out.
+- **Roost Presence Map**: the room from above, as a presence radar sees it: a glowing field of view, metre lines, people as pulsing dots, and the sensor's zones with how many people are inside each.
+- **Roost Weather**: the weather now on an animated sky (rain, snow, drifting clouds, storm flashes, sun or moon and stars), humidity, wind and "feels like", and the next days or hours.
+- **Roost Energy**: power used now (the chosen devices added up), today's energy against yesterday's, and the hungriest devices as bars.
+- **Roost Timer**: a countdown ring that ticks every second, start / pause / cancel and quick times (1, 3, 5, 10 minutes or your own).
+- **Roost Fan**: the fan icon spins faster at higher speeds; Off / Low / Medium / High (or numbered speeds), swing, and its modes.
+- **Roost Lock**: slide to unlock (so it is not opened by accident), tap to lock; shakes when jammed; also for garage doors; can show the door sensor.
+- **Roost Agenda**: your calendars' events for the next days, grouped by Today / Tomorrow; bin day (or any word you choose) is highlighted.
+- **Roost To-do**: tick items off with a little pop, add new ones, and clear the ticked ones. Updates live.
+- **Roost Camera**: a picture that refreshes or live video; when the doorbell rings the card glows and says "Someone is at the door".
+- **Roost Sensors**: many readings in neat squares with fitting icons and colours; orange when outside the range you set.
+- **Roost Buttons**: several small actions in one rounded bar; a button lights up when its device is on.
+
 ## 1.0.0 — 2026-11-16
 **Twelve new cards**
 - **Roost Gauge**: a big ring for one reading. Turns orange and glows when too high (or too low), shows a second reading, and the ring grows smoothly to new values.
