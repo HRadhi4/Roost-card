@@ -2,6 +2,9 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.2.3 — 2026-11-17
+- **Bottom bar**: a button can also light up on other pages (for example **Rooms** stays lit on every room's page), and "only for these people" now takes people from your list.
+
 ## 1.2.2 — 2026-11-17
 **Matches the original phone dashboard**
 - Same fonts as the original (Inter and Space Grotesk, loaded automatically), same spacing, sizes and shadows.

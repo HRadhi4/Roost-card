@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.2.2";
+const ROOST_VERSION = "1.2.3";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1159,7 +1159,8 @@ class RoostNav extends RoostBase {
           name: { label: "Name", selector: { text: {} } },
           icon: { label: "Icon", required: true, selector: { icon: {} } },
           path: { label: "Opens (for example /dashboard-home/0 or #rooms)", required: true, selector: { text: {} } },
-          users: { label: "Only for these people (empty = everyone)", selector: { select: { multiple: true, custom_value: true, options: [] } } },
+          match: { label: "Also lights up on these pages", selector: { select: { multiple: true, custom_value: true, options: [] } } },
+          users: { label: "Only for these people (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
         } } } },
         { type: "grid", name: "", schema: [
           { name: "layout", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Bar on phones, rail on tablets" }, { value: "bar", label: "Always a bottom bar" }, { value: "rail", label: "Always a side rail" }] } } },
@@ -1187,7 +1188,8 @@ class RoostNav extends RoostBase {
 
   getGridOptions() { return { columns: 12, rows: "auto" }; }
 
-  active(path) {
+  active(path, it) {
+    if (Array.isArray(it?.match) && it.match.some((m) => (String(m).startsWith("#") ? location.hash === m : location.pathname.startsWith(m)))) return true;
     const here = `${location.pathname}${location.hash}`;
     if (path.startsWith("#")) return location.hash === path || (!location.hash && this._config.items[0]?.path === path);
     return here === path || location.pathname === path;
@@ -1200,7 +1202,8 @@ class RoostNav extends RoostBase {
     const rail = !editing && (c.layout === "rail" || (c.layout === "auto" && window.innerWidth >= 768));
     const fixed = c.fixed && !editing;
     const uid = this._hass.user?.id;
-    const shown = c.items.map((it, i) => ({ it, i })).filter(({ it }) => editing || !Array.isArray(it.users) || !it.users.length || it.users.includes(uid));
+    const mine = (list) => list.some((u) => u === uid || this._hass.states[u]?.attributes.user_id === uid);
+    const shown = c.items.map((it, i) => ({ it, i })).filter(({ it }) => editing || !Array.isArray(it.users) || !it.users.length || mine(it.users));
     const pos = fixed ? (rail ? "position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:4" : "position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4") : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       :host{${fixed ? (rail ? "height:0;" : "height:calc(76px + env(safe-area-inset-bottom));") : ""}display:block}
@@ -1225,7 +1228,7 @@ class RoostNav extends RoostBase {
       @container (max-width: ${shown.length * 64}px){:host a span{display:none}:host a{padding:4px 2px}:host nav{padding:5px;gap:2px}}
       @media (max-width: 360px){nav{gap:2px;padding:6px}a{padding:4px 2px}}
     </style>
-    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${shown.map(({ it, i }) => `<a href="${esc(it.path)}" data-i="${i}" class="${this.active(it.path) ? "on" : ""}" aria-label="${esc(it.name || it.path)}">
+    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${shown.map(({ it, i }) => `<a href="${esc(it.path)}" data-i="${i}" class="${this.active(it.path, it) ? "on" : ""}" aria-label="${esc(it.name || it.path)}">
       <ha-icon icon="${esc(it.icon || "mdi:circle")}"></ha-icon>${c.show_labels && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</a>`).join("")}</nav>`;
     this.shadowRoot.querySelectorAll("a").forEach((a) => a.addEventListener("click", (ev) => {
       const it = c.items[+a.dataset.i];
