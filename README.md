@@ -13,6 +13,18 @@ Every card has a **visual editor**: pick the device, colours, size, icon and sha
 | **Roost Row** | A long row with a ring (an AC's temperature or any number), a name, a state line and an arrow. |
 | **Roost Nav** | Icon navigation: a bar at the bottom on phones, a rail at the side on tablets. |
 | **Roost Curtain** | A window with curtains that really slide open and closed, a sky behind them, and Open / Stop / Close buttons. |
+| **Roost Gauge** | A big ring for one reading (a cabinet's temperature, a plug's power). Turns orange and glows when too high, with a second reading under it. |
+| **Roost Graph** | A smooth line of a reading over the last hours, with the lowest and highest. |
+| **Roost Room** | One room at a glance: temperature bar, humidity and what is on, open or running. Tap to open the room. |
+| **Roost Light** | A light with brightness you drag, warm / neutral / cool buttons and colour dots. |
+| **Roost Media** | TV and sound: power, what is playing (with moving sound bars), volume you drag, mute, play/pause and inputs. |
+| **Roost Alarm** | The alarm in a big shield: arm and disarm with a question first, a keypad when it needs a code, and the doors. |
+| **Roost People** | Who is home: a picture or initials with a green ring when home, and for how long. |
+| **Roost Automations** | A list of automations with a switch, when each last ran, and an optional "run now" button. |
+| **Roost Clock** | A big clock and date with a line of the day's times (such as prayer times) and a countdown to the next one. |
+| **Roost Alerts** | Only shows when something needs you: a low battery, a device gone offline, a door left open, or your own rules. |
+| **Roost Title** | A section heading with an optional line under it, a badge and a "See all" link. |
+| **Roost Light/Dark** | A sun / moon button that switches this screen between light and dark. |
 | **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. |
 
 All cards follow Home Assistant's light or dark mode (or stay always light or always dark), and their text is never cut off: it moves to the next line instead.
@@ -239,6 +251,114 @@ stop_action:            # optional: what Stop does as well as stopping the curta
   action: perform-action
   perform_action: script.turn_on
   target: { entity_id: script.curtain_stop }
+```
+
+### Roost Gauge
+```yaml
+type: custom:roost-gauge
+entity: sensor.cabinet_temperature
+title: Cabinet           # small word in the ring
+min: 20
+max: 45
+warn: 32                 # orange from here (warn_below for too low)
+second: sensor.cabinet_humidity
+second_name: Humidity
+```
+
+### Roost Graph
+```yaml
+type: custom:roost-graph
+entity: sensor.plug_power
+hours: 24
+color: blue
+height: 90
+```
+
+### Roost Room
+```yaml
+type: custom:roost-room
+name: Living room
+temperature: sensor.living_temperature
+humidity: sensor.living_humidity
+entities: [light.living, climate.living_ac, cover.living_curtain, media_player.tv]
+style: row               # row or card
+tap_action: { action: navigate, navigation_path: "#living" }
+```
+
+### Roost Light
+```yaml
+type: custom:roost-light
+entity: light.desk_lamp
+show_presets: true       # warm / neutral / cool
+show_colors: true
+```
+
+### Roost Media
+```yaml
+type: custom:roost-media
+entity: media_player.living_room_tv
+volume_entity: media_player.soundbar   # optional
+power_entity: switch.tv_plug           # optional
+max_sources: 6
+```
+
+### Roost Alarm
+```yaml
+type: custom:roost-alarm
+entity: alarm_control_panel.alarmo
+modes: [arm_away, arm_home, arm_night]
+doors: [binary_sensor.front_door]
+confirm: true
+```
+
+### Roost People
+```yaml
+type: custom:roost-people
+entities: [person.hasan, person.afaf]
+layout: row              # row or list
+```
+
+### Roost Automations
+```yaml
+type: custom:roost-automations
+title: Automations
+entities: [automation.entrance_light, automation.tv_off]
+all: false               # true: every automation
+show_run: true
+```
+
+### Roost Clock
+```yaml
+type: custom:roost-clock
+countdown_title: Next prayer
+times:
+  - { name: Fajr, short: F, entity: sensor.fajr }
+  - { name: Dhuhr, short: D, entity: sensor.dhuhr }
+  - { name: Maghrib, short: M, entity: sensor.maghrib }
+hour24: false
+```
+
+### Roost Alerts
+```yaml
+type: custom:roost-alerts
+batteries: true
+battery_below: 20
+offline: [sensor.living_temperature]
+doors: [binary_sensor.front_door]
+door_minutes: 10
+rules:
+  - { entity: sensor.cabinet_temperature, above: 32, message: Server cabinet too hot }
+```
+
+### Roost Title and Roost Light/Dark
+```yaml
+type: custom:roost-title
+title: Devices
+link_text: See all
+tap_action: { action: navigate, navigation_path: "#devices" }
+---
+type: custom:roost-theme
+show_label: true
 ```
 
 ## Keep your Home Assistant up to date automatically

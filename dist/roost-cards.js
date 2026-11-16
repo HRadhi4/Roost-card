@@ -2,11 +2,12 @@
  * Roost Cards — beautiful, fully customisable dashboard cards for Home Assistant.
  * Phones and tablets, light and dark. One file, no build step.
  *
- * Cards: roost-tile, roost-chips, roost-thermostat, roost-scene, roost-hero, roost-nav, roost-rooms, roost-row, roost-curtain
+ * Cards: roost-tile, roost-chips, roost-thermostat, roost-scene, roost-hero, roost-nav, roost-rooms, roost-row, roost-curtain,
+ *        roost-gauge, roost-automations, roost-clock, roost-title, roost-theme, roost-media, roost-room, roost-alarm, roost-light, roost-graph, roost-people, roost-alerts
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.9.0";
+const ROOST_VERSION = "1.0.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1681,6 +1682,1041 @@ class RoostCurtain extends RoostBase {
   getCardSize() { return 4; }
 }
 
+// ------------------------------------------------------------------ helpers for the cards below
+// A card that redraws on a timer (clock, "last ran", "home for").
+const ticking = (Base, ms) => class extends Base {
+  connectedCallback() { super.connectedCallback?.(); clearInterval(this._tick); this._tick = setInterval(() => { this._sig = null; if (this._hass) this.hass = this._hass; }, ms); }
+
+  disconnectedCallback() { super.disconnectedCallback?.(); clearInterval(this._tick); }
+};
+
+// "5 min ago", "3 h ago", "2 d ago"
+function ago(iso) {
+  if (!iso) return "";
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  if (m < 1440) return `${Math.round(m / 60)} h ago`;
+  return `${Math.round(m / 1440)} d ago`;
+}
+
+const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+const fmt = (v, dec) => (v == null ? "" : Number(v).toFixed(dec == null ? (Math.abs(v) >= 100 ? 0 : 1) : dec));
+const panelCss = (p, radius = 22) => `background:${p.panel};border:1px solid ${p.border};border-radius:${radius}px;color:${p.text}`;
+// a ring: the track and the coloured part, in a 0..1 fraction
+function ringSvg({ size = 210, r = 80, width = 14, f = 0, track, id = "g", from, to, inner, innerFill }) {
+  const C = 2 * Math.PI * r, L = C * 0.75, cx = size / 2;
+  return `<svg viewBox="0 0 ${size} ${size}"><defs><linearGradient id="${id}" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs>
+    <circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${track}" stroke-width="${width}" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 ${cx} ${cx})"/>
+    <circle class="arc" cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="url(#${id})" stroke-width="${width}" stroke-linecap="round" stroke-dasharray="${(L * Math.max(0.0001, f)).toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 ${cx} ${cx})" ${f <= 0 ? 'opacity="0"' : ""}/>
+    ${inner ? `<circle cx="${cx}" cy="${cx}" r="${inner}" fill="${innerFill}"/>` : ""}</svg>`;
+}
+
+// A switch like the tiles' one.
+const switchCss = (p, g) => `.sw{position:relative;width:44px;height:24px;border-radius:999px;background:${p.track};flex:none;cursor:pointer;transition:background .12s}
+  .sw::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:${p.knob};transition:transform .12s,background .12s}
+  .sw.on{background:linear-gradient(135deg,${g[0]},${g[1]})}
+  .sw.on::after{transform:translateX(20px);background:#fff}`;
+
+// ------------------------------------------------------------------ Roost Gauge
+// A big ring for one reading (a cabinet's temperature, a plug's power). It turns orange and glows when too high.
+class RoostGauge extends RoostBase {
+  static get defaults() { return { min: 0, max: 100, color: "custom", color_start: "#38BDF8", color_end: "#8B6CFF", size: 230, radius: 22, show_name: true, frame: true, tap_action: { action: "more-info" }, theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a reading (sensor)"); }
+
+  watched() { return [this._config.entity, this._config.second].filter(Boolean); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: {} } },
+        { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "title", label: "Small title in the ring (for example POWER)", selector: { text: {} } }] },
+        { type: "expandable", name: "", title: "Numbers", icon: "mdi:numeric", schema: [
+          { type: "grid", name: "", schema: [{ name: "min", label: "Ring starts at", selector: { number: { mode: "box" } } }, { name: "max", label: "Ring is full at", selector: { number: { mode: "box" } } }] },
+          { type: "grid", name: "", schema: [{ name: "warn", label: "Warn at or above", selector: { number: { mode: "box" } } }, { name: "warn_below", label: "Warn at or below", selector: { number: { mode: "box" } } }] },
+          { type: "grid", name: "", schema: [{ name: "unit", label: "Unit (empty = the sensor's)", selector: { text: {} } }, { name: "decimals", selector: { number: { min: 0, max: 3, mode: "box" } } }] },
+          { name: "second", label: "Second reading under it (for example humidity)", selector: { entity: {} } },
+          { name: "second_name", label: "Name of the second reading", selector: { text: {} } },
+        ] },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+          ...colourFields("color", "Ring colour"),
+          { type: "grid", name: "", schema: [{ name: "size", label: "Ring size", selector: slider(140, 320, 10) }, { name: "radius", selector: slider(0, 40, 2) }] },
+          { type: "grid", name: "", schema: [{ name: "show_name", selector: { boolean: {} } }, { name: "frame", label: "Card background", selector: { boolean: {} } }] },
+          THEME_FIELD,
+        ] },
+        { type: "expandable", name: "", title: "Tap", icon: "mdi:gesture-tap", schema: [ACTION_FIELD("tap_action")] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("sensor.") && num(hass.states[id].state) != null) || "", min: 0, max: 50 }; }
+
+  getGridOptions() { return { columns: 6, rows: "auto", min_columns: 4 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, s = this.st();
+    const v = s ? num(s.state) : null, ok = v != null;
+    const hot = ok && ((c.warn != null && c.warn !== "" && v >= c.warn) || (c.warn_below != null && c.warn_below !== "" && v <= c.warn_below));
+    const f = ok ? Math.max(0, Math.min(1, (v - c.min) / ((c.max - c.min) || 1))) : 0;
+    const g = hot ? ["#FF9F6B", "#F43F6B"] : this.colour();
+    const unit = c.unit != null && c.unit !== "" ? c.unit : s?.attributes.unit_of_measurement || "";
+    const u2 = unit.length <= 2 ? unit : ` ${unit}`;
+    const sub = c.second ? this.st(c.second) : null, sv = sub ? num(sub.state) : null;
+    const line = !s ? "Device not found" : !ok ? "Offline" : hot ? (c.warn_below != null && v <= c.warn_below ? "Too low" : "Too high") : sub ? `${c.second_name || sub.attributes.friendly_name || "Also"} ${sv != null ? fmt(sv, 0) : sub.state}${sub.attributes.unit_of_measurement ? (sub.attributes.unit_of_measurement.length <= 2 ? "" : " ") + sub.attributes.unit_of_measurement : ""}` : "";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${c.frame ? panelCss(p, c.radius) : `color:${p.text}`};padding:${c.frame ? "16px 14px" : 0};display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+      .ring{position:relative;width:100%;max-width:${c.size}px;container-type:inline-size}
+      .ring svg{display:block;width:100%;${hot ? "animation:roost-arc 2.4s ease-in-out infinite" : ""}}
+      .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24%}
+      .ti{font-size:max(9px,5cqw);letter-spacing:1.2px;color:${p.muted};text-transform:uppercase}
+      .v{font-size:12.5cqw;font-weight:700;line-height:1.05;color:${hot ? "#FF9F6B" : p.text};white-space:nowrap}
+      .v ha-icon{--mdc-icon-size:12cqw;color:${p.muted}}
+      .ln{font-size:max(10px,5.4cqw);color:${hot ? "#FF9F6B" : p.muted};line-height:1.3}
+      .nm{font-size:15px;font-weight:600;text-align:center}
+    </style>
+    <div class="card" role="button" tabindex="0">
+      <div class="ring">${ringSvg({ f, track: p.track, from: g[0], to: g[1], id: "gg", inner: 58, innerFill: p.dial })}
+        <div class="in">${c.title ? `<span class="ti t">${esc(c.title)}</span>` : ""}<span class="v num">${ok ? esc(fmt(v, c.decimals) + u2) : '<ha-icon icon="mdi:help-circle-outline"></ha-icon>'}</span>${line ? `<span class="ln t">${esc(line)}</span>` : ""}</div></div>
+      ${c.show_name ? `<div class="nm t">${esc(this.name(c.entity))}</div>` : ""}
+    </div>`;
+    // the arc grows to its new value instead of jumping
+    const arc = this.shadowRoot.querySelector(".arc");
+    if (arc && this._lastF != null && this._lastF !== f) {
+      const L = 2 * Math.PI * 80 * 0.75, C = 2 * Math.PI * 80;
+      try { arc.animate([{ strokeDasharray: `${(L * Math.max(0.0001, this._lastF)).toFixed(1)} ${C.toFixed(1)}` }, { strokeDasharray: `${(L * Math.max(0.0001, f)).toFixed(1)} ${C.toFixed(1)}` }], { duration: 700, easing: "cubic-bezier(.3,1,.4,1)" }); } catch (e) { /* jumps */ }
+    }
+    this._lastF = f;
+    this.press(this.shadowRoot.querySelector(".card"), () => this.run(c.tap_action, c.entity), () => this.moreInfo(c.entity));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Automations
+// A list of automations, each with a switch and when it last ran.
+class RoostAutomations extends ticking(RoostBase, 60000) {
+  static get defaults() { return { entities: [], all: false, color: "active", columns: 1, show_last_run: true, show_run: false, only_on: false, title: "", radius: 16, theme: "auto" }; }
+
+  validate(c) { if (!c.all && (!Array.isArray(c.entities) || !c.entities.length)) throw new Error("Pick some automations, or turn on “Show all automations”"); }
+
+  ids() {
+    const c = this._config, h = this._hass;
+    let ids = c.all ? Object.keys(h?.states || {}).filter((id) => id.startsWith("automation.")).sort((a, b) => this.name(a).localeCompare(this.name(b))) : c.entities.map((e) => (typeof e === "string" ? e : e.entity));
+    if (c.only_on) ids = ids.filter((id) => this.st(id)?.state === "on");
+    return ids;
+  }
+
+  name(id) {
+    const e = (this._config.entities || []).find((x) => typeof x === "object" && x.entity === id);
+    return e?.name || this.st(id)?.attributes.friendly_name || id;
+  }
+
+  watched() { return this._hass ? this.ids() : []; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "title", label: "Title above the list (optional)", selector: { text: {} } },
+        { name: "entities", label: "Automations", selector: { entity: { multiple: true, domain: "automation" } } },
+        { name: "all", label: "Show all automations (ignores the list above)", selector: { boolean: {} } },
+        { type: "expandable", name: "", title: "What it shows", icon: "mdi:eye-outline", schema: [
+          { type: "grid", name: "", schema: [{ name: "show_last_run", label: "When it last ran", selector: { boolean: {} } }, { name: "show_run", label: "A “run now” button", selector: { boolean: {} } }] },
+          { name: "only_on", label: "Only the ones that are switched on", selector: { boolean: {} } },
+        ] },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+          ...colourFields("color", "Colour when on"),
+          { type: "grid", name: "", schema: [{ name: "columns", label: "Side by side", selector: { number: { min: 1, max: 3, mode: "box" } } }, { name: "radius", selector: slider(0, 32, 2) }] },
+          THEME_FIELD,
+        ] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entities: Object.keys(hass.states).filter((id) => id.startsWith("automation.")).slice(0, 4) }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    const ids = this.ids();
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${switchCss(p, g)}
+      .ttl{font-size:17px;font-weight:700;color:${p.text};margin:2px 4px 10px}
+      .list{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:8px}
+      .row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:${c.radius}px;background:${p.off};border:1px solid ${p.border};color:${p.text};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .row:active{transform:scale(.98)}
+      .ic{width:38px;height:38px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;background:${p.inset};color:${p.muted}}
+      .row.on .ic{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 8px 18px -8px ${g[2]}}
+      .ic ha-icon{--mdc-icon-size:20px}
+      .tx{flex:1;min-width:0}
+      .n{font-size:14px;font-weight:600;line-height:1.25}
+      .l{font-size:12px;color:${p.muted};margin-top:2px}
+      .run{flex:none;width:34px;height:34px;border-radius:50%;border:1px solid ${p.border};background:${p.panel};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer}
+      .run ha-icon{--mdc-icon-size:18px}
+      .run.go ha-icon{animation:roost-pulse .8s ease-in-out 2}
+      .empty{padding:18px;border-radius:${c.radius}px;border:1px dashed ${p.border};color:${p.muted};text-align:center;font-size:14px}
+    </style>
+    ${c.title ? `<div class="ttl t">${esc(c.title)}</div>` : ""}
+    <div class="list">${ids.length ? ids.map((id) => {
+      const s = this.st(id), on = s?.state === "on", un = !s || UNAVAILABLE.includes(s.state);
+      const line = un ? (s ? "Offline" : "Not found") : c.show_last_run ? (s.attributes.last_triggered ? `Last ran ${ago(s.attributes.last_triggered)}` : "Never ran") : on ? "On" : "Off";
+      const ent = (c.entities || []).find((x) => typeof x === "object" && x.entity === id);
+      return `<div class="row ${on ? "on" : ""}" data-id="${esc(id)}" role="button" tabindex="0" aria-label="${esc(this.name(id))}">
+        <span class="ic"><ha-icon icon="${esc(ent?.icon || (on ? "mdi:robot" : "mdi:robot-outline"))}"></ha-icon></span>
+        <span class="tx"><div class="n t">${esc(this.name(id))}</div><div class="l t">${esc(line)}</div></span>
+        ${c.show_run ? `<button class="run" data-run="${esc(id)}" aria-label="Run now"><ha-icon icon="mdi:play"></ha-icon></button>` : ""}
+        <span class="sw ${on ? "on" : ""}" data-sw="${esc(id)}" role="switch" aria-checked="${on}"></span></div>`;
+    }).join("") : '<div class="empty t">Nothing to show here.</div>'}</div>`;
+    this.shadowRoot.querySelectorAll(".row").forEach((row) => {
+      const id = row.dataset.id;
+      this.press(row, (ev) => {
+        if (ev?.target?.closest?.(".run")) return;
+        this.vibrate();
+        this.call("automation", "toggle", { entity_id: id });
+      }, () => this.moreInfo(id));
+    });
+    this.shadowRoot.querySelectorAll(".run").forEach((b) => b.addEventListener("pointerup", (ev) => {
+      ev.stopPropagation();
+      b.classList.remove("go"); void b.offsetWidth; b.classList.add("go");
+      this.vibrate();
+      this.call("automation", "trigger", { entity_id: b.dataset.run });
+    }));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Clock
+// A big clock and date, with a line of the day's times (prayers or anything else) and a countdown to the next one.
+class RoostClock extends ticking(RoostBase, 15000) {
+  static get defaults() { return { times: [], seconds: false, hour24: false, show_date: true, show_timeline: true, countdown_title: "Next", color: "active", radius: 22, frame: true, theme: "auto" }; }
+
+  watched() { return (this._config.times || []).map((t) => t.entity).filter(Boolean); }
+
+  connectedCallback() {
+    super.connectedCallback();
+    if (this._config?.seconds) { clearInterval(this._tick); this._tick = setInterval(() => { this._sig = null; if (this._hass) this.hass = this._hass; }, 1000); }
+  }
+
+  extraSignature() { const d = new Date(); return `${d.getHours()}:${d.getMinutes()}${this._config.seconds ? `:${d.getSeconds()}` : ""}`; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "times", label: "Times of the day (for example prayer times)", selector: { object: { multiple: true, label_field: "name", fields: {
+          name: { label: "Name", required: true, selector: { text: {} } },
+          short: { label: "Short name on the line (1–2 letters)", selector: { text: {} } },
+          entity: { label: "Time (a sensor with a time)", required: true, selector: { entity: {} } },
+          countdown: { label: "Count down to it", selector: { boolean: {} } },
+        } } } },
+        { name: "countdown_title", label: "Word before the next time", selector: { text: {} } },
+        { type: "expandable", name: "", title: "Clock", icon: "mdi:clock-outline", schema: [
+          { type: "grid", name: "", schema: [{ name: "hour24", label: "24-hour clock", selector: { boolean: {} } }, { name: "seconds", selector: { boolean: {} } }] },
+          { type: "grid", name: "", schema: [{ name: "show_date", selector: { boolean: {} } }, { name: "show_timeline", label: "The line of times", selector: { boolean: {} } }] },
+        ] },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+          ...colourFields("color", "Colour of the next time"),
+          { type: "grid", name: "", schema: [{ name: "radius", selector: slider(0, 40, 2) }, { name: "frame", label: "Card background", selector: { boolean: {} } }] },
+          THEME_FIELD,
+        ] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) {
+    const find = (re) => Object.keys(hass.states).find((id) => re.test(id));
+    const t = [["Fajr", "F", /fajr/], ["Dhuhr", "D", /dhuhr/], ["Asr", "A", /asr/], ["Maghrib", "M", /maghrib/], ["Isha", "I", /isha/]]
+      .map(([name, short, re]) => ({ name, short, entity: find(re), countdown: true })).filter((x) => x.entity);
+    return { times: t };
+  }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  // today's time for a sensor (a full date, or "18:05")
+  when(id) {
+    const s = this.st(id);
+    if (!s || UNAVAILABLE.includes(s.state)) return null;
+    let d = new Date(s.state);
+    if (isNaN(d)) {
+      const m = String(s.state).match(/^(\d{1,2}):(\d{2})/);
+      if (!m) return null;
+      d = new Date(); d.setHours(+m[1], +m[2], 0, 0);
+    }
+    return d;
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), now = new Date();
+    const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: c.seconds ? "2-digit" : undefined, hour12: !c.hour24 });
+    const [hm, ap] = c.hour24 ? [time, ""] : [time.replace(/\s?[AaPp]\.?[Mm]\.?$/, ""), (time.match(/[AaPp]\.?[Mm]\.?$/) || [""])[0]];
+    const date = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+    const times = (c.times || []).map((t) => ({ ...t, at: this.when(t.entity) })).filter((t) => t.at);
+    const mins = (d) => d.getHours() * 60 + d.getMinutes();
+    let next = times.filter((t) => t.countdown !== false && mins(t.at) > mins(now)).sort((a, b) => mins(a.at) - mins(b.at))[0];
+    let nextAt = next ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), next.at.getHours(), next.at.getMinutes()) : null;
+    if (!next) {
+      next = times.filter((t) => t.countdown !== false).sort((a, b) => mins(a.at) - mins(b.at))[0];
+      if (next) { nextAt = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, next.at.getHours(), next.at.getMinutes()); }
+    }
+    const left = nextAt ? Math.max(0, Math.round((nextAt - now) / 60000)) : 0;
+    const cd = nextAt ? `${Math.floor(left / 60) ? `${Math.floor(left / 60)}h ` : ""}${left % 60}m` : "";
+    const fmtT = (d) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: !c.hour24 });
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${c.frame ? panelCss(p, c.radius) : `color:${p.text}`};padding:${c.frame ? 20 : 0}px;display:flex;flex-direction:column;gap:14px}
+      .top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+      .clk{display:flex;align-items:baseline;gap:6px}
+      .hm{font-size:56px;font-weight:700;letter-spacing:-1.5px;line-height:1}
+      .ap{font-size:18px;font-weight:600;color:${p.muted}}
+      .dt{font-size:14px;color:${p.muted};margin-top:6px}
+      .nx{display:flex;flex-direction:column;align-items:flex-end;text-align:right}
+      .nx .w{font-size:12px;color:${p.muted}}
+      .nx .n{font-size:16px;font-weight:700}
+      .nx .c{font-size:13px;font-weight:600;color:${g[1]}}
+      .line{position:relative;height:42px;margin:0 8px}
+      .bar{position:absolute;left:0;right:0;top:10px;height:4px;border-radius:4px;background:${p.track}}
+      .fill{position:absolute;left:0;top:10px;height:4px;border-radius:4px;background:linear-gradient(90deg,${g[0]},${g[1]})}
+      .dot{position:absolute;top:6px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
+      .dot i{display:block;width:8px;height:8px;border-radius:50%;background:${this.dark ? "#0B0D17" : "#fff"};border:2px solid ${p.tick}}
+      .dot.nx2 i{width:12px;height:12px;margin-top:-2px;border:0;background:${g[1]};box-shadow:0 0 10px ${g[1]}}
+      .dot.nx2 i::after{content:"";position:absolute;left:50%;top:-1px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:${g[1]};animation:roost-ping 1.8s ease-out infinite}
+      .dot span{font-size:10px;color:${p.muted}}
+      .now{position:absolute;top:2px;width:2px;height:20px;border-radius:2px;background:${p.text};transform:translateX(-50%)}
+    </style>
+    <div class="card">
+      <div class="top"><div><div class="clk"><span class="hm num">${esc(hm)}</span>${ap ? `<span class="ap">${esc(ap)}</span>` : ""}</div>${c.show_date ? `<div class="dt t">${esc(date)}</div>` : ""}</div>
+        ${next ? `<div class="nx"><span class="w t">${esc(c.countdown_title)}</span><span class="n t">${esc(next.name)} · ${esc(fmtT(nextAt))}</span><span class="c">in ${esc(cd)}</span></div>` : ""}</div>
+      ${c.show_timeline && times.length ? `<div class="line"><span class="bar"></span><span class="fill" style="width:${(mins(now) / 1440 * 100).toFixed(2)}%"></span>
+        ${times.map((t) => `<span class="dot ${next && t.name === next.name ? "nx2" : ""}" style="left:${(mins(t.at) / 1440 * 100).toFixed(2)}%"><i></i><span>${esc(t.short || t.name.slice(0, 2))}</span></span>`).join("")}
+        <span class="now" style="left:${(mins(now) / 1440 * 100).toFixed(2)}%"></span></div>` : ""}
+    </div>`;
+  }
+}
+
+// ------------------------------------------------------------------ Roost Title
+// A section heading, with an optional small line under it and a "See all" link.
+class RoostTitle extends RoostBase {
+  static get defaults() { return { title: "Devices", size: 17, color: "active", link_text: "", tap_action: { action: "none" }, theme: "auto" }; }
+
+  watched() { return [this._config.count_entity].filter(Boolean); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "title", required: true, selector: { text: {} } },
+        { name: "subtitle", label: "Small line under it (optional)", selector: { text: {} } },
+        { type: "grid", name: "", schema: [{ name: "icon", selector: { icon: {} } }, { name: "size", label: "Title size", selector: slider(13, 30) }] },
+        { name: "badge", label: "Small badge next to it (for example “3 on”)", selector: { text: {} } },
+        { type: "expandable", name: "", title: "Link on the right", icon: "mdi:link", schema: [
+          { name: "link_text", label: "Link words (for example “See all”)", selector: { text: {} } },
+          ACTION_FIELD("tap_action", "What the link does"),
+          ...colourFields("color", "Link colour"),
+          THEME_FIELD,
+        ] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return { title: "Devices", link_text: "See all" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
+
+  render() {
+    if (!this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .h{display:flex;align-items:center;gap:10px;padding:6px 4px 0;color:${p.text}}
+      .h ha-icon{--mdc-icon-size:${Math.round(c.size * 1.2)}px;color:${g[this.dark ? 1 : 0]}}
+      .tx{flex:1;min-width:0}
+      .t1{font-size:${c.size}px;font-weight:700;letter-spacing:-.2px;line-height:1.2}
+      .t2{font-size:12.5px;color:${p.muted};margin-top:2px}
+      .bd{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:11.5px;font-weight:600;vertical-align:middle;background:${g[0]}2E;color:${g[this.dark ? 1 : 0]}}
+      .ln{flex:none;font-size:13px;font-weight:600;color:${g[this.dark ? 1 : 0]};background:none;border:0;cursor:pointer;padding:6px 4px;font-family:inherit;display:flex;align-items:center;gap:2px}
+      .ln ha-icon{--mdc-icon-size:18px;color:inherit}
+    </style>
+    <div class="h">${c.icon ? `<ha-icon icon="${esc(c.icon)}"></ha-icon>` : ""}
+      <div class="tx"><div class="t1 t">${esc(c.title)}${c.badge ? `<span class="bd">${esc(c.badge)}</span>` : ""}</div>${c.subtitle ? `<div class="t2 t">${esc(c.subtitle)}</div>` : ""}</div>
+      ${c.link_text ? `<button class="ln">${esc(c.link_text)}<ha-icon icon="mdi:chevron-right"></ha-icon></button>` : ""}</div>`;
+    const ln = this.shadowRoot.querySelector(".ln");
+    if (ln) ln.addEventListener("click", () => this.run(c.tap_action));
+  }
+
+  set hass(h) { this._hass = h; if (!this._drawn || this._lastDark !== this.dark) { this._drawn = true; this._lastDark = this.dark; this.render(); } }
+
+  get hass() { return this._hass; }
+}
+
+// ------------------------------------------------------------------ Roost Theme switch
+// The sun / moon button: switches this phone or tablet between light and dark.
+class RoostTheme extends RoostBase {
+  static get defaults() { return { include_auto: false, show_label: false, shape: "rounded", size: 44, theme: "auto" }; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "include_auto", label: "Also “Automatic” (follow the phone's own setting)", selector: { boolean: {} } },
+        { name: "show_label", label: "Show the word (Light / Dark)", selector: { boolean: {} } },
+        { type: "grid", name: "", schema: [{ name: "shape", selector: pick([["rounded", "Rounded square"], ["circle", "Circle"], ["pill", "Pill"]]) }, { name: "size", selector: slider(32, 64, 2) }] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return {}; }
+
+  getGridOptions() { return { columns: 3, rows: "auto", min_columns: 2 }; }
+
+  signature() { return `${this._hass?.themes?.darkMode ? 1 : 0}|${this._hass?.selectedTheme?.dark}`; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, d = !!this._hass.themes?.darkMode;
+    const chosen = this._hass.selectedTheme?.dark;
+    const mode = chosen === undefined && c.include_auto ? "auto" : d ? "dark" : "light";
+    const icon = mode === "auto" ? "mdi:theme-light-dark" : d ? "mdi:weather-night" : "mdi:white-balance-sunny";
+    const word = mode === "auto" ? "Automatic" : d ? "Dark" : "Light";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      button{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 auto;height:${c.size}px;min-width:${c.size}px;padding:${c.show_label || c.shape === "pill" ? "0 14px" : 0};
+        border-radius:${c.shape === "circle" || c.shape === "pill" ? 999 : Math.round(c.size / 3)}px;border:1px solid ${p.border};background:${d ? "#1D2244" : "#FFFFFF"};
+        color:${d ? "#FCD34D" : "#6D4BFF"};cursor:pointer;font:inherit;font-size:13px;font-weight:600;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      button:active{transform:scale(.92)}
+      ha-icon{--mdc-icon-size:${Math.round(c.size / 2)}px;animation:roost-float 4s ease-in-out infinite}
+      span{color:${p.text}}
+    </style><button aria-label="Switch to ${d ? "light" : "dark"} mode"><ha-icon icon="${icon}"></ha-icon>${c.show_label ? `<span>${word}</span>` : ""}</button>`;
+    this.shadowRoot.querySelector("button").addEventListener("click", () => {
+      this.vibrate();
+      // light -> dark -> (automatic) -> light
+      const nextDark = mode === "light" ? true : mode === "dark" && c.include_auto ? undefined : false;
+      this.fire("settheme", { dark: nextDark });
+    });
+  }
+}
+
+// ------------------------------------------------------------------ Roost Media
+// TV and sound: power, what is playing, volume, mute, play/pause and the input.
+class RoostMedia extends RoostBase {
+  static get defaults() { return { color: "purple", show_volume: true, show_sources: true, show_controls: true, max_sources: 6, radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a TV or speaker (media player)"); }
+
+  watched() { return [this._config.entity, this._config.volume_entity, this._config.power_entity].filter(Boolean); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: { domain: "media_player" } } },
+        { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "icon", selector: { icon: {} } }] },
+        { type: "expandable", name: "", title: "Extra devices", icon: "mdi:speaker", schema: [
+          { name: "volume_entity", label: "Sound bar or speaker for the volume (optional)", selector: { entity: { domain: "media_player" } } },
+          { name: "power_entity", label: "Plug or switch that powers it (optional)", selector: { entity: { domain: ["switch", "remote", "input_boolean"] } } },
+        ] },
+        { type: "expandable", name: "", title: "What it shows", icon: "mdi:eye-outline", schema: [
+          { type: "grid", name: "", schema: [{ name: "show_volume", label: "Volume", selector: { boolean: {} } }, { name: "show_controls", label: "Play / pause / skip", selector: { boolean: {} } }] },
+          { type: "grid", name: "", schema: [{ name: "show_sources", label: "Inputs and apps", selector: { boolean: {} } }, { name: "max_sources", label: "How many inputs", selector: { number: { min: 1, max: 20, mode: "box" } } }] },
+        ] },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [...colourFields("color"), { name: "radius", selector: slider(0, 40, 2) }, THEME_FIELD] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("media_player.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), s = this.st();
+    const un = !s || UNAVAILABLE.includes(s.state);
+    const on = !un && !["off", "standby"].includes(s.state);
+    const playing = s?.state === "playing";
+    const vs = this.st(c.volume_entity || c.entity) || s;
+    const vol = vs?.attributes.volume_level, muted = !!vs?.attributes.is_volume_muted;
+    const a = s?.attributes || {};
+    const now = [a.media_title, a.media_artist || a.media_series_title].filter(Boolean).join(" · ") || a.app_name || (a.source ? `Input: ${a.source}` : "");
+    const line = !s ? "Device not found" : un ? "Offline" : !on ? "Off" : playing ? "Playing" : s.state === "paused" ? "Paused" : "On";
+    const srcs = (a.source_list || []).slice(0, c.max_sources);
+    const art = on && (a.entity_picture_local || a.entity_picture);
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px;opacity:${un ? 0.6 : 1}}
+      .top{display:flex;align-items:center;gap:12px}
+      .ic{position:relative;width:48px;height:48px;border-radius:16px;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden;
+        background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? g[3] : p.muted};box-shadow:${on ? `0 10px 22px -10px ${g[2]}` : "none"};cursor:pointer}
+      .ic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+      .ic ha-icon{--mdc-icon-size:24px}
+      .tx{flex:1;min-width:0}
+      .n{font-size:16px;font-weight:600;line-height:1.25}
+      .l{font-size:12.5px;color:${p.muted};margin-top:2px;display:flex;align-items:center;gap:6px}
+      .eq{display:inline-flex;gap:2px;align-items:flex-end;height:12px}
+      .eq i{display:block;width:3px;height:12px;border-radius:2px;background:${g[1]};transform-origin:bottom;animation:roost-eq .9s ease-in-out infinite}
+      .eq i:nth-child(2){animation-delay:.2s}.eq i:nth-child(3){animation-delay:.4s}
+      .pw{width:44px;height:44px;border-radius:50%;flex:none;border:1px solid ${p.border};background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.off};color:${on ? g[3] : p.text};cursor:pointer;display:flex;align-items:center;justify-content:center}
+      .pw ha-icon{--mdc-icon-size:22px}
+      .now{font-size:13px;line-height:1.35;color:${p.text};padding:10px 12px;border-radius:14px;background:${p.inset}}
+      .row{display:flex;align-items:center;gap:8px}
+      .b{width:42px;height:42px;border-radius:50%;flex:none;border:1px solid ${p.border};background:${p.off};color:${p.text};cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .b:active{transform:scale(.9)}
+      .b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent}
+      .b ha-icon{--mdc-icon-size:20px}
+      .vol{flex:1;position:relative;height:42px;border-radius:999px;background:${p.inset};overflow:hidden;cursor:pointer;touch-action:none}
+      .vol .f{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,${g[0]},${g[1]});opacity:${muted ? 0.4 : 1}}
+      .vol .v{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${p.text};mix-blend-mode:${this.dark ? "normal" : "multiply"}}
+      .ctl{display:flex;justify-content:center;gap:14px}
+      .src{display:flex;flex-wrap:wrap;gap:6px}
+      .src button{padding:7px 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+      .src button.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]};border-color:transparent}
+    </style>
+    <div class="card">
+      <div class="top"><span class="ic" data-more>${art ? `<img src="${esc(art)}" alt="">` : `<ha-icon icon="${esc(c.icon || "mdi:television")}"></ha-icon>`}</span>
+        <span class="tx"><div class="n t">${esc(this.name(c.entity))}</div><div class="l t">${playing ? '<span class="eq"><i></i><i></i><i></i></span>' : ""}${esc(line)}</div></span>
+        <button class="pw" data-a="power" aria-label="Power"><ha-icon icon="mdi:power"></ha-icon></button></div>
+      ${on && now ? `<div class="now t">${esc(now)}</div>` : ""}
+      ${on && c.show_volume && vs ? `<div class="row"><button class="b" data-a="down" aria-label="Volume down"><ha-icon icon="mdi:volume-minus"></ha-icon></button>
+        ${vol != null ? `<div class="vol" role="slider" aria-valuenow="${Math.round(vol * 100)}"><span class="f" style="width:${(vol * 100).toFixed(0)}%"></span><span class="v num">${muted ? "Muted" : `${Math.round(vol * 100)}%`}</span></div>` : '<span style="flex:1"></span>'}
+        <button class="b ${muted ? "on" : ""}" data-a="mute" aria-label="Mute"><ha-icon icon="${muted ? "mdi:volume-off" : "mdi:volume-mute"}"></ha-icon></button>
+        <button class="b" data-a="up" aria-label="Volume up"><ha-icon icon="mdi:volume-plus"></ha-icon></button></div>` : ""}
+      ${on && c.show_controls ? `<div class="ctl"><button class="b" data-a="prev" aria-label="Previous"><ha-icon icon="mdi:skip-previous"></ha-icon></button>
+        <button class="b on" data-a="play" aria-label="Play or pause"><ha-icon icon="${playing ? "mdi:pause" : "mdi:play"}"></ha-icon></button>
+        <button class="b" data-a="next" aria-label="Next"><ha-icon icon="mdi:skip-next"></ha-icon></button></div>` : ""}
+      ${on && c.show_sources && srcs.length ? `<div class="src">${srcs.map((x) => `<button class="${x === a.source ? "on" : ""}" data-src="${esc(x)}">${esc(x)}</button>`).join("")}</div>` : ""}
+    </div>`;
+    const vid = c.volume_entity || c.entity, root = this.shadowRoot;
+    root.querySelector("[data-more]").addEventListener("click", () => this.moreInfo(c.entity));
+    root.querySelectorAll("[data-a]").forEach((b) => b.addEventListener("click", () => {
+      this.vibrate();
+      const act = b.dataset.a;
+      if (act === "power") {
+        if (c.power_entity && !on) return this.call("homeassistant", "turn_on", { entity_id: c.power_entity }).then(() => this.call("media_player", "turn_on", { entity_id: c.entity }));
+        return this.call("media_player", on ? "turn_off" : "turn_on", { entity_id: c.entity });
+      }
+      if (act === "down") return this.call("media_player", "volume_down", { entity_id: vid });
+      if (act === "up") return this.call("media_player", "volume_up", { entity_id: vid });
+      if (act === "mute") return this.call("media_player", "volume_mute", { entity_id: vid, is_volume_muted: !muted });
+      if (act === "play") return this.call("media_player", "media_play_pause", { entity_id: c.entity });
+      if (act === "prev") return this.call("media_player", "media_previous_track", { entity_id: c.entity });
+      if (act === "next") return this.call("media_player", "media_next_track", { entity_id: c.entity });
+      return undefined;
+    }));
+    root.querySelectorAll("[data-src]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("media_player", "select_source", { entity_id: c.entity, source: b.dataset.src }); }));
+    const bar = root.querySelector(".vol");
+    if (bar) {
+      const set = (ev, done) => {
+        const r = bar.getBoundingClientRect(), f = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+        bar.querySelector(".f").style.width = `${(f * 100).toFixed(0)}%`;
+        bar.querySelector(".v").textContent = `${Math.round(f * 100)}%`;
+        if (done) this.call("media_player", "volume_set", { entity_id: vid, volume_level: Math.round(f * 100) / 100 });
+      };
+      bar.addEventListener("pointerdown", (ev) => { bar.setPointerCapture(ev.pointerId); this._drag = true; set(ev); });
+      bar.addEventListener("pointermove", (ev) => { if (this._drag) set(ev); });
+      bar.addEventListener("pointerup", (ev) => { if (this._drag) { this._drag = false; set(ev, true); } });
+    }
+  }
+}
+
+// ------------------------------------------------------------------ Roost Room
+// One room at a glance: its temperature (with a bar), humidity, and what is on, open or running. Tap to open the room.
+class RoostRoom extends RoostBase {
+  static get defaults() { return { color: "active", min: 18, max: 36, warn: 32, style: "row", radius: 16, entities: [], tap_action: { action: "none" }, theme: "auto" }; }
+
+  validate(c) { if (!c.name) throw new Error("Give the room a name"); }
+
+  watched() { const c = this._config; return [c.temperature, c.humidity, ...(c.entities || [])].filter(Boolean); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { type: "grid", name: "", schema: [{ name: "name", required: true, label: "Room name", selector: { text: {} } }, { name: "icon", selector: { icon: {} } }] },
+        { type: "grid", name: "", schema: [{ name: "temperature", label: "Temperature sensor", selector: { entity: { domain: "sensor" } } }, { name: "humidity", label: "Humidity sensor", selector: { entity: { domain: "sensor" } } }] },
+        { name: "entities", label: "Devices to sum up (lights, AC, curtain, TV)", selector: { entity: { multiple: true } } },
+        ACTION_FIELD("tap_action", "Tap opens (for example the room's page)"),
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+          { name: "style", selector: pick([["row", "Slim row with a bar"], ["card", "Card with an icon"]]) },
+          ...colourFields("color", "Bar colour"),
+          { type: "grid", name: "", schema: [{ name: "min", label: "Bar starts at (°)", selector: { number: { mode: "box" } } }, { name: "max", label: "Bar is full at (°)", selector: { number: { mode: "box" } } }] },
+          { type: "grid", name: "", schema: [{ name: "warn", label: "Too hot from (°)", selector: { number: { mode: "box" } } }, { name: "radius", selector: slider(0, 32, 2) }] },
+          THEME_FIELD,
+        ] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { name: "Living room", icon: "mdi:sofa", temperature: Object.keys(hass.states).find((id) => hass.states[id].attributes.device_class === "temperature") || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  summary() {
+    const out = [], lights = [];
+    for (const id of this._config.entities || []) {
+      const s = this.st(id); if (!s) continue;
+      const d = id.split(".")[0], nm = s.attributes.friendly_name || id;
+      if (UNAVAILABLE.includes(s.state)) { out.push(`${nm} offline`); continue; }
+      if (d === "light" || (d === "switch" && /light|lamp/i.test(nm))) { if (s.state === "on") lights.push(nm); continue; }
+      if (d === "climate") out.push(s.state === "off" ? "AC off" : `AC ${s.state.replace("_only", "").replace("heat_cool", "auto")}${s.attributes.temperature != null ? ` ${s.attributes.temperature}°` : ""}`);
+      else if (d === "cover") out.push(`${/blind/i.test(nm) ? "Blind" : "Curtain"} ${s.state}`);
+      else if (d === "media_player") { if (!["off", "standby"].includes(s.state)) out.push(`${/tv/i.test(nm) ? "TV" : nm} on`); }
+      else if (d === "binary_sensor") { if (s.state === "on") out.push(`${nm} ${["door", "window", "opening"].includes(s.attributes.device_class) ? "open" : "on"}`); }
+      else if (s.state === "on") out.push(`${nm} on`);
+    }
+    if (lights.length) out.unshift(`${lights.length} light${lights.length > 1 ? "s" : ""} on`);
+    return out.join(" · ") || "All quiet";
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    const ts = this.st(c.temperature), t = ts ? num(ts.state) : null, hs = this.st(c.humidity), h = hs ? num(hs.state) : null;
+    const hot = t != null && c.warn != null && t >= c.warn;
+    const f = t == null ? 0 : Math.max(0.06, Math.min(1, (t - c.min) / ((c.max - c.min) || 1)));
+    const bar = hot ? "linear-gradient(90deg,#FF9F6B,#F43F6B)" : `linear-gradient(90deg,${g[0]},${g[1]})`;
+    const card = c.style === "card";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .r{${panelCss(p, c.radius)};padding:${card ? 16 : 12}px ${card ? 16 : 14}px;display:grid;grid-template-columns:${card ? "48px 1fr auto" : "14px 1fr auto"};column-gap:${card ? 14 : 10}px;row-gap:6px;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .r:active{transform:scale(.98)}
+      .dot{grid-row:1/4;width:10px;height:10px;border-radius:50%;background:${hot ? "#FF9F6B" : t != null ? g[0] : p.knob};box-shadow:0 0 0 4px ${hot ? "rgba(255,159,107,.22)" : t != null ? `${g[0]}2E` : "transparent"};${hot ? "animation:roost-breathe 1.6s ease-in-out infinite" : ""}}
+      .ic{grid-row:1/4;width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:${g[0]}24;color:${g[this.dark ? 1 : 0]}}
+      .ic ha-icon{--mdc-icon-size:24px}
+      .n{font-size:${card ? 16 : 14}px;font-weight:600;text-align:left}
+      .tp{font-size:${card ? 16 : 14}px;font-weight:600;text-align:right;white-space:nowrap;color:${hot ? "#FF9F6B" : p.text}}
+      .bar{grid-column:2/4;height:4px;border-radius:999px;background:${p.track};overflow:hidden}
+      .bar i{display:block;height:100%;width:${(f * 100).toFixed(0)}%;border-radius:999px;background:${bar}}
+      .l{grid-column:2/4;font-size:12px;color:${p.muted};line-height:1.35}
+    </style>
+    <div class="r" role="button" tabindex="0" aria-label="${esc(c.name)}">
+      ${card ? `<span class="ic"><ha-icon icon="${esc(c.icon || "mdi:home-outline")}"></ha-icon></span>` : '<span class="dot"></span>'}
+      <span class="n t">${esc(c.name)}</span><span class="tp num">${t != null ? `${fmt(t, 1)}°` : c.temperature ? "No reading" : ""}${h != null ? `<span style="color:${p.muted};font-weight:500"> · ${Math.round(h)}%</span>` : ""}</span>
+      ${c.temperature ? `<span class="bar"><i></i></span>` : ""}
+      <span class="l t">${esc(this.summary())}</span>
+    </div>`;
+    this.press(this.shadowRoot.querySelector(".r"), () => {
+      if ((c.tap_action || {}).action && c.tap_action.action !== "none") this.run(c.tap_action);
+      else if (c.temperature) this.moreInfo(c.temperature);
+    }, () => c.temperature && this.moreInfo(c.temperature));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Alarm
+// The alarm: its state in a big shield, arm and disarm buttons (with a question first), a keypad if it needs a code, and the doors.
+class RoostAlarm extends RoostBase {
+  static get defaults() { return { modes: ["arm_away", "arm_home", "arm_night"], doors: [], confirm: true, radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose the alarm"); }
+
+  watched() { return [this._config.entity, ...(this._config.doors || [])]; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: { domain: "alarm_control_panel" } } },
+        { name: "name", selector: { text: {} } },
+        { name: "modes", label: "Buttons", selector: { select: { multiple: true, mode: "list", options: [
+          { value: "arm_away", label: "Away" }, { value: "arm_home", label: "Home" }, { value: "arm_night", label: "Night" }, { value: "arm_vacation", label: "Holiday" }] } } },
+        { name: "doors", label: "Doors and windows to show", selector: { entity: { multiple: true, domain: "binary_sensor" } } },
+        { type: "grid", name: "", schema: [{ name: "confirm", label: "Ask before arming or disarming", selector: { boolean: {} } }, { name: "radius", selector: slider(0, 40, 2) }] },
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("alarm_control_panel.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  look(state) {
+    return {
+      disarmed: ["Disarmed", "mdi:shield-off-outline", COLORS.green], armed_away: ["Armed · away", "mdi:shield-lock", COLORS.blue], armed_home: ["Armed · home", "mdi:shield-home", COLORS.teal],
+      armed_night: ["Armed · night", "mdi:shield-moon", COLORS.purple], armed_vacation: ["Armed · holiday", "mdi:shield-airplane", COLORS.blue], armed_custom_bypass: ["Armed", "mdi:shield-half-full", COLORS.blue],
+      arming: ["Arming", "mdi:shield-sync", COLORS.amber], pending: ["Pending", "mdi:shield-alert-outline", COLORS.amber], triggered: ["Alarm!", "mdi:bell-ring", COLORS.coral],
+    }[state] || [state ? state.charAt(0).toUpperCase() + state.slice(1) : "Not found", "mdi:shield-outline", COLORS.slate];
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, s = this.st();
+    const [word, icon, g] = this.look(s?.state);
+    const armed = s && s.state !== "disarmed" && !UNAVAILABLE.includes(s.state);
+    const busy = ["arming", "pending", "triggered"].includes(s?.state);
+    const needCode = !!s?.attributes.code_format && s?.attributes.code_arm_required !== false;
+    const label = { arm_away: ["Away", "mdi:shield-lock"], arm_home: ["Home", "mdi:shield-home"], arm_night: ["Night", "mdi:shield-moon"], arm_vacation: ["Holiday", "mdi:shield-airplane"] };
+    const doors = (c.doors || []).map((id) => this.st(id)).filter(Boolean);
+    const open = doors.filter((d) => d.state === "on");
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:18px;display:flex;flex-direction:column;gap:16px}
+      .top{display:flex;align-items:center;gap:16px}
+      .sh{position:relative;width:72px;height:72px;border-radius:24px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 14px 30px -12px ${g[2]}}
+      .sh ha-icon{--mdc-icon-size:36px;${s?.state === "triggered" ? "animation:roost-wiggle .5s ease-in-out infinite" : busy ? "animation:roost-pulse 1.2s ease-in-out infinite" : ""}}
+      .sh::after{content:"";position:absolute;inset:0;border-radius:inherit;border:2px solid ${g[1]};${armed ? "animation:roost-halo 2.4s ease-out infinite" : "display:none"}}
+      @keyframes roost-halo{0%{transform:scale(1);opacity:.8}100%{transform:scale(1.3);opacity:0}}
+      .n{font-size:13px;color:${p.muted}}
+      .w{font-size:22px;font-weight:700;line-height:1.2}
+      .d{font-size:12.5px;color:${open.length ? "#FF9F6B" : p.muted};margin-top:3px}
+      .btns{display:grid;grid-template-columns:repeat(${Math.max(1, (c.modes || []).length + 1)},minmax(0,1fr));gap:8px}
+      .b{min-height:64px;border-radius:16px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px 4px;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .b:active{transform:scale(.95)}
+      .b ha-icon{--mdc-icon-size:22px}
+      .b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 10px 22px -10px ${g[2]}}
+      .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+      .pad button{height:48px;border-radius:14px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:18px;font-weight:600;cursor:pointer}
+      .code{text-align:center;font-size:22px;letter-spacing:8px;min-height:30px;color:${p.text}}
+      .doors{display:flex;flex-wrap:wrap;gap:6px}
+      .dr{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12.5px;background:${p.inset};color:${p.text};cursor:pointer}
+      .dr ha-icon{--mdc-icon-size:16px}
+    </style>
+    <div class="card">
+      <div class="top"><span class="sh"><ha-icon icon="${icon}"></ha-icon></span>
+        <span><div class="n t">${esc(this.name(c.entity, "Alarm"))}</div><div class="w t">${esc(word)}</div>${doors.length ? `<div class="d t">${open.length ? `${open.length} open: ${esc(open.map((d) => d.attributes.friendly_name).join(", "))}` : "All doors closed"}</div>` : ""}</span></div>
+      ${this._pending ? `<div class="code num">${"•".repeat(this._code.length) || "&nbsp;"}</div><div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, "×", 0, "✓"].map((k) => `<button data-k="${k}">${k}</button>`).join("")}</div>` : `
+      <div class="btns">${(c.modes || []).map((m) => `<button class="b ${s?.state === m.replace("arm_", "armed_") ? "on" : ""}" data-m="${m}"><ha-icon icon="${label[m]?.[1] || "mdi:shield"}"></ha-icon>${esc(label[m]?.[0] || m)}</button>`).join("")}
+        <button class="b ${s?.state === "disarmed" ? "on" : ""}" data-m="disarm"><ha-icon icon="mdi:shield-off-outline"></ha-icon>Off</button></div>`}
+      ${doors.length ? `<div class="doors">${doors.map((d) => `<span class="dr" data-e="${esc(d.entity_id)}"><ha-icon icon="${d.state === "on" ? "mdi:door-open" : "mdi:door-closed"}" style="color:${d.state === "on" ? "#FF9F6B" : "#3DD68C"}"></ha-icon>${esc(d.attributes.friendly_name || d.entity_id)}</span>`).join("")}</div>` : ""}
+    </div>`;
+    const root = this.shadowRoot;
+    root.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
+    root.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => {
+      const m = b.dataset.m;
+      const text = m === "disarm" ? "Turn the alarm off?" : `Arm the alarm (${label[m]?.[0] || m})?${open.length ? ` ${open.length} door${open.length > 1 ? "s are" : " is"} open.` : ""}`;
+      if (c.confirm && !window.confirm(text)) return;
+      this.vibrate();
+      if (needCode || (m === "disarm" && s?.attributes.code_format)) { this._pending = m; this._code = ""; this._sig = null; this.render(); return; }
+      this.call("alarm_control_panel", m === "disarm" ? "alarm_disarm" : `alarm_${m}`, { entity_id: c.entity });
+    }));
+    root.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => {
+      const k = b.dataset.k;
+      this.vibrate(8);
+      if (k === "×") { this._pending = null; this._code = ""; }
+      else if (k === "✓") { const m = this._pending; this._pending = null; this.call("alarm_control_panel", m === "disarm" ? "alarm_disarm" : `alarm_${m}`, { entity_id: c.entity, code: this._code }); this._code = ""; }
+      else this._code += k;
+      this._sig = null; this.render();
+    }));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Light
+// One light with its brightness you drag, warm-to-cool presets and colour dots.
+class RoostLight extends RoostBase {
+  static get defaults() { return { color: "amber", show_presets: true, show_colors: true, radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a light"); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: { domain: "light" } } },
+        { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "icon", selector: { icon: {} } }] },
+        { type: "grid", name: "", schema: [{ name: "show_presets", label: "Warm / neutral / cool buttons", selector: { boolean: {} } }, { name: "show_colors", label: "Colour dots (colour bulbs)", selector: { boolean: {} } }] },
+        ...colourFields("color", "Bar colour"),
+        { type: "grid", name: "", schema: [{ name: "radius", selector: slider(0, 40, 2) }, THEME_FIELD] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("light.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), s = this.st();
+    const un = !s || UNAVAILABLE.includes(s.state), on = s?.state === "on";
+    const a = s?.attributes || {};
+    const modes = a.supported_color_modes || [];
+    const dims = modes.some((m) => m !== "onoff");
+    const temps = modes.includes("color_temp");
+    const colours = modes.some((m) => ["hs", "rgb", "rgbw", "rgbww", "xy"].includes(m));
+    const pct = on ? (a.brightness != null ? Math.round(a.brightness / 2.55) : 100) : 0;
+    const tint = on && a.rgb_color ? `rgb(${a.rgb_color.join(",")})` : g[1];
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${switchCss(p, g)}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px;opacity:${un ? 0.6 : 1}}
+      .top{display:flex;align-items:center;gap:12px}
+      .ic{position:relative;width:48px;height:48px;border-radius:16px;flex:none;display:flex;align-items:center;justify-content:center;background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? g[3] : p.muted};cursor:pointer;
+        box-shadow:${on ? `0 0 ${10 + pct / 3}px ${Math.round(pct / 12)}px ${tint}66` : "none"}}
+      .ic ha-icon{--mdc-icon-size:24px;${on ? "animation:roost-glow 2.4s ease-in-out infinite" : ""}}
+      .tx{flex:1;min-width:0}
+      .n{font-size:16px;font-weight:600;line-height:1.25}
+      .l{font-size:12.5px;color:${p.muted};margin-top:2px}
+      .pc{font-size:28px;font-weight:700;color:${on ? p.text : p.muted}}
+      .bar{position:relative;height:52px;border-radius:18px;background:${p.inset};overflow:hidden;cursor:pointer;touch-action:none}
+      .bar .f{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,${g[0]},${tint});border-radius:18px}
+      .bar ha-icon{position:absolute;left:14px;top:14px;--mdc-icon-size:24px;color:${on ? g[3] : p.muted}}
+      .chips{display:flex;flex-wrap:wrap;gap:8px}
+      .chips button{height:36px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+      .chips button i{display:block;width:14px;height:14px;border-radius:50%}
+      .dotc{width:36px;padding:0!important;justify-content:center}
+    </style>
+    <div class="card">
+      <div class="top"><span class="ic" data-more><ha-icon icon="${esc(c.icon || (on ? "mdi:lightbulb-on" : "mdi:lightbulb-outline"))}"></ha-icon></span>
+        <span class="tx"><div class="n t">${esc(this.name(c.entity))}</div><div class="l t">${!s ? "Device not found" : un ? "Offline" : on ? "On" : "Off"}</div></span>
+        ${dims ? `<span class="pc num">${pct}%</span>` : ""}<span class="sw ${on ? "on" : ""}" role="switch" aria-checked="${on}"></span></div>
+      ${dims ? `<div class="bar" role="slider" aria-valuenow="${pct}"><span class="f" style="width:${pct}%"></span><ha-icon icon="mdi:brightness-6"></ha-icon></div>` : ""}
+      ${(temps && c.show_presets) || (colours && c.show_colors) ? `<div class="chips">
+        ${temps && c.show_presets ? [["Warm", 2700, "#FFB45A"], ["Neutral", 4000, "#FFE7C2"], ["Cool", 6000, "#CFE6FF"]].map(([w, k, col]) => `<button data-k="${k}"><i style="background:${col}"></i>${w}</button>`).join("") : ""}
+        ${colours && c.show_colors ? ["#FF5A5F", "#FFB020", "#3DD68C", "#38BDF8", "#8B6CFF", "#F472B6"].map((col) => `<button class="dotc" data-rgb="${col}" aria-label="Colour"><i style="background:${col}"></i></button>`).join("") : ""}</div>` : ""}
+    </div>`;
+    const root = this.shadowRoot;
+    root.querySelector("[data-more]").addEventListener("click", () => this.moreInfo(c.entity));
+    root.querySelector(".sw").addEventListener("click", () => { this.vibrate(); this.call("light", "toggle", { entity_id: c.entity }); });
+    root.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("light", "turn_on", { entity_id: c.entity, color_temp_kelvin: +b.dataset.k }); }));
+    root.querySelectorAll("[data-rgb]").forEach((b) => b.addEventListener("click", () => {
+      this.vibrate();
+      const h = b.dataset.rgb.slice(1);
+      this.call("light", "turn_on", { entity_id: c.entity, rgb_color: [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)) });
+    }));
+    const bar = root.querySelector(".bar");
+    if (bar) {
+      const set = (ev, done) => {
+        const r = bar.getBoundingClientRect(), f = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+        bar.querySelector(".f").style.width = `${Math.round(f * 100)}%`;
+        const pc = root.querySelector(".pc"); if (pc) pc.textContent = `${Math.round(f * 100)}%`;
+        if (done) this.call("light", f < 0.01 ? "turn_off" : "turn_on", f < 0.01 ? { entity_id: c.entity } : { entity_id: c.entity, brightness_pct: Math.max(1, Math.round(f * 100)) });
+      };
+      bar.addEventListener("pointerdown", (ev) => { bar.setPointerCapture(ev.pointerId); this._drag = true; set(ev); });
+      bar.addEventListener("pointermove", (ev) => { if (this._drag) set(ev); });
+      bar.addEventListener("pointerup", (ev) => { if (this._drag) { this._drag = false; this.vibrate(); set(ev, true); } });
+    }
+  }
+}
+
+// ------------------------------------------------------------------ Roost Graph
+// A smooth line of one reading over the last hours, with now, lowest and highest.
+class RoostGraph extends RoostBase {
+  static get defaults() { return { hours: 24, color: "blue", height: 90, show_stats: true, fill: true, radius: 22, theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a reading (sensor)"); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entity", required: true, selector: { entity: {} } },
+        { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "hours", label: "Hours to show", selector: { number: { min: 1, max: 168, mode: "box" } } }] },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+          ...colourFields("color", "Line colour"),
+          { type: "grid", name: "", schema: [{ name: "height", label: "Graph height", selector: slider(50, 200, 10) }, { name: "radius", selector: slider(0, 40, 2) }] },
+          { type: "grid", name: "", schema: [{ name: "fill", label: "Soft colour under the line", selector: { boolean: {} } }, { name: "show_stats", label: "Now / lowest / highest", selector: { boolean: {} } }] },
+          { type: "grid", name: "", schema: [{ name: "unit", selector: { text: {} } }, { name: "decimals", selector: { number: { min: 0, max: 3, mode: "box" } } }] },
+          THEME_FIELD,
+        ] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("sensor.") && num(hass.states[id].state) != null) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  connectedCallback() { this._timer = setInterval(() => this.load(), 5 * 60000); }
+
+  disconnectedCallback() { clearInterval(this._timer); }
+
+  async load() {
+    const c = this._config, h = this._hass;
+    if (!h?.callWS || !c?.entity) return;
+    const start = new Date(Date.now() - c.hours * 3600e3).toISOString();
+    try {
+      const r = await h.callWS({ type: "history/history_during_period", start_time: start, entity_ids: [c.entity], minimal_response: true, no_attributes: true, significant_changes_only: false });
+      const rows = r?.[c.entity] || [];
+      this._points = rows.map((x) => [new Date((x.lu ?? x.lc ?? 0) * 1000 || x.last_updated || x.last_changed).getTime(), num(x.s ?? x.state)]).filter((x) => x[1] != null && x[0]);
+    } catch (e) { this._points = this._points || []; }
+    this._loadedFor = `${c.entity}|${c.hours}`;
+    this._sig = null;
+    this.hass = this._hass;
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), s = this.st();
+    if (this._loadedFor !== `${c.entity}|${c.hours}` && !this._loading) { this._loading = true; this.load().finally(() => { this._loading = false; }); }
+    const now = s ? num(s.state) : null;
+    const pts = [...(this._points || [])];
+    if (now != null) pts.push([Date.now(), now]);
+    const vals = pts.map((x) => x[1]);
+    const lo = vals.length ? Math.min(...vals) : null, hi = vals.length ? Math.max(...vals) : null;
+    const unit = c.unit != null && c.unit !== "" ? c.unit : s?.attributes.unit_of_measurement || "";
+    const u2 = unit.length <= 2 ? unit : ` ${unit}`;
+    const W = 300, H = c.height, t0 = Date.now() - c.hours * 3600e3;
+    let path = "", area = "";
+    if (pts.length > 1) {
+      const span = (hi - lo) || 1;
+      const xy = pts.map(([t, v]) => [Math.max(0, (t - t0) / (c.hours * 3600e3)) * W, H - 6 - ((v - lo) / span) * (H - 16)]);
+      path = `M${xy[0][0].toFixed(1)},${xy[0][1].toFixed(1)}`;
+      for (let i = 1; i < xy.length; i++) {
+        const [x0, y0] = xy[i - 1], [x1, y1] = xy[i], mx = (x0 + x1) / 2;
+        path += ` C${mx.toFixed(1)},${y0.toFixed(1)} ${mx.toFixed(1)},${y1.toFixed(1)} ${x1.toFixed(1)},${y1.toFixed(1)}`;
+      }
+      area = `${path} L${W},${H} L${xy[0][0].toFixed(1)},${H} Z`;
+    }
+    const st = (w, v) => `<div class="s"><span>${w}</span><b class="num">${v == null ? "" : esc(fmt(v, c.decimals) + u2)}</b></div>`;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:10px;cursor:pointer}
+      .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+      .n{font-size:15px;font-weight:600}
+      .v{font-size:26px;font-weight:700}
+      svg{display:block;width:100%;height:${H}px}
+      .ln{fill:none;stroke:url(#lg);stroke-width:3;stroke-linecap:round}
+      .stats{display:flex;justify-content:space-between;gap:8px}
+      .s{display:flex;flex-direction:column;font-size:11.5px;color:${p.muted}}
+      .s b{font-size:14px;color:${p.text}}
+      .wait{height:${H}px;display:flex;align-items:center;justify-content:center;color:${p.muted};font-size:13px}
+    </style>
+    <div class="card" role="button" tabindex="0">
+      <div class="top"><span class="n t">${esc(this.name(c.entity))}</span><span class="v num">${now != null ? esc(fmt(now, c.decimals) + u2) : s ? esc(s.state) : "Not found"}</span></div>
+      ${path ? `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs>
+          <linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/></linearGradient>
+          <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${g[1]}" stop-opacity=".35"/><stop offset="1" stop-color="${g[1]}" stop-opacity="0"/></linearGradient></defs>
+          ${c.fill ? `<path d="${area}" fill="url(#ag)"/>` : ""}<path class="ln" d="${path}" vector-effect="non-scaling-stroke"/></svg>`
+        : `<div class="wait t">${this._loadedFor ? "Not enough readings yet" : "Loading"}</div>`}
+      ${c.show_stats ? `<div class="stats">${lo != null ? st("Lowest", lo) : ""}<div class="s" style="text-align:center"><span>Last ${c.hours} h</span></div>${hi != null ? st("Highest", hi) : ""}</div>` : ""}
+    </div>`;
+    this.press(this.shadowRoot.querySelector(".card"), () => this.moreInfo(c.entity), () => this.moreInfo(c.entity));
+  }
+}
+
+// ------------------------------------------------------------------ Roost People
+// Who is home: a picture (or initials) with a green ring when home, and for how long.
+class RoostPeople extends ticking(RoostBase, 60000) {
+  static get defaults() { return { entities: [], layout: "row", size: 56, show_since: true, theme: "auto" }; }
+
+  validate(c) { if (!Array.isArray(c.entities) || !c.entities.length) throw new Error("Pick the people"); }
+
+  watched() { return this._config.entities; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "entities", label: "People", selector: { entity: { multiple: true, domain: ["person", "device_tracker"] } } },
+        { type: "grid", name: "", schema: [{ name: "layout", selector: pick([["row", "Side by side"], ["list", "A list"]]) }, { name: "size", label: "Picture size", selector: slider(36, 96, 2) }] },
+        { name: "show_since", label: "How long home or away", selector: { boolean: {} } },
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entities: Object.keys(hass.states).filter((id) => id.startsWith("person.")).slice(0, 3) }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, list = c.layout === "list";
+    const ppl = c.entities.map((id) => this.st(id)).filter(Boolean);
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .wrap{${panelCss(p)};padding:16px;display:${list ? "flex;flex-direction:column;gap:12px" : `grid;grid-template-columns:repeat(auto-fit,minmax(${c.size + 24}px,1fr));gap:12px`}}
+      .pp{display:flex;${list ? "flex-direction:row;align-items:center;gap:12px" : "flex-direction:column;align-items:center;gap:6px;text-align:center"};cursor:pointer}
+      .av{position:relative;width:${c.size}px;height:${c.size}px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${Math.round(c.size * 0.36)}px;overflow:hidden}
+      .av img{width:100%;height:100%;object-fit:cover}
+      .ring{position:relative;padding:3px;border-radius:50%}
+      .ring.home{background:linear-gradient(135deg,#10B981,#6EE7B7)}
+      .ring.away{background:${p.track}}
+      .ring.away .av{filter:grayscale(.7);opacity:.75}
+      .b{position:absolute;right:0;bottom:0;width:${Math.round(c.size * 0.3)}px;height:${Math.round(c.size * 0.3)}px;border-radius:50%;border:3px solid ${this.dark ? "#141831" : "#fff"};display:flex;align-items:center;justify-content:center;font-size:0}
+      .home .b{background:#10B981}
+      .home .b::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid #10B981;animation:roost-ping 2.4s ease-out infinite}
+      .away .b{background:${p.knob}}
+      .n{font-size:14px;font-weight:600;color:${p.text}}
+      .l{font-size:12px;color:${p.muted}}
+    </style>
+    <div class="wrap">${ppl.map((s) => {
+      const home = s.state === "home", pic = s.attributes.entity_picture;
+      const nm = s.attributes.friendly_name || s.entity_id;
+      const where = home ? "Home" : s.state === "not_home" ? "Away" : s.state.charAt(0).toUpperCase() + s.state.slice(1);
+      const hue = [...nm].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 360;
+      return `<div class="pp" data-e="${esc(s.entity_id)}" role="button" tabindex="0"><span class="ring ${home ? "home" : "away"}"><span class="av" style="background:hsl(${hue} 55% 50%);color:#fff">${pic ? `<img src="${esc(pic)}" alt="">` : esc(nm.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase())}</span><span class="b"></span></span>
+        <span><div class="n t">${esc(nm.split(" ")[0])}</div><div class="l t">${esc(where)}${c.show_since ? ` · ${esc(since(s.last_changed).replace(/^for /, ""))}` : ""}</div></span></div>`;
+    }).join("")}</div>`;
+    this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Alerts
+// Only shows when something needs you: a low battery, a device that went offline, a door left open, or your own rules.
+class RoostAlerts extends ticking(RoostBase, 60000) {
+  static get defaults() { return { battery_below: 20, batteries: true, offline: [], doors: [], door_minutes: 10, rules: [], show_all_good: false, max: 5, theme: "auto" }; }
+
+  watched() {
+    const c = this._config, h = this._hass;
+    const bats = c.batteries ? Object.keys(h?.states || {}).filter((id) => h.states[id].attributes.device_class === "battery" && id.startsWith("sensor.")) : [];
+    return [...bats, ...(c.offline || []), ...(c.doors || []), ...(c.rules || []).map((r) => r.entity)].filter(Boolean);
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { type: "grid", name: "", schema: [{ name: "batteries", label: "Low batteries (all battery sensors)", selector: { boolean: {} } }, { name: "battery_below", label: "Low below", selector: slider(5, 50, 5, "%") }] },
+        { name: "offline", label: "Tell me when these go offline", selector: { entity: { multiple: true } } },
+        { name: "doors", label: "Doors and windows left open", selector: { entity: { multiple: true, domain: "binary_sensor" } } },
+        { name: "door_minutes", label: "Open for longer than (minutes)", selector: { number: { min: 1, max: 240, mode: "box" } } },
+        { name: "rules", label: "My own alerts", selector: { object: { multiple: true, label_field: "message", fields: {
+          entity: { label: "Device or reading", required: true, selector: { entity: {} } },
+          state: { label: "When it is (a word, for example on)", selector: { text: {} } },
+          above: { label: "Or when above", selector: { number: { mode: "box" } } },
+          below: { label: "Or when below", selector: { number: { mode: "box" } } },
+          message: { label: "Message", required: true, selector: { text: {} } },
+          icon: { label: "Icon", selector: { icon: {} } },
+        } } } },
+        { type: "grid", name: "", schema: [{ name: "show_all_good", label: "Say “All good” when there is nothing", selector: { boolean: {} } }, { name: "max", label: "Show at most", selector: { number: { min: 1, max: 20, mode: "box" } } }] },
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return { batteries: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
+
+  alerts() {
+    const c = this._config, h = this._hass, out = [];
+    const nm = (id) => h.states[id]?.attributes.friendly_name || id;
+    for (const r of c.rules || []) {
+      const s = h.states[r.entity]; if (!s) continue;
+      const v = num(s.state);
+      const hit = (r.state != null && r.state !== "" && s.state === String(r.state)) || (r.above != null && r.above !== "" && v != null && v > r.above) || (r.below != null && r.below !== "" && v != null && v < r.below);
+      if (hit) out.push({ id: r.entity, icon: r.icon || "mdi:alert-circle-outline", text: r.message, tone: "#FF9F6B" });
+    }
+    for (const id of c.doors || []) {
+      const s = h.states[id];
+      if (s?.state === "on" && (Date.now() - new Date(s.last_changed)) / 60000 >= c.door_minutes) out.push({ id, icon: "mdi:door-open", text: `${nm(id)} open ${since(s.last_changed).replace(/^for /, "for ")}`, tone: "#FF9F6B" });
+    }
+    for (const id of c.offline || []) if (UNAVAILABLE.includes(h.states[id]?.state)) out.push({ id, icon: "mdi:lan-disconnect", text: `${nm(id)} is offline`, tone: "#F43F6B" });
+    if (c.batteries) {
+      Object.keys(h.states).filter((id) => id.startsWith("sensor.") && h.states[id].attributes.device_class === "battery").forEach((id) => {
+        const v = num(h.states[id].state);
+        if (v != null && v < c.battery_below) out.push({ id, icon: v < 10 ? "mdi:battery-alert-variant-outline" : "mdi:battery-low", text: `${nm(id).replace(/\s*battery$/i, "")} battery ${Math.round(v)}%`, tone: "#FCD34D" });
+      });
+    }
+    return out;
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, list = this.alerts();
+    if (!list.length && !c.show_all_good) { this.shadowRoot.innerHTML = "<style>:host{display:none}</style>"; this.style.display = "none"; return; }
+    this.style.display = "";
+    const shown = list.slice(0, c.max);
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .wrap{display:flex;flex-direction:column;gap:8px}
+      .a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:${p.panel};border:1px solid ${p.border};color:${p.text};cursor:pointer;border-left-width:4px}
+      .a ha-icon{--mdc-icon-size:22px;flex:none;animation:roost-breathe 1.8s ease-in-out infinite}
+      .a span{flex:1;font-size:13.5px;font-weight:600;line-height:1.3}
+      .ok{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;background:${p.panel};border:1px solid ${p.border};color:${p.muted};font-size:13.5px}
+      .ok ha-icon{color:#3DD68C;--mdc-icon-size:22px}
+      .more{font-size:12px;color:${p.muted};text-align:center}
+    </style>
+    <div class="wrap">${shown.length ? shown.map((a) => `<div class="a" data-e="${esc(a.id)}" style="border-left-color:${a.tone}"><ha-icon icon="${esc(a.icon)}" style="color:${a.tone}"></ha-icon><span class="t">${esc(a.text)}</span></div>`).join("")
+      : '<div class="ok"><ha-icon icon="mdi:check-circle-outline"></ha-icon><span class="t">All good</span></div>'}
+      ${list.length > shown.length ? `<div class="more t">and ${list.length - shown.length} more</div>` : ""}</div>`;
+    this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
+  }
+
+  getCardSize() { return this.style.display === "none" ? 0 : 2; }
+}
+
 // ------------------------------------------------------------------ register
 const CARDS = [
   ["roost-tile", RoostTile, "Roost Tile", "A big tile with a switch, colour, icon and how long it has been on."],
@@ -1692,6 +2728,18 @@ const CARDS = [
   ["roost-row", RoostRow, "Roost Row", "A long row with a ring (an AC's temperature or any number), a name, a state line and an arrow."],
   ["roost-rooms", RoostRooms, "Roost Rooms", "A room switcher: tap a room pill to show that room's cards. Switching is instant."],
   ["roost-curtain", RoostCurtain, "Roost Curtain", "A window with curtains that really slide open and closed, with a sky behind them."],
+  ["roost-gauge", RoostGauge, "Roost Gauge", "A big ring for one reading, such as a temperature or a plug's power. It turns orange when too high."],
+  ["roost-automations", RoostAutomations, "Roost Automations", "A list of automations with a switch and when each last ran."],
+  ["roost-clock", RoostClock, "Roost Clock", "A big clock and date with a line of the day's times (such as prayer times) and a countdown."],
+  ["roost-title", RoostTitle, "Roost Title", "A section heading with an optional line under it and a “See all” link."],
+  ["roost-theme", RoostTheme, "Roost Light/Dark", "A sun / moon button that switches this screen between light and dark."],
+  ["roost-media", RoostMedia, "Roost Media", "TV and sound: power, what is playing, volume, mute and inputs."],
+  ["roost-room", RoostRoom, "Roost Room", "One room at a glance: temperature bar, humidity and what is on. Tap to open the room."],
+  ["roost-alarm", RoostAlarm, "Roost Alarm", "The alarm with arm and disarm buttons, a keypad when needed, and the doors."],
+  ["roost-light", RoostLight, "Roost Light", "A light with brightness you drag, warm/cool buttons and colour dots."],
+  ["roost-graph", RoostGraph, "Roost Graph", "A smooth line of a reading over the last hours, with lowest and highest."],
+  ["roost-people", RoostPeople, "Roost People", "Who is home, with a picture and how long they have been home or away."],
+  ["roost-alerts", RoostAlerts, "Roost Alerts", "Shows only when something needs you: low battery, offline device, door left open."],
 ];
 window.customCards = window.customCards || [];
 for (const [, cls] of CARDS) {
