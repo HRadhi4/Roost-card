@@ -229,6 +229,7 @@ show_sky: true
 show_header: true
 show_buttons: true
 show_percent: true
+reverse: false          # true: the curtain reports open/closed the wrong way round
 tap_action: { action: toggle }
 stop_action:            # optional: what Stop does as well as stopping the curtain
   action: perform-action

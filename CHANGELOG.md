@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 0.8.1 — 2026-11-16
+- **Reverse for curtains**: for curtains that report open and closed the wrong way round (99% open when they are really 1% open). Turn on "Reverse" on the Roost Curtain card or on a curtain tile: the picture, the words and the percentage are flipped, and Open, Close and a tap send the command the motor understands.
+- When a curtain reports its position, the position now decides whether it says "Open" or "Closed", because some integrations mix the two up.
+
 ## 0.8.0 — 2026-11-16
 **New: Roost Curtain**
 - A window with a sky that follows the sun (sun by day, moon and twinkling stars at night) and curtains that **really slide** open and closed.

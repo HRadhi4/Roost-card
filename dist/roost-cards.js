@@ -6,7 +6,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "0.8.0";
+const ROOST_VERSION = "0.8.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -49,6 +49,19 @@ const SKIES = {
   aurora: ["linear-gradient(115deg,#064E3B 0%,#10B981 45%,#6366F1 100%)", "Aurora"],
   desert: ["linear-gradient(115deg,#B45309 0%,#F59E0B 50%,#FDE68A 100%)", "Desert"],
 };
+
+// A curtain whose motor reports the other way round (99% open = really 1% open): flip it.
+const FLIP_STATE = { open: "closed", closed: "open", opening: "closing", closing: "opening" };
+function coverView(s, reverse) {
+  if (!s) return { state: "unknown", pos: null };
+  let pos = s.attributes.current_position;
+  if (pos != null && reverse) pos = 100 - pos;
+  let state = reverse ? FLIP_STATE[s.state] || s.state : s.state;
+  // when the position is known, it decides open or closed (some integrations mix the two up)
+  if (pos != null && (state === "open" || state === "closed")) state = pos > 0 ? "open" : "closed";
+  return { state, pos };
+}
+const REVERSE_FIELD = { name: "reverse", label: "Reverse (my curtain reports open and closed the wrong way round)", selector: { boolean: {} } };
 
 // Small helpers for the settings screens and for the shared looks.
 const pick = (pairs) => ({ select: { mode: "dropdown", options: pairs.map(([value, label]) => ({ value, label })) } });
@@ -190,7 +203,13 @@ class RoostBase extends HTMLElement {
     }
     this.vibrate();
     switch (a.action) {
-      case "toggle": return this.call("homeassistant", "toggle", { entity_id: entityId });
+      case "toggle":
+        if (String(entityId).startsWith("cover.") && this._config?.reverse) {
+          // reversed curtain: decide from what it really is, then send the command the motor understands
+          const v = coverView(this.st(entityId), true);
+          return this.call("cover", v.state === "closed" || v.state === "closing" ? "close_cover" : "open_cover", { entity_id: entityId });
+        }
+        return this.call("homeassistant", "toggle", { entity_id: entityId });
       case "more-info": return this.moreInfo(a.entity || entityId);
       case "navigate":
         if (a.navigation_path) { history.pushState(null, "", a.navigation_path); this.fire("location-changed", { replace: false }); }
@@ -365,6 +384,7 @@ class RoostTile extends RoostBase {
           { name: "show_state", selector: { boolean: {} } },
           { name: "show_since", selector: { boolean: {} } },
           { name: "power_entity", selector: { entity: { domain: "sensor" } } },
+          { ...REVERSE_FIELD, label: "Curtains only: reverse (it reports open and closed the wrong way round)" },
         ] },
         { type: "expandable", name: "", title: "Safety", icon: "mdi:shield-lock-outline", schema: [
           { name: "locked", label: "Locked: can't be switched from here (for things that must stay on)", selector: { boolean: {} } },
@@ -389,7 +409,7 @@ class RoostTile extends RoostBase {
     const d = s.entity_id.split(".")[0];
     const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
     if (d === "climate") return on ? `${cap(s.state.replace("_only", "").replace("heat_cool", "auto"))}${s.attributes.temperature != null ? ` · ${s.attributes.temperature}°` : ""}` : "Off";
-    if (d === "cover") { const pos = s.attributes.current_position; return cap(s.state) + (pos != null && pos > 0 && pos < 100 ? ` · ${pos}%` : ""); }
+    if (d === "cover") { const v = coverView(s, this._config.reverse); return cap(v.state) + (v.pos != null && v.pos > 0 && v.pos < 100 ? ` · ${v.pos}% open` : ""); }
     if (d === "binary_sensor") {
       const cls = s.attributes.device_class;
       if (["door", "window", "opening", "garage_door"].includes(cls)) return s.state === "on" ? "Open" : "Closed";
@@ -413,7 +433,7 @@ class RoostTile extends RoostBase {
     const c = this._config, s = this.st(), p = this.p, g = this.colour();
     const broken = !!c.problem;
     const un = !s || UNAVAILABLE.includes(s.state) || broken;
-    const on = !un && !OFF_STATES.includes(s.state);
+    const on = !un && !OFF_STATES.includes(s.entity_id.startsWith("cover.") ? coverView(s, c.reverse).state : s.state);
     const h = SIZES[c.size] || SIZES.large;
     const togglable = s && ["light", "switch", "fan", "input_boolean", "automation", "media_player", "climate", "cover", "humidifier", "siren", "lock"].includes(s.entity_id.split(".")[0]);
     const showSwitch = c.show_switch && togglable && !un && !c.locked;
@@ -1427,7 +1447,7 @@ class RoostRooms extends RoostBase {
 class RoostCurtain extends RoostBase {
   static get defaults() {
     return { color: "coral", style: "pair", height: 150, radius: 18, show_sky: true, show_header: true, show_buttons: true, show_percent: true,
-      travel_time: 1.4, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
+      travel_time: 1.4, reverse: false, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
   }
 
   validate(c) { if (!c.entity) throw new Error("Choose a curtain or blind (cover)"); }
@@ -1449,6 +1469,7 @@ class RoostCurtain extends RoostBase {
         { type: "expandable", name: "", title: "What it shows", icon: "mdi:eye-outline", schema: [
           { type: "grid", name: "", schema: [{ name: "show_header", label: "Name and state above", selector: { boolean: {} } }, { name: "show_buttons", label: "Open, Stop and Close buttons", selector: { boolean: {} } }] },
           { name: "show_percent", label: "Show how far open (%)", selector: { boolean: {} } },
+          REVERSE_FIELD,
         ] },
         { type: "expandable", name: "", title: "Tap and hold", icon: "mdi:gesture-tap", schema: [ACTION_FIELD("tap_action"), ACTION_FIELD("hold_action"),
           { name: "stop_action", label: "Stop button does (empty = stop the curtain)", selector: { ui_action: {} } }] },
@@ -1461,11 +1482,13 @@ class RoostCurtain extends RoostBase {
 
   getGridOptions() { return { columns: 12, rows: "auto" }; }
 
+  view(s = this.st()) { return coverView(s, this._config.reverse); }
+
   position(s) {
     if (!s || UNAVAILABLE.includes(s.state)) return 0;
-    const pos = s.attributes.current_position;
-    if (pos != null) return Math.max(0, Math.min(100, pos));
-    return s.state === "open" || s.state === "opening" ? 100 : s.state === "closed" || s.state === "closing" ? 0 : 50;
+    const v = this.view(s);
+    if (v.pos != null) return Math.max(0, Math.min(100, v.pos));
+    return v.state === "open" || v.state === "opening" ? 100 : v.state === "closed" || v.state === "closing" ? 0 : 50;
   }
 
   // how much of the window each curtain covers, in % of the window
@@ -1539,7 +1562,8 @@ class RoostCurtain extends RoostBase {
       const a = el.dataset.a;
       if (a === "stop" && c.stop_action && c.stop_action.action && c.stop_action.action !== "none") { this.run(c.stop_action, c.entity); this.call("cover", "stop_cover", { entity_id: c.entity }); return; }
       this._moveUntil = Date.now() + c.travel_time * 1000 + 300;
-      this.call("cover", `${a}_cover`, { entity_id: c.entity });
+      const cmd = c.reverse && a !== "stop" ? (a === "open" ? "close" : "open") : a;
+      this.call("cover", `${cmd}_cover`, { entity_id: c.entity });
     }));
   }
 
@@ -1556,12 +1580,13 @@ class RoostCurtain extends RoostBase {
         : ";width:26px;height:26px;background:radial-gradient(circle at 36% 34%,#FFFBEA,#E2C273);box-shadow:0 0 22px 6px rgba(255,234,170,.25)";
     }
     const un = !s || UNAVAILABLE.includes(s.state);
-    const word = !s ? "Device not found" : un ? (s.attributes.assumed_state ? "Ready" : "Offline") : s.state.charAt(0).toUpperCase() + s.state.slice(1);
-    const pct = c.show_percent && s?.attributes.current_position != null && pos > 0 && pos < 100 ? ` · ${pos}%` : "";
+    const v = this.view(s);
+    const word = !s ? "Device not found" : un ? (s.attributes.assumed_state ? "Ready" : "Offline") : v.state.charAt(0).toUpperCase() + v.state.slice(1);
+    const pct = c.show_percent && v.pos != null && pos > 0 && pos < 100 ? ` · ${pos}% open` : "";
     const nm = root.querySelector(".nm"), stt = root.querySelector(".stt");
     if (nm) nm.textContent = this.name(c.entity);
     if (stt) stt.textContent = word + pct;
-    root.querySelectorAll(".btn").forEach((b) => b.classList.toggle("on", (b.dataset.a === "open" && s?.state === "open") || (b.dataset.a === "close" && s?.state === "closed")));
+    root.querySelectorAll(".btn").forEach((b) => b.classList.toggle("on", (b.dataset.a === "open" && v.state === "open") || (b.dataset.a === "close" && v.state === "closed")));
     // slide the fabric from where it is to where it should be
     const amount = this.cover(pos), blind = c.style === "blind";
     const dur = Math.max(200, (Number(c.travel_time) || 1.4) * 1000);
@@ -1577,14 +1602,14 @@ class RoostCurtain extends RoostBase {
     });
     this._shown = pos;
     // ripple while it moves
-    const moving = s && (s.state === "opening" || s.state === "closing" || (this._moveUntil || 0) > Date.now());
+    const moving = s && (v.state === "opening" || v.state === "closing" || (this._moveUntil || 0) > Date.now());
     const win = root.querySelector(".win");
     win.classList.toggle("moving", !!moving);
-    const goingUp = s?.state === "opening" || (s?.state !== "closing" && pos >= 50);
+    const goingUp = v.state === "opening" || (v.state !== "closing" && pos >= 50);
     root.querySelector(".nt").textContent = goingUp ? "Opening" : "Closing";
     root.querySelector(".note ha-icon").setAttribute("icon", blind ? (goingUp ? "mdi:arrow-up" : "mdi:arrow-down") : goingUp ? "mdi:arrow-expand-horizontal" : "mdi:arrow-collapse-horizontal");
     clearTimeout(this._stopTimer);
-    if (moving && s.state !== "opening" && s.state !== "closing") this._stopTimer = setTimeout(() => { this._sig = null; this.update(); }, Math.max(50, this._moveUntil - Date.now() + 20));
+    if (moving && v.state !== "opening" && v.state !== "closing") this._stopTimer = setTimeout(() => { this._sig = null; this.update(); }, Math.max(50, this._moveUntil - Date.now() + 20));
   }
 
   getCardSize() { return 4; }

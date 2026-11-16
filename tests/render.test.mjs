@@ -104,6 +104,16 @@ if (!/position:fixed/.test(nv.shadowRoot.innerHTML)) { fails++; console.error("F
 const he = document.createElement("roost-hero"); he.setConfig({ greeting: "Welcome home", show_name: false, info: [{ entity: "sensor.power", name: "Power" }], sky: "ocean" });
 document.body.appendChild(he); he.hass = hass(true);
 if (!/Welcome home</.test(he.shadowRoot.innerHTML) || !/Power <b>42W/.test(he.shadowRoot.innerHTML) || !/#0E7490/.test(he.shadowRoot.innerHTML)) { fails++; console.error("FAIL hero options"); }
+// Reverse: a curtain reported 99% open is shown as 1% open, and Open sends close_cover.
+const rcalls = [];
+const rc = document.createElement("roost-curtain"); rc.setConfig({ entity: "cover.rev", reverse: true });
+const hr = hass(true); hr.states["cover.rev"] = { entity_id: "cover.rev", state: "open", attributes: { current_position: 99, friendly_name: "Rev" }, last_changed: new Date().toISOString() };
+hr.callService = async (d, sv) => { rcalls.push(`${d}.${sv}`); };
+document.body.appendChild(rc); rc.hass = hr;
+if (!/1% open/.test(rc.shadowRoot.innerHTML)) { fails++; console.error("FAIL reverse shows 1% open", rc.shadowRoot.querySelector(".stt")?.textContent); }
+rc.shadowRoot.querySelector('.btn[data-a="open"]').dispatchEvent(new window.Event("click"));
+await new Promise((r) => setTimeout(r, 10));
+if (rcalls[0] !== "cover.close_cover") { fails++; console.error("FAIL reverse open button", rcalls); }
 // Doors say Closed, not Off.
 const dt = document.createElement("roost-tile"); dt.setConfig({ entity: "binary_sensor.front_door" }); document.body.appendChild(dt); dt.hass = hass(true);
 if (!/Closed/.test(dt.shadowRoot.innerHTML)) { fails++; console.error("FAIL door tile word"); }
