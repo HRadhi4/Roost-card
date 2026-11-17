@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.6.4
+- **Tile**: a new **Compact** size for wall panels: shorter, without the “for 2 h” line.
+- **Thermostat**: a **Compact** option. The power and +/- buttons sit in the open gap of the dial, so the card is about 70 px shorter.
+- A whole wall-tablet dashboard now fits one 1280 × 800 screen without scrolling.
+
 ## 1.6.3
 - **Rooms: add or remove any card in a room from the visual editor.** Under “Cards in each room”, pick a room and use Home Assistant's own card picker to add, move or remove cards. No YAML is needed. Each room button shows how many cards it has.
 - Cards in a Page, Panel or Room no longer show a “Title” box that did nothing.

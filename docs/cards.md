@@ -34,7 +34,7 @@ entity: light.kitchen
 name: Kitchen          # optional
 icon: mdi:ceiling-light # optional
 color: amber           # or "custom" with color_start / color_end
-size: large            # small, medium or large
+size: large            # compact (short, for wall panels), small, medium or large
 radius: 22             # corner roundness in px
 animation: auto        # auto, none, glow, spin, pulse, bounce, wiggle or bars
 fill: gradient         # gradient, solid, glass or outline
@@ -87,6 +87,7 @@ modes: [cool, dry, fan_only, heat_cool]
 show_power: true
 show_plus_minus: true
 max_width: 250           # dial size in px
+compact: false           # true: the power and +/- buttons sit in the gap of the dial, for wall panels
 power_action:            # optional: for an AC sent by infrared, the power button runs your script
   action: perform-action
   perform_action: script.turn_on
