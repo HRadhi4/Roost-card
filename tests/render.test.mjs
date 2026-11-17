@@ -327,10 +327,32 @@ if (!/Location off/.test(hl.shadowRoot.innerHTML)) { fails++; console.error("FAI
 const tp = document.createElement("roost-thermostat"); tp.setConfig({ entity: "climate.living", power_action: { action: "perform-action", perform_action: "script.turn_on", target: { entity_id: "script.ac_power" } } }); document.body.appendChild(tp); tp.hass = hass(true);
 calls.length = 0; tp.shadowRoot.querySelector(".pw").dispatchEvent(new window.Event("click")); await new Promise((r) => setTimeout(r, 5));
 if (!calls.some((x) => x[0] === "script" && x[1] === "turn_on")) { fails++; console.error("FAIL thermostat power action", JSON.stringify(calls)); }
+// Popup: opens from a device change, shows its parts, closes when the device goes back; confirmations use it too.
+states["binary_sensor.doorbell"] = st("binary_sensor.doorbell", "off");
+const pop = document.createElement("roost-popup");
+pop.setConfig({ id: "doorbell", kind: "camera", title: "Someone is at the door", camera: "camera.door", entity: "lock.front", message: "The door is {{state}}", open_on: [{ entity: "binary_sensor.doorbell" }], buttons: [{ name: "Open the door", icon: "mdi:lock-open", color: "green", tap_action: { action: "perform-action", perform_action: "lock.unlock", target: { entity_id: "lock.front" } } }, { name: "Dismiss" }] });
+document.body.appendChild(pop); pop.hass = hass(true);
+const layer = () => document.querySelector("roost-popup-layer");
+if (layer() && layer().style.display !== "none" && layer().shadowRoot.innerHTML.includes("Someone")) { fails++; console.error("FAIL popup opened too early"); }
+states["binary_sensor.doorbell"] = st("binary_sensor.doorbell", "on", { }); states["binary_sensor.doorbell"].last_changed = new Date().toISOString();
+pop.hass = hass(true);
+const lt = () => layer()?.shadowRoot.innerHTML.replace(/<style>[\s\S]*?<\/style>/g, "") || "";
+if (!/Someone is at the door/.test(lt()) || !/Open the door/.test(lt()) || !/The door is /.test(lt()) || /undefined|NaN|\bnull\b/.test(lt())) { fails++; console.error("FAIL popup opens with its parts", lt().slice(0, 300)); }
+calls.length = 0; layer().shadowRoot.querySelector('[data-b="0"]').dispatchEvent(new window.Event("click")); await new Promise((r) => setTimeout(r, 10));
+if (!calls.some((x) => x[0] === "lock" && x[1] === "unlock")) { fails++; console.error("FAIL popup button", JSON.stringify(calls)); }
+if (layer().style.display !== "none") { fails++; console.error("FAIL popup closes after a button"); }
+pop._prev = {}; states["binary_sensor.doorbell"] = { ...states["binary_sensor.doorbell"], last_changed: new Date().toISOString() }; pop.hass = hass(true);
+states["binary_sensor.doorbell"] = st("binary_sensor.doorbell", "off"); pop.hass = hass(true);
+if (layer().style.display !== "none") { fails++; console.error("FAIL popup closes when the bell stops"); }
+const tl = document.createElement("roost-tile"); tl.setConfig({ entity: "switch.kettle", tap_action: { action: "toggle", confirmation: { text: "Turn the kettle off?" } } }); document.body.appendChild(tl); tl.hass = hass(true);
+calls.length = 0; const ask = tl.run({ action: "toggle", confirmation: { text: "Turn the kettle off?" } }, "switch.kettle"); await new Promise((r) => setTimeout(r, 5));
+if (!/Turn the kettle off\?/.test(lt())) { fails++; console.error("FAIL confirm popup"); }
+layer().shadowRoot.querySelector('[data-b="1"]').dispatchEvent(new window.Event("click")); await ask;
+if (!calls.some((x) => x[1] === "toggle")) { fails++; console.error("FAIL confirm yes runs it"); }
 // Errors for missing settings
 for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }], ["roost-rooms", { rooms: [] }]]) {
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 25} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 31} checks passed`);
 process.exit(fails ? 1 : 0);

@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.6.6";
+const ROOST_VERSION = "1.6.7";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -425,6 +425,7 @@ class RoostBase extends HTMLElement {
   }
 
   set hass(hass) {
+    if (hass && RoostPop.hass !== hass && this.localName !== "roost-popup-layer") RoostPop.setHass(hass);
     if (this._config?.sample && hass) { this._realHass = hass; hass = Sample.wrap(hass, this); }
     this._hass = hass;
     if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
@@ -651,7 +652,7 @@ class RoostBase extends HTMLElement {
     const a = typeof action === "string" ? { action } : action || { action: "more-info" };
     if (a.confirmation && a.action !== "none" && a.action !== "more-info") {
       const text = typeof a.confirmation === "object" && a.confirmation.text ? a.confirmation.text : "Are you sure?";
-      if (!window.confirm(text)) return undefined;
+      if (!(await RoostPop.confirm(text))) return undefined;
     }
     this.vibrate();
     switch (a.action) {
@@ -7887,6 +7888,350 @@ class RoostCamera extends RoostBase {
   }
 }
 
+// ------------------------------------------------------------------ Roost Popup
+// One popup for everything: the doorbell with its camera, alarms, leaks, a door left open, the washing done,
+// a timer, "are you sure?" questions, or any cards. It opens when a device changes, from a link (#popup-doorbell),
+// from a button (fire-dom-event roost_popup), or from an automation, and closes itself when it should.
+const RoostPop = {
+  defs: new Map(), queue: [], cur: null, hass: null, layer: null, subscribed: false, helper: null, ready: false,
+
+  init() {
+    if (this.ready) return;
+    this.ready = true;
+    const onLoc = () => this.fromHash();
+    window.addEventListener("hashchange", onLoc);
+    window.addEventListener("location-changed", () => setTimeout(onLoc, 30));
+    window.addEventListener("ll-custom", (ev) => {
+      const d = ev.detail || {};
+      if (d.roost_popup) this.open(typeof d.roost_popup === "string" ? d.roost_popup : d.roost_popup);
+      if (d.roost_popup_close) this.close();
+    });
+  },
+
+  setHass(h) {
+    this.init();
+    this.hass = h;
+    if (this.layer) this.layer.hass = h;
+    if (!this.subscribed && h?.connection?.subscribeEvents) {
+      this.subscribed = true;
+      // automations: event "roost_popup" with an id, or a whole popup; { close: true } closes it
+      h.connection.subscribeEvents((e) => this.fromEvent(e.data || {}), "roost_popup").catch(() => { /* only people with admin rights may listen; the helper below works for everyone */ });
+    }
+    // a text helper, input_text.roost_popup: set it to a popup's id to open it, or to "close"
+    const hs = h?.states?.["input_text.roost_popup"];
+    if (hs) {
+      const key = `${hs.state}|${hs.last_changed}`;
+      if (this.helper !== null && key !== this.helper && Date.now() - new Date(hs.last_changed) < 60000) {
+        if (hs.state === "close") this.close(); else if (hs.state && !UNAVAILABLE.includes(hs.state)) this.open(hs.state);
+      }
+      this.helper = key;
+    }
+  },
+
+  register(card, cfg) { if (cfg.id) this.defs.set(cfg.id, { card, cfg }); this.fromHash(); },
+
+  unregister(card, id) { if (this.defs.get(id)?.card === card) this.defs.delete(id); },
+
+  // who may see a popup: people (person.*) matched to Home Assistant users
+  allows(users) {
+    if (!Array.isArray(users) || !users.length) return true;
+    const me = this.hass?.user?.id, name = String(this.hass?.user?.name || "").toLowerCase();
+    return users.some((u) => this.hass?.states?.[u]?.attributes?.user_id === me || String(u).toLowerCase() === name);
+  },
+
+  fromHash() {
+    const m = location.hash.match(/^#popup-([\w-]+)$/);
+    if (m && this.defs.has(m[1]) && this.cur?.id !== m[1]) this.open(m[1], { fromHash: true });
+  },
+
+  fromEvent(d) {
+    if (d.close) { this.close(typeof d.close === "string" ? d.close : null); return; }
+    if (!this.allows(d.users)) return;
+    if (d.id && this.defs.has(d.id) && !d.title) this.open(d.id); else this.open({ ...d, id: d.id || `event-${Date.now()}` });
+  },
+
+  open(what, opts = {}) {
+    const cfg = typeof what === "string" ? this.defs.get(what)?.cfg : what;
+    if (!cfg || !this.allows(cfg.users)) return null;
+    const item = { ...cfg, ...opts, at: Date.now() };
+    if (this.cur && this.cur.id === item.id) { this.cur = item; this.show(); return item; }
+    if (this.cur) { this.queue = this.queue.filter((q) => q.id !== item.id); if (item.urgent) { this.queue.unshift(this.cur); this.cur = item; this.show(); } else this.queue.push(item); return item; }
+    this.cur = item;
+    this.show();
+    return item;
+  },
+
+  close(id) {
+    if (!this.cur || (id && this.cur.id !== id)) { if (id) this.queue = this.queue.filter((q) => q.id !== id); return; }
+    const was = this.cur;
+    was.resolve?.(false);
+    if (was.fromHash && location.hash === `#popup-${was.id}`) { try { history.replaceState(history.state, "", location.pathname + location.search); } catch (e) { /* old browser */ } }
+    this.cur = this.queue.shift() || null;
+    this.show();
+  },
+
+  // the nice "are you sure?" every Roost card uses instead of the browser's grey box
+  confirm(text, o = {}) {
+    if (!document.body) return Promise.resolve(window.confirm(text));
+    return new Promise((resolve) => {
+      this.open({ id: `confirm-${Date.now()}`, kind: "confirm", title: o.title || "Are you sure?", message: text, icon: o.icon || "mdi:help-circle-outline", color: o.color || "purple", urgent: true, close_after: 0,
+        resolve, buttons: [{ name: o.no || "Cancel", icon: "mdi:close", answer: false }, { name: o.yes || "Yes", icon: "mdi:check", color: "active", answer: true }] });
+    });
+  },
+
+  show() {
+    if (!this.layer) { this.layer = document.createElement("roost-popup-layer"); document.body.appendChild(this.layer); }
+    this.layer.hass = this.hass;
+    this.layer.showItem(this.cur, this.queue.length);
+  },
+};
+
+class RoostPopupLayer extends RoostBase {
+  constructor() { super(); this._config = { theme: "auto" }; this.attachShadow({ mode: "open" }); this._onKey = (e) => { if (e.key === "Escape" && this._item && this._item.dismissible !== false) RoostPop.close(); }; }
+
+  set hass(h) { this._hass = h; this._cards?.forEach((el) => { el.hass = h; }); if (this._item && !this._busy) this.refresh(); }
+
+  get hass() { return this._hass; }
+
+  // HA's pop-ups and page changes are heard by Home Assistant, not by the page body
+  fire(type, detail) { (document.querySelector("home-assistant") || window).dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true })); }
+
+  connectedCallback() { window.addEventListener("keydown", this._onKey); }
+
+  disconnectedCallback() { window.removeEventListener("keydown", this._onKey); }
+
+  showItem(item, more) {
+    clearTimeout(this._timer); clearInterval(this._pic);
+    this._item = item; this._more = more; this._cards = null; this._sig = null;
+    this._config = { theme: item?.theme || "auto" };
+    if (!item) { this.shadowRoot.innerHTML = ""; this.style.display = "none"; return; }
+    this.style.cssText = "position:fixed;inset:0;z-index:999;display:block";
+    if (item.sound) { try { new Audio(item.sound).play().catch(() => {}); } catch (e) { /* no sound here */ } }
+    try { navigator.vibrate?.(item.kind === "alert" ? [60, 40, 60] : 20); } catch (e) { /* no vibration */ }
+    const secs = Number(item.close_after) || 0;
+    if (secs > 0) this._timer = setTimeout(() => { if (this._item === item) RoostPop.close(); }, secs * 1000);
+    this.render();
+    if (Array.isArray(item.cards) && item.cards.length) this.buildCards(item);
+    if (item.camera && !item.live) this._pic = setInterval(() => { const img = this.shadowRoot.querySelector(".cam img"); const s = this._hass?.states?.[item.camera]; if (img && s?.attributes.entity_picture) img.src = `${s.attributes.entity_picture}&t=${Date.now()}`; }, 2000);
+  }
+
+  async buildCards(item) {
+    const helpers = window.loadCardHelpers ? await window.loadCardHelpers() : null;
+    if (this._item !== item) return;
+    this._cards = item.cards.map((cfg0) => {
+      let el; const cfg = withTheme(cfg0, item.theme);
+      try { el = helpers ? helpers.createCardElement(cfg) : document.createElement(String(cfg.type || "").replace(/^custom:/, "")); if (!helpers) el.setConfig?.(cfg); }
+      catch (e) { el = document.createElement("div"); el.textContent = `Card problem: ${e.message}`; }
+      el.hass = this._hass; return el;
+    });
+    const box = this.shadowRoot.querySelector(".cards");
+    if (box) this._cards.forEach((el) => box.appendChild(el));
+  }
+
+  // only the live parts change while it is open: the state line and the button lights
+  refresh() {
+    const it = this._item, r = this.shadowRoot;
+    if (!it || !r) return;
+    const s = it.entity ? this._hass?.states?.[it.entity] : null, sub = r.querySelector(".sub");
+    if (sub && s) sub.textContent = this.subText(it);
+  }
+
+  subText(it) {
+    if (it.subtitle) return it.subtitle;
+    const s = it.entity ? this._hass?.states?.[it.entity] : null;
+    if (!s) return "";
+    const st = UNAVAILABLE.includes(s.state) ? "Offline" : this._hass.formatEntityState ? this._hass.formatEntityState(s) : s.state;
+    return `${s.attributes.friendly_name || it.entity} · ${st}`;
+  }
+
+  message(it) {
+    const s = it.entity ? this._hass?.states?.[it.entity] : null;
+    const st = s ? String(this._hass.formatEntityState ? this._hass.formatEntityState(s) : s.state) : "";
+    return String(it.message || "").replace(/\{\{\s*state\s*\}\}/g, st && st.length > 1 && st[1] === st[1].toLowerCase() ? st[0].toLowerCase() + st.slice(1) : st).replace(/\{\{\s*name\s*\}\}/g, s?.attributes.friendly_name || "");
+  }
+
+  render() {
+    const it = this._item;
+    if (!it) return;
+    const p = this.p, dark = this.dark;
+    const g = it.color === "active" ? ACTIVE : COLORS[it.color] || (it.kind === "alert" ? COLORS.coral : it.kind === "camera" ? COLORS.coral : ACTIVE);
+    const icon = it.icon || { alert: "mdi:alert-circle-outline", camera: "mdi:doorbell-video", confirm: "mdi:help-circle-outline", cards: "mdi:view-grid-outline", info: "mdi:information-outline" }[it.kind] || "mdi:bell-outline";
+    const cam = it.camera ? this._hass?.states?.[it.camera] : null;
+    const wide = it.size === "wide" || (it.size !== "small" && (it.camera || (Array.isArray(it.cards) && it.cards.length > 1)));
+    const buttons = Array.isArray(it.buttons) ? it.buttons.slice(0, 4) : [];
+    const secs = Number(it.close_after) || 0;
+    const motion = it.kind === "camera" || /doorbell|bell/.test(icon) ? "roost-wiggle .6s ease-in-out infinite" : it.kind === "alert" ? "roost-pulse 1.2s ease-in-out infinite" : "none";
+    const bcol = (b) => (b.color === "active" ? ACTIVE : COLORS[b.color] || null);
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      @keyframes roost-left{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+      .bg{position:absolute;inset:0;background:rgba(5,6,15,${dark ? ".62" : ".38"});backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+      .sheet{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(calc(100% - 32px),${wide ? 620 : 440}px);max-height:calc(100% - 48px);overflow:auto;box-sizing:border-box;
+        background:${dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};border-radius:28px;padding:20px;color:${p.text};display:flex;flex-direction:column;gap:16px;
+        box-shadow:0 30px 60px -20px rgba(0,0,0,.6),0 0 0 1px ${g[0]}22}
+      @media (max-width: 600px){.sheet{left:0;right:0;top:auto;bottom:0;transform:none;width:100%;max-height:88%;border-radius:28px 28px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom))}
+        .sheet::before{content:"";display:block;width:40px;height:5px;border-radius:3px;background:${p.track};margin:-6px auto 2px}}
+      .hd{display:flex;align-items:center;gap:14px}
+      .ic{width:48px;height:48px;border-radius:16px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -8px ${g[2]};--mdc-icon-size:24px}
+      .ic ha-icon{animation:${motion}}
+      .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+      .tx b{font-family:${FONT_NUM};font-size:19px;font-weight:700;line-height:1.2}
+      .sub{font-size:13px;color:${p.muted};line-height:1.3}
+      .x{width:44px;height:44px;border-radius:15px;border:0;background:${p.inset};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;--mdc-icon-size:20px;transition:transform .12s}
+      .x:active,.bt:active{transform:scale(.95)}
+      .x:focus:not(:focus-visible),.bt:focus:not(:focus-visible){outline:none}
+      .msg{font-size:15px;line-height:1.5;color:${p.text};white-space:pre-line}
+      .cam{position:relative;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:${p.inset}}
+      .cam img,.cam ha-camera-stream{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+      .cam .tag{position:absolute;left:10px;top:10px;padding:4px 10px;border-radius:999px;background:rgba(10,8,40,.55);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px}
+      .cam .tag i{width:8px;height:8px;border-radius:50%;background:#F43F6B;animation:roost-breathe 1.4s ease-in-out infinite}
+      .cam .off{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:${p.muted};font-size:14px}
+      .cards{display:grid;grid-template-columns:repeat(${Math.max(1, Math.min(4, Number(it.columns) || 1))},minmax(0,1fr));gap:8px}
+      .cards > *{min-width:0}
+      @media (max-width: 600px){.cards{grid-template-columns:minmax(0,1fr)}}
+      .bts{display:grid;grid-template-columns:repeat(${Math.max(1, buttons.length)},minmax(0,1fr));gap:8px}
+      @media (max-width: 380px){.bts{grid-template-columns:repeat(${Math.min(2, Math.max(1, buttons.length))},minmax(0,1fr))}}
+      .bt{min-height:50px;border-radius:16px;border:0;padding:8px 12px;display:flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:transform .12s;--mdc-icon-size:20px}
+      .bt.plain{background:${p.inset};color:${p.text}}
+      .more{align-self:center;font-size:12px;font-weight:600;color:${p.muted}}
+      .tm{height:4px;border-radius:999px;background:${p.track};overflow:hidden}
+      .tm i{display:block;height:100%;background:linear-gradient(90deg,${g[0]},${g[1]});transform-origin:left;animation:roost-left ${secs}s linear forwards}
+      @media (prefers-reduced-motion: reduce){.ic ha-icon{animation:none}}
+    </style>
+    <div class="bg" data-bg="1"></div>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="pt">
+      <div class="hd"><span class="ic"><ha-icon icon="${esc(icon)}"></ha-icon></span>
+        <div class="tx"><b id="pt" class="t">${esc(it.title || "Roost")}</b>${it.subtitle || it.entity ? `<span class="sub t">${esc(this.subText(it))}</span>` : ""}</div>
+        ${it.dismissible === false ? "" : '<button class="x" data-close="1" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button>'}</div>
+      ${it.camera ? `<div class="cam" role="button" tabindex="0" aria-label="Open the camera">${!cam ? '<div class="off t">Camera not found</div>' : UNAVAILABLE.includes(cam.state) ? '<div class="off t">Camera offline</div>' : it.live ? "" : `<img alt="" src="${esc(cam.attributes.entity_picture || "")}">`}<span class="tag"><i></i>${esc(cam?.attributes.friendly_name || "Camera")}</span></div>` : ""}
+      ${it.message ? `<div class="msg t">${esc(this.message(it))}</div>` : ""}
+      ${Array.isArray(it.cards) && it.cards.length ? '<div class="cards"></div>' : ""}
+      ${buttons.length ? `<div class="bts">${buttons.map((b, i) => { const c = bcol(b); return `<button class="bt ${c ? "" : "plain"}" data-b="${i}" style="${c ? `background:linear-gradient(135deg,${c[0]},${c[1]});color:${c[3]};box-shadow:0 10px 22px -10px ${c[2]}` : ""}">${b.icon ? `<ha-icon icon="${esc(b.icon)}"></ha-icon>` : ""}<span class="t">${esc(b.name || "OK")}</span></button>`; }).join("")}</div>` : ""}
+      ${this._more ? `<span class="more t">${this._more} more waiting</span>` : ""}
+      ${secs > 0 ? '<div class="tm" aria-hidden="true"><i></i></div>' : ""}
+    </div>`;
+    const r = this.shadowRoot;
+    if (it.camera && it.live && cam && !UNAVAILABLE.includes(cam.state) && customElements.get("ha-camera-stream")) {
+      const el = document.createElement("ha-camera-stream"); el.hass = this._hass; el.stateObj = cam; el.muted = true; el.controls = false;
+      r.querySelector(".cam").prepend(el);
+    }
+    r.querySelector(".cam")?.addEventListener("click", () => this.moreInfo(it.camera));
+    r.querySelectorAll("[data-close],[data-bg]").forEach((el) => el.addEventListener("click", () => { if (el.dataset.bg && it.dismissible === false) return; this.vibrate(); RoostPop.close(); }));
+    r.querySelectorAll("[data-b]").forEach((el) => el.addEventListener("click", async () => {
+      const b = buttons[+el.dataset.b];
+      this.vibrate();
+      if (it.resolve && "answer" in b) { const res = it.resolve; it.resolve = null; RoostPop.close(); res(b.answer); return; }
+      this._busy = true;
+      try { if (b.tap_action) await this.run(b.tap_action, b.entity || it.entity); } finally { this._busy = false; }
+      if (b.close !== false) RoostPop.close(it.id);
+    }));
+    if (this._cards) { const box = r.querySelector(".cards"); this._cards.forEach((el) => box?.appendChild(el)); }
+    // the keyboard starts on the main button, without a ring for people who tap
+    r.querySelector(".bt:not(.plain), .x")?.focus?.({ preventScroll: true, focusVisible: false });
+  }
+}
+if (!customElements.get("roost-popup-layer")) customElements.define("roost-popup-layer", RoostPopupLayer);
+
+class RoostPopup extends RoostBase {
+  static get hasCards() { return true; }
+  static get defaults() { return { kind: "alert", color: "", close_after: 0, close_when_back: true, dismissible: true, live: false, columns: 1, size: "auto", open_on: [], buttons: [], cards: [], users: [], theme: "auto" }; }
+
+  validate(c) { if (!c.id) throw new Error("Give the popup a short name (its id), for example doorbell"); if (!/^[\w-]+$/.test(c.id)) throw new Error("The popup's id may only have letters, numbers, - and _"); }
+
+  setConfig(config) {
+    if (this._config?.id && this._config.id !== config?.id) RoostPop.unregister(this, this._config.id);
+    super.setConfig(config);
+    if (!this._setup) RoostPop.register(this, this._config);
+  }
+
+  connectedCallback() { if (this._config?.id && !this._setup) RoostPop.register(this, this._config); }
+
+  disconnectedCallback() { if (this._config?.id) RoostPop.unregister(this, this._config.id); }
+
+  static getConfigForm() {
+    const ACT = { ui_action: {} };
+    return { schema: [
+      { type: "grid", name: "", schema: [{ name: "id", label: "Short name (id), used in links: #popup-<id>", required: true, selector: { text: {} } }, { name: "kind", label: "Kind", selector: pick([["alert", "Alert (a warning)"], ["camera", "Camera (doorbell, someone outside)"], ["info", "Message"], ["cards", "Any cards (a room, a remote, a chart)"]]) }] },
+      { type: "grid", name: "", schema: [{ name: "title", label: "Title", selector: { text: {} } }, { name: "icon", selector: { icon: {} } }] },
+      { name: "message", label: "Message ({{state}} and {{name}} are filled in from the device below)", selector: { text: { multiline: true } } },
+      { type: "grid", name: "", schema: [{ name: "entity", label: "A device to show under the title", selector: { entity: {} } }, { name: "camera", label: "Camera", selector: { entity: { domain: "camera" } } }] },
+      { type: "expandable", name: "", title: "When it opens by itself", icon: "mdi:bell-ring-outline", schema: [
+        { name: "open_on", label: "Opens when a device changes to a state", selector: { object: { multiple: true, label_field: "entity", fields: {
+          entity: { label: "Device", required: true, selector: { entity: {} } },
+          state: { label: "Changes to (for example on, open, ringing, triggered; empty = on)", selector: { text: {} } },
+          above: { label: "Or goes above", selector: { number: { mode: "box", step: "any" } } },
+          below: { label: "Or goes below", selector: { number: { mode: "box", step: "any" } } },
+        } } } },
+        { type: "grid", name: "", schema: [{ name: "close_when_back", label: "Closes when it goes back (the bell stops, the door shuts)", selector: { boolean: {} } }, { name: "close_after", label: "Closes by itself after (seconds, 0 = stays)", selector: slider(0, 300, 5) }] },
+        { name: "users", label: "Only for these people (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
+        { name: "sound", label: "A sound when it opens (for example /local/chime.mp3)", selector: { text: {} } },
+      ] },
+      { type: "expandable", name: "", title: "Buttons (up to 4)", icon: "mdi:gesture-tap-button", schema: [
+        { name: "buttons", label: "Buttons", selector: { object: { multiple: true, label_field: "name", fields: {
+          name: { label: "Name", required: true, selector: { text: {} } }, icon: { label: "Icon", selector: { icon: {} } },
+          color: { label: "Colour (empty = plain)", selector: { select: { mode: "dropdown", options: COLOR_OPTIONS.filter((o) => o.value !== "custom") } } },
+          tap_action: { label: "When tapped", selector: ACT }, close: { label: "Close the popup after (default yes)", selector: { boolean: {} } },
+        } } } },
+      ] },
+      { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+        { type: "grid", name: "", schema: [{ name: "color", label: "Colour", selector: { select: { mode: "dropdown", options: COLOR_OPTIONS.filter((o) => o.value !== "custom") } } }, { name: "size", label: "Size", selector: pick([["auto", "Automatic"], ["small", "Small"], ["wide", "Wide"]]) }] },
+        { type: "grid", name: "", schema: [{ name: "live", label: "Live camera video (instead of a picture every 2 seconds)", selector: { boolean: {} } }, { name: "dismissible", label: "Can be closed (✕, tap outside, Esc)", selector: { boolean: {} } }] },
+        { name: "columns", label: "Cards side by side", selector: slider(1, 4) },
+        THEME_FIELD,
+      ] },
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { id: "doorbell", kind: "camera", title: "Someone is at the door", icon: "mdi:doorbell-video", close_after: 60, open_on: [], buttons: [{ name: "Dismiss", icon: "mdi:close" }] }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
+
+  getCardSize() { return this.editing() ? 1 : 0; }
+
+  editing() { return !!(this.editMode || this.preview || /[?&]edit=1/.test(location.search) || this.closest?.("hui-card-preview, hui-dialog-edit-card")); }
+
+  watched() { return (this._config.open_on || []).map((o) => o.entity).filter(Boolean); }
+
+  // opening by itself: a device changes into the chosen state (or crosses a number)
+  checkTriggers() {
+    const c = this._config, h = this._hass;
+    if (!h || this.editing()) return;
+    this._prev = this._prev || {};
+    for (const o of c.open_on || []) {
+      const s = h.states[o.entity];
+      if (!s) continue;
+      const v = num(s.state), want = o.state != null && o.state !== "" ? String(o.state) : null;
+      const hit = o.above != null && o.above !== "" ? v != null && v > Number(o.above) : o.below != null && o.below !== "" ? v != null && v < Number(o.below) : s.state === (want || "on");
+      const was = this._prev[o.entity];
+      this._prev[o.entity] = hit;
+      const fresh = Date.now() - new Date(s.last_changed) < 60000;
+      if (hit && (was === false || (was === undefined && fresh))) RoostPop.open(c.id, { watch: { ...o, state: want || s.state }, watchHit: true });
+      if (!hit && was && c.close_when_back !== false && RoostPop.cur?.id === c.id) RoostPop.close(c.id);
+    }
+  }
+
+  set hass(h) { super.hass = h; this.checkTriggers(); }
+
+  get hass() { return this._hass; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, ed = this.editing();
+    this.style.display = ed ? "" : "none";
+    if (!ed) { this.shadowRoot.innerHTML = ""; return; }
+    const g = COLORS[c.color] || ACTIVE;
+    const when = (c.open_on || []).map((o) => `${this.name(o.entity, o.entity)} ${o.above != null && o.above !== "" ? `goes above ${o.above}` : o.below != null && o.below !== "" ? `goes below ${o.below}` : `turns ${o.state || "on"}`}`).join(", ");
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .ed{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;border:1px dashed ${p.border};color:${p.text};font-size:13px;line-height:1.4}
+      .ic{width:40px;height:40px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};--mdc-icon-size:20px}
+      .tx{flex:1;min-width:0}.tx b{display:block;font-size:14px}.tx span{color:${p.muted}}
+      button{min-height:40px;padding:0 14px;border-radius:14px;border:0;background:${p.inset};color:${p.text};font:inherit;font-weight:700;cursor:pointer;flex:none}
+    </style><div class="ed"><span class="ic"><ha-icon icon="${esc(c.icon || "mdi:message-badge-outline")}"></ha-icon></span>
+      <div class="tx"><b class="t">Popup · ${esc(c.title || c.id)}</b><span class="t">${esc(when ? `Opens when ${when}. ` : "")}Link: #popup-${esc(c.id)}. Shown here only while editing.</span></div>
+      <button data-try="1">Show it</button></div>`;
+    this.shadowRoot.querySelector("[data-try]").addEventListener("click", () => { RoostPop.setHass(this._realHass || this._hass); RoostPop.open(c.id); });
+  }
+}
+
 // ------------------------------------------------------------------ Roost Sensors
 // Many small readings in neat squares, each turning orange when outside the range you set.
 // How a reading feels: bands from low to high, each with a word, a short word for the scale and a colour.
@@ -8650,6 +8995,7 @@ const CARDS = [
   ["roost-nursery", RoostNursery, "Roost Nursery", "The baby's room: camera, warmth, a banner when the baby cries, night light and lullaby."],
   ["roost-network", RoostNetwork, "Roost Network", "The internet (speed, devices online) or a server (CPU, memory, disk, heat), with a safe restart."],
   ["roost-bins", RoostBins, "Roost Bins", "Which bin goes out next, drawn as coloured bins; tonight's one bounces."],
+  ["roost-popup", RoostPopup, "Roost Popup", "A popup for the doorbell and its camera, alarms, leaks, a door left open, the washing done, or any cards. Opens by itself, from a link or from an automation."],
   ["roost-grocy", RoostGrocy, "Roost Grocy", "The kitchen from Grocy: food that goes off soon, the shopping list, chores, tasks and the meal plan."],
   ["roost-medicine", RoostMedicine, "Roost Medicine", "Today's doses to tick off, the next dose, and a warning for a missed one."],
   ["roost-modes", RoostModes, "Roost Modes", "House modes (home, away, holiday, guests): checks doors and windows, and shows a guest Wi-Fi code to scan."],

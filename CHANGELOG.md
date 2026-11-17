@@ -2,6 +2,14 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.6.7
+- **New: Roost Popup.** One popup for everything:
+  - **Uses:** the doorbell with its camera, alarms, leaks, a door left open, the washing done, or any cards.
+  - **Opening:** it opens by itself when a device changes, from a link (`#popup-doorbell`) or a button, or from an automation (the `roost_popup` event, or the `input_text.roost_popup` helper).
+  - **Closing:** it closes when the device goes back, after a time you choose, with ✕, by tapping outside or with Esc.
+  - **Look:** up to 4 buttons running any action. It rises from the bottom on phones and sits in the middle on tablets, in light and dark.
+- **Every “Are you sure?”** on a Roost card now uses the same popup instead of the browser's grey box.
+
 ## 1.6.6
 - **Sensors: four styles to choose from.**
   - **A · Line:** a comfort word, a line of the last hours, today's lowest and highest.

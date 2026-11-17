@@ -1,7 +1,7 @@
 <h1 align="center">Roost Cards</h1>
 
 <p align="center"><b>Beautiful, animated dashboard cards for Home Assistant. Made for phones and tablets.</b><br>
-60 cards · a visual editor for every setting · light and dark · no code needed</p>
+61 cards · a visual editor for every setting · light and dark · no code needed</p>
 
 <p align="center">
 <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
@@ -71,7 +71,7 @@ Recorded on a real Home Assistant (its built-in demo devices), so everything you
 10. [Clock and prayer times](docs/tutorials/10-clock-and-prayer.md)
 11. [Try cards before you own the device](docs/tutorials/11-try-without-devices.md)
 
-## All 60 cards
+## All 61 cards
 
 Each GIF shows the card in use, then in the other colour mode, then as frosted glass.
 
@@ -116,6 +116,7 @@ Each GIF shows the card in use, then in the other colour mode, then as frosted g
 | **Roost Printer** | Ink or toner levels as little bottles, or a 3D print growing layer by layer with time left and temperatures. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/printer.gif" width="180" alt="Roost Printer"> |
 | **Roost Moments** | Your day in moments (morning, day, evening, bedtime) with the scene that fits right now. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/moments.gif" width="180" alt="Roost Moments"> |
 | **Roost Family Map** | Where everyone is, drawn simply around home (no map service): places as circles, people as faces, how far away. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/family.gif" width="180" alt="Roost Family Map"> |
+| **Roost Popup** | One popup for everything: the doorbell with its camera, alarms, leaks, a door left open, the washing done, or any cards. It opens by itself when a device changes, from a link or button, or from an automation. Every “Are you sure?” in Roost uses it too. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/popup.gif" width="180" alt="Roost Popup"> |
 | **Roost Grocy** | The kitchen from Grocy: food that goes off soon, the shopping list to tick off, chores, tasks and the meal plan. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/grocy.gif" width="180" alt="Roost Grocy"> |
 | **Roost Tank** | A water tank or gas cylinder: how full it is (the water sways), used today, days left, a leak warning and the pump. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tank.gif" width="180" alt="Roost Tank"> |
 | **Roost Pool** | The pool from above with light moving on the water: warmth, chlorine and pH with the good zone, pump, heater and light. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pool.gif" width="180" alt="Roost Pool"> |

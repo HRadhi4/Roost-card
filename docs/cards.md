@@ -661,6 +661,50 @@ entities: [person.saeed, person.layla, person.daniel]
 zones: [zone.work, zone.school]
 ```
 
+### Roost Popup
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/popup.gif" width="320" alt="Roost popup in action">
+
+Put the Popup card anywhere on the dashboard. It is invisible, and shows only while you edit (with a **Show it** button to try it). On a phone it rises from the bottom; on a tablet it sits in the middle.
+
+```yaml
+type: custom:roost-popup
+id: doorbell                     # its short name: the link is #popup-doorbell
+kind: camera                     # alert, camera, info or cards
+title: Someone is at the door
+icon: mdi:doorbell-video
+camera: camera.front_door        # a picture every 2 seconds, or live: true for video
+entity: lock.front_door          # its state shows under the title
+message: The front door is {{state}}.
+open_on:                         # opens by itself when...
+  - entity: binary_sensor.doorbell
+    state: "on"                  # or above: / below: for numbers
+close_when_back: true            # ...and closes when the bell stops
+close_after: 60                  # or after 60 seconds (a thin bar shows the time left)
+users: [person.saeed]            # only on these people's screens (empty = everyone)
+sound: /local/chime.mp3          # optional
+buttons:                         # up to 4; a button with a colour is the main one
+  - name: Open the door
+    icon: mdi:lock-open-variant
+    color: green
+    tap_action: { action: perform-action, perform_action: lock.unlock, target: { entity_id: lock.front_door } }
+  - name: Dismiss
+```
+
+**Kinds:** *alert* (a warning, red), *camera* (doorbell or someone outside), *info* (a plain message), *cards* (any cards inside, such as a room or a remote; add them under **Cards on it**).
+
+**Ways to open it:**
+- by itself, with **open_on** (the doorbell rings, a door opens, a leak, the washing machine finishes, the cabinet gets too hot);
+- from any card's tap: `tap_action: { action: navigate, navigation_path: "#popup-doorbell" }`, or `{ action: fire-dom-event, roost_popup: doorbell }`;
+- from an automation (people with admin rights): fire the event `roost_popup`:
+  ```yaml
+  - event: roost_popup
+    event_data: { id: doorbell }          # a popup on the dashboard, or a whole one:
+    # event_data: { title: Washing done, message: Time to hang the clothes, icon: mdi:washing-machine, color: teal, close_after: 120 }
+  ```
+- from an automation, for everyone: make a text helper called `input_text.roost_popup` and set it to a popup's id (or to `close`).
+
+**Every “Are you sure?”** on a Roost card (any action with `confirmation:`) now uses this popup instead of the browser's grey box.
+
 ### Roost Grocy
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/grocy.gif" width="320" alt="Roost Grocy card in action">
 
