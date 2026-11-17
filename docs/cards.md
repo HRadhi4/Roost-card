@@ -419,8 +419,48 @@ type: custom:roost-remote
 athom_remote: Living room TV    # an Athom Hub remote's name
 # or: entity: remote.living_room_tv   /   entity: media_player.tv
 # or: buttons: [button.tv_power, button.tv_up, button.tv_ok]
+pad_style: buttons      # buttons (round pad) or touchpad (swipe to move, tap for OK, hold for Back)
+show_pad: true
+show_extra: true        # back, home, menu, input
+show_volume: true       # volume and channel rockers
+show_media: false       # rewind, previous, play/pause, next, fast forward
+show_colors: false      # red, green, yellow, blue keys
 show_numbers: false
+key_size: 56
+shortcuts:              # your own buttons on top: apps, scenes, scripts
+  - name: Netflix
+    icon: mdi:netflix
+    color: coral
+    tap_action: { action: perform-action, perform_action: script.tv_netflix }
+actions:                # optional: what a key does instead (YAML only)
+  ok: { action: perform-action, perform_action: remote.send_command, target: { entity_id: remote.tv }, data: { command: select } }
 ```
+
+### Roost Vacuum
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/vacuum.gif" width="320" alt="Roost vacuum card in action">
+
+Pick the robot and the card finds the rest on the same device by itself: battery, area and time cleaned, error, filter and brushes, water and mop settings, dock buttons and the map.
+
+```yaml
+type: custom:roost-vacuum
+entity: vacuum.robot
+shape: auto            # auto (from the brand), lidar, lidar_rear, flush, round, shark, d_shape or slim
+image: /local/robot.png   # optional: your own picture of the robot from above
+map: camera.robot_map  # optional: the robot's map (switch with the map button)
+rooms:                 # tap rooms, then "Clean 2 rooms"
+  - { name: Living room, icon: mdi:sofa, area: living_room }
+  - { name: Kitchen, icon: mdi:stove, area: kitchen }
+# Older robots without area cleaning: give a room a tap_action (a script or a command) instead of an area.
+# Change what was found: battery, area_sensor, time_sensor, error_sensor, consumables, selects, buttons
+```
+What it shows:
+- **Cleaning**: drives in lanes and leaves a clean trail (blue and wet when it mops); brushes and the laser tower turn.
+- **Spot clean**: circles round one place. **Going home**: drives to the dock along a dashed line. **Docked**: a lightning bolt while it charges.
+- **Paused** and **Needs help** (with what the robot says is wrong). **Find my robot** sends out rings while it beeps.
+- One big button (Start, Pause, Resume, Clean 2 rooms), the dock button, and the rest under **⋯**: spot clean, find, stop, dock buttons.
+- Small chips for suction, water flow and mop mode. **Care** says if the filter, brushes or mop pad need changing soon; tap it for each part.
+
+For rooms, first map the robot's rooms to Home Assistant areas: Settings → Devices & services → Entities → your vacuum → cog → **Map vacuum segments to areas**.
 
 ### Roost Presence Map
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/presence.gif" width="320" alt="Roost presence card in action">
@@ -456,7 +496,9 @@ presets: [5, 10]    # optional quick-time buttons as well
 ```yaml
 type: custom:roost-fan
 entity: fan.bedroom
-style: dial         # dial (turn it: Off, Low, Medium, High; swing and modes as small chips) or buttons
+style: dial         # dial (beside the name), big (a big square dial like the thermostat) or buttons
+temperature: sensor.bedroom_temperature   # optional: shown with the speed
+humidity: sensor.bedroom_humidity
 ---
 type: custom:roost-lock
 entity: lock.front_door

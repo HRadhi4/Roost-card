@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.3.9";
+const ROOST_VERSION = "1.4.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -136,7 +136,7 @@ const Sample = {
 
   make() {
     const now = new Date(Date.now() - 3600e3).toISOString(), st = (entity_id, state, attributes) => ({ entity_id, state, attributes, last_changed: now, last_updated: now });
-    const keys = ["Power", "Up", "Down", "Left", "Right", "OK", "Back", "Home", "Menu", "Vol up", "Vol down", "Mute", "Ch up", "Ch down", "Input"];
+    const keys = ["Power", "Up", "Down", "Left", "Right", "OK", "Back", "Home", "Menu", "Vol up", "Vol down", "Mute", "Ch up", "Ch down", "Input", "Rewind", "Previous", "Play pause", "Next", "Fast forward", "Red", "Green", "Yellow", "Blue", "Info"];
     const s = {
       "fan.sample_fan": st("fan.sample_fan", "on", { friendly_name: "Bedroom fan", percentage: 66, percentage_step: 33.33, oscillating: true, preset_modes: ["Breeze", "Sleep"], preset_mode: "Breeze", supported_features: 63 }),
       "lock.sample_front_door": st("lock.sample_front_door", "locked", { friendly_name: "Front door" }),
@@ -144,6 +144,18 @@ const Sample = {
       "camera.sample_door": st("camera.sample_door", "idle", { friendly_name: "Front door", entity_picture: SAMPLE_DOOR }),
       "binary_sensor.sample_doorbell": st("binary_sensor.sample_doorbell", "off", { friendly_name: "Doorbell", device_class: "occupancy" }),
       "timer.sample_kettle": st("timer.sample_kettle", "idle", { friendly_name: "Kettle", duration: "0:05:00" }),
+      "vacuum.sample_robot": st("vacuum.sample_robot", "docked", { friendly_name: "Robot vacuum", fan_speed: "Balanced", fan_speed_list: ["Quiet", "Balanced", "Turbo", "Max"], status: "Charging", supported_features: 32764 }),
+      "sensor.sample_robot_battery": st("sensor.sample_robot_battery", "86", { friendly_name: "Robot vacuum Battery", device_class: "battery", unit_of_measurement: "%" }),
+      "sensor.sample_robot_area": st("sensor.sample_robot_area", "0", { friendly_name: "Robot vacuum Cleaning area", unit_of_measurement: "m²" }),
+      "sensor.sample_robot_time": st("sensor.sample_robot_time", "0", { friendly_name: "Robot vacuum Cleaning time", unit_of_measurement: "min", device_class: "duration" }),
+      "sensor.sample_robot_filter": st("sensor.sample_robot_filter", "62", { friendly_name: "Robot vacuum Filter", unit_of_measurement: "%" }),
+      "sensor.sample_robot_main_brush": st("sensor.sample_robot_main_brush", "78", { friendly_name: "Robot vacuum Main brush", unit_of_measurement: "%" }),
+      "sensor.sample_robot_side_brush": st("sensor.sample_robot_side_brush", "34", { friendly_name: "Robot vacuum Side brush", unit_of_measurement: "%" }),
+      "sensor.sample_robot_mop_pad": st("sensor.sample_robot_mop_pad", "12", { friendly_name: "Robot vacuum Mop pad", unit_of_measurement: "%" }),
+      "select.sample_robot_water": st("select.sample_robot_water", "Medium", { friendly_name: "Robot vacuum Water flow", options: ["Off", "Low", "Medium", "High"] }),
+      "select.sample_robot_mode": st("select.sample_robot_mode", "Vacuum and mop", { friendly_name: "Robot vacuum Cleaning mode", options: ["Vacuum", "Mop", "Vacuum and mop", "Mop after vacuum"] }),
+      "button.sample_robot_empty": st("button.sample_robot_empty", "unknown", { friendly_name: "Robot vacuum Empty dustbin", icon: "mdi:delete-empty-outline" }),
+      "button.sample_robot_wash": st("button.sample_robot_wash", "unknown", { friendly_name: "Robot vacuum Wash the mop", icon: "mdi:water-sync" }),
     };
     keys.forEach((k) => { const id = `button.sample_tv_${k.toLowerCase().replace(/ /g, "_")}`; s[id] = st(id, "unknown", { friendly_name: `Sample TV ${k}`, remote: "Sample TV" }); });
     return s;
@@ -186,6 +198,26 @@ const Sample = {
       } else if (service === "cancel" || service === "finish") this.set(id, "idle", { finishes_at: null });
       return undefined;
     }
+    if (domain === "vacuum") {
+      clearTimeout(this.timers[id]); clearInterval(this.timers[`${id}_run`]);
+      const run = (status) => {
+        this.set(id, "cleaning", { status });
+        this.timers[`${id}_run`] = setInterval(() => {
+          const ar = this.states["sensor.sample_robot_area"], tm = this.states["sensor.sample_robot_time"], bt = this.states["sensor.sample_robot_battery"];
+          this.states["sensor.sample_robot_area"] = { ...ar, state: String(Math.round((Number(ar.state) + 0.4) * 10) / 10) };
+          this.states["sensor.sample_robot_time"] = { ...tm, state: String(Number(tm.state) + 1) };
+          this.set("sensor.sample_robot_battery", String(Math.max(15, Number(bt.state) - 1)));
+        }, 4000);
+      };
+      if (service === "start" || service === "clean_area") { if (s.state !== "paused") { this.states["sensor.sample_robot_area"].state = "0"; this.states["sensor.sample_robot_time"].state = "0"; } run(service === "clean_area" ? "Cleaning rooms" : "Cleaning"); }
+      else if (service === "clean_spot") run("Spot cleaning");
+      else if (service === "pause") this.set(id, "paused", { status: "Paused" });
+      else if (service === "stop") this.set(id, "idle", { status: "Idle" });
+      else if (service === "return_to_base") { this.set(id, "returning", { status: "Going home" }); this.timers[id] = setTimeout(() => this.set(id, "docked", { status: "Charging" }), 6000); }
+      else if (service === "set_fan_speed") this.set(id, null, { fan_speed: data.fan_speed });
+      return undefined;
+    }
+    if (domain === "select") return this.set(id, data.option);
     if (domain === "camera" || domain === "button") return undefined;
     return undefined;
   },
@@ -214,7 +246,11 @@ class RoostBase extends HTMLElement {
     if (!config) throw new Error("Missing configuration");
     if (config.sample) {
       const fill = { "roost-fan": { entity: "fan.sample_fan" }, "roost-lock": { entity: "lock.sample_front_door", door: "binary_sensor.sample_front_door" }, "roost-camera": { entity: "camera.sample_door", doorbell: "binary_sensor.sample_doorbell" },
-        "roost-timer": { entity: "timer.sample_kettle" }, "roost-remote": { athom_remote: "Sample TV" } }[this.localName] || {};
+        "roost-timer": { entity: "timer.sample_kettle" },
+        "roost-vacuum": { entity: "vacuum.sample_robot", battery: "sensor.sample_robot_battery", area_sensor: "sensor.sample_robot_area", time_sensor: "sensor.sample_robot_time",
+          consumables: ["sensor.sample_robot_filter", "sensor.sample_robot_main_brush", "sensor.sample_robot_side_brush", "sensor.sample_robot_mop_pad"],
+          selects: ["select.sample_robot_water", "select.sample_robot_mode"], buttons: ["button.sample_robot_empty", "button.sample_robot_wash"],
+          rooms: [{ name: "Living room", icon: "mdi:sofa" }, { name: "Kitchen", icon: "mdi:stove" }, { name: "Bedroom", icon: "mdi:bed-king" }, { name: "Hallway", icon: "mdi:door" }] }, "roost-remote": { athom_remote: "Sample TV" } }[this.localName] || {};
       config = { ...fill, ...config };
       if (this.localName === "roost-remote" && config.entity && !config.athom_remote) config = { ...config, entity: undefined, athom_remote: "Sample TV" };
     }
@@ -3981,6 +4017,9 @@ const REMOTE_RULES = [
   [["up"], "up"], [["down"], "down"], [["left"], "left"], [["right"], "right"], [["ok"], "ok"], [["enter"], "ok"], [["select"], "ok"],
   [["back"], "back"], [["return"], "back"], [["home"], "home"], [["menu"], "menu"], [["input"], "source"], [["source"], "source"],
   [["play", "pause"], "play_pause"], [["play"], "play"], [["pause"], "pause"], [["info"], "info"],
+  [["rewind"], "rewind"], [["rew"], "rewind"], [["fast", "forward"], "fast_forward"], [["ff"], "fast_forward"], [["forward"], "fast_forward"],
+  [["previous"], "prev"], [["prev"], "prev"], [["next"], "next"], [["red"], "red"], [["green"], "green"], [["yellow"], "yellow"], [["blue"], "blue"],
+  [["guide"], "guide"], [["epg"], "guide"], [["settings"], "settings"], [["exit"], "exit"],
 ];
 const roleOfName = (name) => {
   const words = String(name).toLowerCase().replace(/[^a-z0-9+\-]+/g, " ").split(" ").filter(Boolean);
@@ -3991,7 +4030,8 @@ const roleOfName = (name) => {
 };
 
 class RoostRemote extends RoostBase {
-  static get defaults() { return { color: "purple", show_numbers: false, show_extra: true, radius: 26, theme: "auto" }; }
+  static get defaults() { return { color: "purple", pad_style: "buttons", show_pad: true, show_extra: true, show_volume: true, show_media: false, show_colors: false, show_numbers: false,
+    shortcuts: [], key_size: 56, radius: 26, theme: "auto" }; }
 
   validate(c) { if (!c.athom_remote && !c.entity && !(c.buttons || []).length) throw new Error("Choose an Athom Hub remote, a remote, or a TV"); }
 
@@ -4003,8 +4043,19 @@ class RoostRemote extends RoostBase {
         { name: "entity", label: "Or a remote / TV entity", selector: { entity: { domain: ["remote", "media_player"] } } },
         { name: "buttons", label: "Or pick buttons (named Power, Up, OK, Vol up and so on)", selector: { entity: { multiple: true, domain: "button" } } },
         { name: "name", selector: { text: {} } },
-        { type: "grid", name: "", schema: [{ name: "show_numbers", label: "Number keys", selector: { boolean: {} } }, { name: "show_extra", label: "Back, home, menu", selector: { boolean: {} } }] },
-        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [...colourFields("color"), { name: "radius", selector: slider(0, 40, 2) }, THEME_FIELD] },
+        { type: "expandable", name: "", title: "What the remote shows", icon: "mdi:remote-tv", schema: [
+          { name: "pad_style", label: "Arrows and OK", selector: pick([["buttons", "Round pad with arrow buttons"], ["touchpad", "Touch pad: swipe to move, tap for OK, hold for Back"]]) },
+          { type: "grid", name: "", schema: [{ name: "show_pad", label: "Arrows and OK", selector: { boolean: {} } }, { name: "show_extra", label: "Back, home, menu, input", selector: { boolean: {} } }] },
+          { type: "grid", name: "", schema: [{ name: "show_volume", label: "Volume and channels", selector: { boolean: {} } }, { name: "show_media", label: "Play, pause, skip", selector: { boolean: {} } }] },
+          { type: "grid", name: "", schema: [{ name: "show_colors", label: "Red, green, yellow, blue keys", selector: { boolean: {} } }, { name: "show_numbers", label: "Number keys", selector: { boolean: {} } }] },
+        ] },
+        { name: "shortcuts", label: "Shortcut buttons (apps, scenes, scripts)", selector: { object: { multiple: true, label_field: "name", fields: {
+          name: { label: "Name", required: true, selector: { text: {} } },
+          icon: { label: "Icon", selector: { icon: {} } },
+          color: { label: "Colour", selector: { select: { mode: "dropdown", options: COLOR_OPTIONS.filter((o) => o.value !== "custom") } } },
+          tap_action: { label: "What it does", selector: { ui_action: {} } },
+        } } } },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [...colourFields("color"), { type: "grid", name: "", schema: [{ name: "key_size", label: "Button size", selector: slider(40, 72, 2) }, { name: "radius", selector: slider(0, 40, 2) }] }, THEME_FIELD] },
       ],
       computeLabel,
     };
@@ -4037,13 +4088,14 @@ class RoostRemote extends RoostBase {
     if (map[role]) return true;
     const c = this._config, d = (c.entity || "").split(".")[0];
     if (d === "remote") return true;
-    if (d === "media_player") return ["power", "vol_up", "vol_down", "mute", "ch_up", "ch_down", "play_pause", "source"].includes(role);
+    if (d === "media_player") return ["power", "vol_up", "vol_down", "mute", "ch_up", "ch_down", "play_pause", "source", "prev", "next"].includes(role);
     return false;
   }
 
   press_(role, map) {
     const c = this._config;
     this.vibrate(10);
+    if (c.actions && c.actions[role]) return this.run(c.actions[role], c.entity);
     if (map[role]) return this.call("button", "press", { entity_id: map[role] });
     const d = (c.entity || "").split(".")[0];
     if (d === "remote") {
@@ -4052,7 +4104,7 @@ class RoostRemote extends RoostBase {
     }
     if (d === "media_player") {
       const s = this.st();
-      const svc = { power: s && s.state !== "off" ? "turn_off" : "turn_on", vol_up: "volume_up", vol_down: "volume_down", ch_up: "media_next_track", ch_down: "media_previous_track", play_pause: "media_play_pause" }[role];
+      const svc = { power: s && s.state !== "off" ? "turn_off" : "turn_on", vol_up: "volume_up", vol_down: "volume_down", ch_up: "media_next_track", ch_down: "media_previous_track", play_pause: "media_play_pause", prev: "media_previous_track", next: "media_next_track" }[role];
       if (role === "mute") return this.call("media_player", "volume_mute", { entity_id: c.entity, is_volume_muted: !s?.attributes.is_volume_muted });
       if (svc) return this.call("media_player", svc, { entity_id: c.entity });
     }
@@ -4062,12 +4114,29 @@ class RoostRemote extends RoostBase {
   render() {
     if (!this._hass || !this._config) return;
     const c = this._config, p = this.p, g = this.colour(), map = this.map();
-    const k = (role, icon, cls = "") => `<button class="k ${cls} ${this.has(role, map) ? "" : "no"}" data-r="${role}" aria-label="${role.replace("_", " ")}"${this.has(role, map) ? "" : " disabled"}>${icon.startsWith("mdi:") ? `<ha-icon icon="${icon}"></ha-icon>` : `<span>${icon}</span>`}</button>`;
+    const can = (role) => this.has(role, map) || !!(c.actions && c.actions[role]);
+    const k = (role, icon, cls = "") => `<button class="k ${cls} ${can(role) ? "" : "no"}" data-r="${role}" aria-label="${role.replace("_", " ")}"${can(role) ? "" : " disabled"}>${icon.startsWith("mdi:") ? `<ha-icon icon="${icon}"></ha-icon>` : `<span>${icon}</span>`}</button>`;
     const title = c.name || c.athom_remote || (c.entity ? this.name(c.entity) : "Remote");
     const pw = map.power ? "power" : map.power_on ? "power_on" : "power";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       :host{container-type:inline-size}
-      .card{${panelCss(p, c.radius)};padding:18px;display:flex;flex-direction:column;gap:16px;align-items:center;--k:min(56px,15cqw)}
+      .card{${panelCss(p, c.radius)};padding:18px;display:flex;flex-direction:column;gap:16px;align-items:center;--k:min(${Math.max(40, Number(c.key_size) || 56)}px,15cqw)}
+      .touch{position:relative;width:100%;max-width:300px;aspect-ratio:4/3;border-radius:24px;background:${p.inset};border:1px solid ${p.border};touch-action:none;cursor:pointer;overflow:hidden;
+        display:flex;align-items:center;justify-content:center;color:${p.muted};font-size:12px;-webkit-tap-highlight-color:transparent}
+      .touch .hint{display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none}
+      .touch .hint ha-icon{--mdc-icon-size:26px;opacity:.7}
+      .touch .dot{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:radial-gradient(circle,${g[1]}AA,${g[1]}00 70%);pointer-events:none;opacity:0}
+      .touch .arr{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;color:${g[1]}}
+      .touch .arr ha-icon{--mdc-icon-size:44px}
+      .k.c-red{color:#F43F6B}.k.c-green{color:#34D399}.k.c-yellow{color:#F5B94A}.k.c-blue{color:#38BDF8}
+      .k.cbar{width:calc(var(--k) * .9);height:16px;border-radius:999px}
+      .k.c-red.cbar{background:#F43F6B}.k.c-green.cbar{background:#34D399}.k.c-yellow.cbar{background:#F5B94A}.k.c-blue.cbar{background:#38BDF8}
+      .sc{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;width:100%;justify-content:${(c.shortcuts || []).length > 3 ? "flex-start" : "center"}}
+      .sc::-webkit-scrollbar{display:none}
+      .s{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;color:${p.text};font:inherit;font-size:11px;font-weight:600;cursor:pointer;padding:0;width:64px}
+      .s i{width:46px;height:46px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-style:normal}
+      .s ha-icon{--mdc-icon-size:22px}
+      .s:active i{transform:scale(.92)}
       .top{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px}
       .n{font-size:16px;font-weight:600}
       .k{width:var(--k);height:var(--k);border-radius:50%;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};cursor:pointer;display:flex;align-items:center;justify-content:center;font:inherit;font-size:18px;font-weight:600;
@@ -4091,17 +4160,44 @@ class RoostRemote extends RoostBase {
     </style>
     <div class="card">
       <div class="top"><span class="n t">${esc(title)}</span>${k(pw, "mdi:power", "pw")}</div>
-      <div class="pad">${k("up", "mdi:chevron-up", "up")}${k("left", "mdi:chevron-left", "left")}${k("ok", "OK", "ok")}${k("right", "mdi:chevron-right", "right")}${k("down", "mdi:chevron-down", "down")}</div>
+      ${(c.shortcuts || []).length ? `<div class="sc">${c.shortcuts.map((x, i) => { const sg = x.color ? (x.color === "active" ? ACTIVE : COLORS[x.color] || g) : g; return `<button class="s" data-s="${i}"><i style="background:linear-gradient(135deg,${sg[0]},${sg[1]});color:${sg[3]};box-shadow:0 10px 20px -10px ${sg[2]}"><ha-icon icon="${esc(x.icon || "mdi:application")}"></ha-icon></i><span class="t">${esc(x.name || "")}</span></button>`; }).join("")}</div>` : ""}
+      ${c.show_pad === false ? "" : c.pad_style === "touchpad" ? '<div class="touch" role="button" aria-label="Touch pad: swipe to move, tap for OK, hold for back"><span class="hint t"><ha-icon icon="mdi:gesture-swipe"></ha-icon>Swipe to move · tap for OK · hold for Back</span><span class="dot"></span><span class="arr"><ha-icon icon="mdi:chevron-up"></ha-icon></span></div>'
+    : `<div class="pad">${k("up", "mdi:chevron-up", "up")}${k("left", "mdi:chevron-left", "left")}${k("ok", "OK", "ok")}${k("right", "mdi:chevron-right", "right")}${k("down", "mdi:chevron-down", "down")}</div>`}
       ${c.show_extra ? `<div class="row">${k("back", "mdi:arrow-u-left-top")}${k("home", "mdi:home-outline")}${k("menu", "mdi:menu")}${k("source", "mdi:import")}</div>` : ""}
-      <div class="row"><div class="rock">${k("vol_up", "mdi:plus")}<small>VOL</small>${k("vol_down", "mdi:minus")}</div>
-        <div class="mid">${k("mute", "mdi:volume-off")}${k("play_pause", "mdi:play-pause")}</div>
-        <div class="rock">${k("ch_up", "mdi:chevron-up")}<small>CH</small>${k("ch_down", "mdi:chevron-down")}</div></div>
+      ${c.show_media ? `<div class="row">${k("rewind", "mdi:rewind")}${k("prev", "mdi:skip-previous")}${k("play_pause", "mdi:play-pause")}${k("next", "mdi:skip-next")}${k("fast_forward", "mdi:fast-forward")}</div>` : ""}
+      ${c.show_colors ? `<div class="row">${["red", "green", "yellow", "blue"].map((x) => k(x, "", `c-${x} cbar`)).join("")}</div>` : ""}
+      ${c.show_volume === false ? "" : `<div class="row"><div class="rock">${k("vol_up", "mdi:plus")}<small>VOL</small>${k("vol_down", "mdi:minus")}</div>
+        <div class="mid">${k("mute", "mdi:volume-off")}${c.show_media ? k("info", "mdi:information-outline") : k("play_pause", "mdi:play-pause")}</div>
+        <div class="rock">${k("ch_up", "mdi:chevron-up")}<small>CH</small>${k("ch_down", "mdi:chevron-down")}</div></div>`}
       ${c.show_numbers ? `<div class="nums">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => k(`n${n}`, String(n))).join("")}<span></span>${k("n0", "0")}</div>` : ""}
     </div>`;
     this.shadowRoot.querySelectorAll(".k:not(.no)").forEach((b) => b.addEventListener("click", () => {
       try { if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) b.animate([{ boxShadow: `0 0 0 0 ${g[2]}` }, { boxShadow: "0 0 0 12px rgba(0,0,0,0)" }], { duration: 450, easing: "ease-out" }); } catch (e) { /* no glow */ }
       this.press_(b.dataset.r, map);
     }));
+    this.shadowRoot.querySelectorAll("[data-s]").forEach((b) => b.addEventListener("click", () => { this.vibrate(10); const x = c.shortcuts[+b.dataset.s]; if (x?.tap_action) this.run(x.tap_action, c.entity); }));
+    const tp = this.shadowRoot.querySelector(".touch");
+    if (tp) {
+      const dot = tp.querySelector(".dot"), arr = tp.querySelector(".arr"), ico = arr.querySelector("ha-icon");
+      let x0 = 0, y0 = 0, t0 = 0, held = null, moved = false;
+      const flash = (role) => {
+        ico.setAttribute("icon", { up: "mdi:chevron-up", down: "mdi:chevron-down", left: "mdi:chevron-left", right: "mdi:chevron-right", ok: "mdi:circle-medium", back: "mdi:arrow-u-left-top" }[role]);
+        try { arr.animate([{ opacity: 0.9 }, { opacity: 0 }], { duration: 400, easing: "ease-out" }); } catch (e) { /* no motion */ }
+      };
+      const go = (role) => { if (can(role)) { flash(role); this.press_(role, map); } };
+      tp.addEventListener("pointerdown", (ev) => {
+        tp.setPointerCapture?.(ev.pointerId); x0 = ev.clientX; y0 = ev.clientY; t0 = Date.now(); moved = false;
+        const b = tp.getBoundingClientRect(); dot.style.left = `${ev.clientX - b.left}px`; dot.style.top = `${ev.clientY - b.top}px`; dot.style.opacity = 1;
+        held = setTimeout(() => { held = null; if (!moved) go("back"); }, 600);
+      });
+      tp.addEventListener("pointermove", (ev) => {
+        const b = tp.getBoundingClientRect(); dot.style.left = `${ev.clientX - b.left}px`; dot.style.top = `${ev.clientY - b.top}px`;
+        const dx = ev.clientX - x0, dy = ev.clientY - y0;
+        if (Math.hypot(dx, dy) > 34) { moved = true; clearTimeout(held); held = null; go(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up")); x0 = ev.clientX; y0 = ev.clientY; }
+      });
+      const end = () => { dot.style.opacity = 0; if (held) { clearTimeout(held); held = null; if (!moved && Date.now() - t0 < 600) go("ok"); } };
+      tp.addEventListener("pointerup", end); tp.addEventListener("pointercancel", () => { dot.style.opacity = 0; clearTimeout(held); held = null; });
+    }
   }
 }
 
@@ -4499,17 +4595,20 @@ class RoostTimer extends RoostBase {
 class RoostFan extends RoostBase {
   static get defaults() { return { color: "teal", radius: 22, style: "dial", theme: "auto" }; }
 
+  watched() { return [this._config.entity, this._config.temperature, this._config.humidity].filter(Boolean); }
+
   validate(c) { if (!c.entity) throw new Error("Choose a fan"); }
 
-  // While a finger is on the dial, Home Assistant's updates must not redraw it.
-  signature() { return this._drag ? this._sig : super.signature(); }
+  // While a finger is on the dial, or a list is open, Home Assistant's updates must not redraw it.
+  signature() { return this._drag || this._menuOpen ? this._sig : super.signature(); }
 
   static getConfigForm() {
     return {
       schema: [
         { name: "sample", label: "Show sample data (try the card without the device)", selector: { boolean: {} } },
         { name: "entity", required: true, selector: { entity: { domain: "fan" } } },
-        { name: "style", label: "Look", selector: pick([["dial", "Dial: turn it to set the speed (fewer buttons)"], ["buttons", "A button for each speed and mode"]]) },
+        { name: "style", label: "Look", selector: pick([["dial", "Dial beside the name"], ["big", "Big dial in a square card (like the thermostat)"], ["buttons", "A button for each speed and mode"]]) },
+        { type: "grid", name: "", schema: [{ name: "temperature", label: "Room temperature (optional)", selector: { entity: { domain: "sensor" } } }, { name: "humidity", label: "Room humidity (optional)", selector: { entity: { domain: "sensor" } } }] },
         { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "radius", selector: slider(0, 40, 2) }] },
         ...colourFields("color"),
         THEME_FIELD,
@@ -4524,6 +4623,7 @@ class RoostFan extends RoostBase {
 
   render() {
     if (!this._hass || !this._config) return;
+    if (this._menuOpen) return; // a list is open: redraw when it closes
     if (this._config.style === "buttons") { this.renderButtons(); return; }
     const c = this._config, p = this.p, g = this.colour(), s = this.st();
     const on = s?.state === "on", a = s?.attributes || {};
@@ -4538,24 +4638,30 @@ class RoostFan extends RoostBase {
     const modes = a.preset_modes || [];
     const oscil = a.oscillating != null, dir = a.direction != null;
     const offline = !s || UNAVAILABLE.includes(s.state);
-    const R = 64, C = 84, SW = 270, L = 2 * Math.PI * R * (SW / 360);
+    const big = c.style === "big", D = big ? 240 : 168, R = big ? 96 : 64, C = D / 2, HUB = big ? 150 : 100, SW = 270, L = 2 * Math.PI * R * (SW / 360);
+    const rd = (id, u) => { const x = id ? this.st(id) : null; const v = x ? num(x.state) : null; return v == null ? "" : `${fmt(v, Math.min(2, decOf(x.state)))}${u}`; };
+    const room = [rd(c.temperature, "°"), rd(c.humidity, "%")].filter(Boolean).join(" · ");
     const at = (f) => { const t = ((135 + SW * f) * Math.PI) / 180; return [C + R * Math.cos(t), C + R * Math.sin(t)]; };
     const stops = smooth ? [0, 1] : Array.from({ length: speeds + 1 }, (_, i) => i / speeds);
     const spin = (v) => (v > 0 ? Math.max(0.28, 2.4 - (v / 100) * 2.1).toFixed(2) : 0);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .card{${panelCss(p, c.radius)};padding:16px 18px;display:grid;grid-template-columns:168px minmax(0,1fr);align-items:center;column-gap:18px;row-gap:12px;position:relative}
+      .card{${panelCss(p, c.radius)};padding:16px 18px;display:grid;grid-template-columns:${D}px minmax(0,1fr);align-items:center;column-gap:18px;row-gap:12px;position:relative}
       .chips{grid-column:1/-1}
       @container (max-width: 330px){:host .card{grid-template-columns:minmax(0,1fr)}:host .dial{justify-self:center}}
-      .dial{position:relative;width:168px;height:168px;flex:none;touch-action:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+      ${big ? `.card{grid-template-columns:minmax(0,1fr);justify-items:center;padding:20px 18px}.side{width:100%;flex-direction:row;align-items:center;justify-content:space-between}
+        .side .sub{display:none}.pill{font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;background:${on ? `${g[0]}33` : p.inset};color:${on ? g[1] : p.muted}}
+        .hub{flex-direction:column;gap:2px}.hub .blades{position:absolute;opacity:${on ? 0.22 : 0.14}}.hub .hw{position:relative;font-size:11px;letter-spacing:1px;color:${p.muted}}
+        .hub .hv{position:relative;font-size:30px;font-weight:700;line-height:1.05;color:${on ? p.text : p.muted}}.hub .hr{position:relative;font-size:12px;color:${p.muted}}` : ""}
+      .dial{position:relative;width:${D}px;height:${D}px;flex:none;touch-action:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
       .dial svg{position:absolute;inset:0;overflow:visible}
       .arc{transition:stroke-dasharray .12s ease-out}
       .on .arc{animation:roost-fanglow 3s ease-in-out infinite}
       @keyframes roost-fanglow{0%,100%{filter:drop-shadow(0 0 4px ${g[2]})}50%{filter:drop-shadow(0 0 14px ${g[2]})}}
       .knob{transition:cx .12s ease-out,cy .12s ease-out}
       .drag .arc,.drag .knob{transition:none}
-      .hub{position:absolute;left:34px;top:34px;width:100px;height:100px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+      .hub{position:absolute;left:${(D - HUB) / 2}px;top:${(D - HUB) / 2}px;width:${HUB}px;height:${HUB}px;border-radius:50%;display:flex;align-items:center;justify-content:center;
         background:radial-gradient(circle at 40% 30%,${this.dark ? "#232856,#12152E" : "#FFFFFF,#E9ECF8"});box-shadow:inset 0 2px 12px rgba(255,255,255,.06),0 14px 30px -12px rgba(0,0,0,.5)}
-      .blades{--mdc-icon-size:62px;display:flex;color:${on ? g[1] : p.muted}}
+      .blades{--mdc-icon-size:${big ? 120 : 62}px;display:flex;color:${on ? g[1] : p.muted}}
       .blades.go{animation:roost-spin var(--spin) linear infinite}
       .air{position:absolute;inset:-6px;border-radius:50%;border:2px solid ${g[1]};opacity:0;pointer-events:none}
       .on .air{animation:roost-air var(--air) ease-out infinite}
@@ -4567,8 +4673,9 @@ class RoostFan extends RoostBase {
       .n{font-size:16px;font-weight:600}
       .big{font-size:26px;font-weight:700;letter-spacing:-.4px;line-height:1.1;color:${on ? p.text : p.muted}}
       .l{font-size:12.5px;color:${p.muted}}
-      .chips{display:flex;flex-wrap:wrap;gap:8px}
-      .chips .chip{flex:1 1 auto;justify-content:center}
+      .chips{display:flex;flex-wrap:nowrap;gap:8px;width:100%}
+      .chips .chip{flex:1 1 0;min-width:0;justify-content:center;padding:0 8px}
+      @container (max-width: 300px){:host .chips .chip .cw{display:none}}
       .chip{height:40px;padding:0 14px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:13px;font-weight:600;
         display:inline-flex;align-items:center;gap:7px;cursor:pointer;-webkit-tap-highlight-color:transparent}
       .chip ha-icon{--mdc-icon-size:18px}
@@ -4585,7 +4692,7 @@ class RoostFan extends RoostBase {
     <div class="card">
       <div class="dial ${on ? "on" : ""}" role="slider" tabindex="0" aria-label="Fan speed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}" aria-valuetext="${esc(word(pct))}"
         style="--spin:${spin(pct)}s;--air:${on ? Math.max(0.7, 2.6 - (pct / 100) * 1.8).toFixed(2) : 2}s">
-        <svg width="168" height="168" viewBox="0 0 168 168" aria-hidden="true">
+        <svg width="${D}" height="${D}" viewBox="0 0 ${D} ${D}" aria-hidden="true">
           <defs><linearGradient id="fg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/></linearGradient></defs>
           <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${p.track}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)} 999" transform="rotate(135 ${C} ${C})"/>
           <circle class="arc" cx="${C}" cy="${C}" r="${R}" fill="none" stroke="url(#fg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 999" transform="rotate(135 ${C} ${C})"/>
@@ -4594,21 +4701,21 @@ class RoostFan extends RoostBase {
         </svg>
         ${!smooth && speeds <= 4 ? stops.map((f, i) => { const [x, y] = at(f); const dx = (x - C) * 0.32, dy = (y - C) * 0.32; return `<span class="lbl" data-i="${i}" style="left:${(x + dx).toFixed(1)}px;top:${(y + dy).toFixed(1)}px">${esc((names || [])[i] || i)}</span>`; }).join("") : ""}
         <span class="hub" role="button" aria-label="Turn the fan on or off"><span class="air"></span><span class="air b2"></span>
-          <ha-icon class="blades ${on ? "go" : ""}" icon="mdi:fan"></ha-icon></span>
+          <ha-icon class="blades ${on ? "go" : ""}" icon="mdi:fan"></ha-icon>${big ? `<span class="hw">SPEED</span><span class="hv num">${offline ? "Offline" : esc(word(pct))}</span>${room ? `<span class="hr t">Room ${esc(room)}</span>` : ""}` : ""}</span>
       </div>
-      <div class="side">
-        <div class="n t">${esc(this.name(c.entity, "Fan"))}</div>
-        <div><div class="big num" aria-live="polite">${offline ? "Offline" : esc(word(pct))}</div>
-          <div class="l t">${on && hasPct ? `${Math.round(pct)}%` : on ? "On" : "Turn the dial or tap the fan"}${a.preset_mode && on ? ` · ${esc(a.preset_mode)}` : ""}</div></div>
+      <div class="side"${big ? ' style="order:-1"' : ""}>
+        <div class="n t">${esc(this.name(c.entity, "Fan"))}</div>${big ? `<span class="pill">${on ? `On${hasPct ? ` · ${Math.round(pct)}%` : ""}` : "Off"}</span>` : ""}
+        <div class="sub"><div class="big num" aria-live="polite">${offline ? "Offline" : esc(word(pct))}</div>
+          <div class="l t">${on && hasPct ? `${Math.round(pct)}%` : on ? "On" : "Turn the dial or tap the fan"}${a.preset_mode && on ? ` · ${esc(a.preset_mode)}` : ""}${room ? ` · Room ${esc(room)}` : ""}</div></div>
       </div>
         ${oscil || dir || modes.length ? `<div class="chips">
-          ${oscil ? `<button class="chip sw ${a.oscillating ? "on" : ""}" data-o="1" aria-pressed="${!!a.oscillating}"><ha-icon icon="mdi:arrow-oscillating"></ha-icon>Swing</button>` : ""}
-          ${dir ? `<button class="chip" data-d="1" aria-label="Direction"><ha-icon icon="${a.direction === "reverse" ? "mdi:rotate-left" : "mdi:rotate-right"}"></ha-icon>${a.direction === "reverse" ? "Reverse" : "Forward"}</button>` : ""}
-          ${modes.length ? `<button class="chip ${a.preset_mode ? "on" : ""}" data-menu="1" aria-haspopup="true"><ha-icon icon="mdi:tune-variant"></ha-icon>${esc(a.preset_mode || "Mode")}<ha-icon icon="mdi:chevron-down" style="--mdc-icon-size:16px;margin-right:-4px"></ha-icon></button>` : ""}
+          ${oscil ? `<button class="chip sw ${a.oscillating ? "on" : ""}" data-o="1" aria-pressed="${!!a.oscillating}"><ha-icon icon="mdi:arrow-oscillating"></ha-icon><span class="cw">Swing</span></button>` : ""}
+          ${dir ? `<button class="chip" data-d="1" aria-label="Direction"><ha-icon icon="${a.direction === "reverse" ? "mdi:rotate-left" : "mdi:rotate-right"}"></ha-icon><span class="cw">${a.direction === "reverse" ? "Reverse" : "Forward"}</span></button>` : ""}
+          ${modes.length ? `<button class="chip ${a.preset_mode ? "on" : ""}" data-menu="1" aria-haspopup="true"><ha-icon icon="mdi:tune-variant"></ha-icon><span class="cw">${esc(a.preset_mode || "Mode")}</span><ha-icon icon="mdi:chevron-down" style="--mdc-icon-size:16px;margin-right:-4px"></ha-icon></button>` : ""}
         </div>` : ""}
       ${modes.length ? `<div class="menu" hidden role="menu">${a.preset_mode ? `<button class="mi" data-m="">None</button>` : ""}${modes.map((m) => `<button class="mi ${a.preset_mode === m ? "on" : ""}" role="menuitem" data-m="${esc(m)}">${esc(m)}${a.preset_mode === m ? '<ha-icon icon="mdi:check" style="--mdc-icon-size:16px"></ha-icon>' : ""}</button>`).join("")}</div>` : ""}
     </div>`;
-    const r = this.shadowRoot, dial = r.querySelector(".dial"), arc = r.querySelector(".arc"), knob = r.querySelector(".knob"), big = r.querySelector(".big");
+    const r = this.shadowRoot, dial = r.querySelector(".dial"), arc = r.querySelector(".arc"), knob = r.querySelector(".knob"), bigEl = r.querySelector(big ? ".hv" : ".big");
     const paint = (v) => {
       const f = Math.max(0, Math.min(1, v / 100));
       arc.setAttribute("stroke-dasharray", `${(L * f).toFixed(1)} 999`);
@@ -4635,11 +4742,11 @@ class RoostFan extends RoostBase {
       if (ev.target.closest(".hub")) return;
       this._drag = true; moved = false; startV = pct; dial.classList.add("drag");
       dial.setPointerCapture?.(ev.pointerId);
-      const v = snap(valueAt(ev)); paint(v); big.textContent = word(v); this._dv = v;
+      const v = snap(valueAt(ev)); paint(v); bigEl && (bigEl.textContent = word(v)); this._dv = v;
     });
     dial.addEventListener("pointermove", (ev) => {
       if (!this._drag) return;
-      moved = true; const v = snap(valueAt(ev)); if (v !== this._dv) { this._dv = v; paint(v); big.textContent = word(v); if (!smooth) this.vibrate(); }
+      moved = true; const v = snap(valueAt(ev)); if (v !== this._dv) { this._dv = v; paint(v); bigEl && (bigEl.textContent = word(v)); if (!smooth) this.vibrate(); }
     });
     const end = () => {
       if (!this._drag) return;
@@ -4647,7 +4754,7 @@ class RoostFan extends RoostBase {
       if (this._dv !== startV || !moved) send(this._dv);
     };
     dial.addEventListener("pointerup", end);
-    dial.addEventListener("pointercancel", () => { this._drag = false; dial.classList.remove("drag"); paint(pct); big.textContent = word(pct); });
+    dial.addEventListener("pointercancel", () => { this._drag = false; dial.classList.remove("drag"); paint(pct); bigEl && (bigEl.textContent = word(pct)); });
     dial.addEventListener("keydown", (ev) => {
       const d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[ev.key];
       if (!d) return; ev.preventDefault();
@@ -4657,13 +4764,20 @@ class RoostFan extends RoostBase {
     r.querySelectorAll("[data-o]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("fan", "oscillate", { entity_id: c.entity, oscillating: !a.oscillating }); }));
     r.querySelectorAll("[data-d]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("fan", "set_direction", { entity_id: c.entity, direction: a.direction === "reverse" ? "forward" : "reverse" }); }));
     const menu = r.querySelector(".menu");
-    r.querySelectorAll("[data-menu]").forEach((b) => b.addEventListener("click", (ev) => { ev.stopPropagation(); menu.hidden = !menu.hidden; }));
+    this._menuOpen = false;
+    r.querySelectorAll("[data-menu]").forEach((b) => b.addEventListener("click", (ev) => {
+      ev.stopPropagation(); menu.hidden = !menu.hidden; this._menuOpen = !menu.hidden;
+      if (this._menuOpen) {
+        const away = (e) => { if (!e.composedPath().includes(this)) { window.removeEventListener("pointerdown", away, true); menu.hidden = true; this._menuOpen = false; this._sig = null; this.hass = this._hass; } };
+        window.addEventListener("pointerdown", away, true);
+      }
+    }));
     r.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => {
-      this.vibrate(); menu.hidden = true;
+      this.vibrate(); menu.hidden = true; this._menuOpen = false; this._sig = null;
       if (b.dataset.m) this.call("fan", "set_preset_mode", { entity_id: c.entity, preset_mode: b.dataset.m });
       else this.call("fan", "set_percentage", { entity_id: c.entity, percentage: Math.round(pct || 100 / speeds) });
     }));
-    r.querySelector(".card").addEventListener("click", (ev) => { if (menu && !menu.hidden && !ev.target.closest(".menu,[data-menu]")) menu.hidden = true; });
+    r.querySelector(".card").addEventListener("click", (ev) => { if (menu && !menu.hidden && !ev.target.closest(".menu,[data-menu]")) { menu.hidden = true; this._menuOpen = false; } });
   }
 
   renderButtons() {
@@ -4705,6 +4819,349 @@ class RoostFan extends RoostBase {
     r.querySelectorAll("[data-p]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); const v = +b.dataset.p; this.call("fan", v ? "set_percentage" : "turn_off", v ? { entity_id: c.entity, percentage: v } : { entity_id: c.entity }); }));
     r.querySelectorAll("[data-o]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("fan", "oscillate", { entity_id: c.entity, oscillating: !a.oscillating }); }));
     r.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("fan", "set_preset_mode", { entity_id: c.entity, preset_mode: b.dataset.m }); }));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Vacuum
+// A robot vacuum seen from above on a little floor: it drives in lanes while it cleans (a wet trail when it mops), spirals for a spot clean,
+// heads home to its dock, charges there, and says when something needs care. One big button, the dock, and the rest tucked away.
+const VAC_SHAPES = [["auto", "Find it from the brand"], ["lidar", "Round with a laser tower (Roborock, Dreame, Xiaomi, Eufy X, Tapo)"], ["lidar_rear", "Round, tower at the back (Ecovacs Deebot)"],
+  ["flush", "Round, tower hidden inside (Dreame X40/X50, Roborock Qrevo Curv)"], ["round", "Round without a tower (Roomba i/j, Eufy G, Shark ION)"], ["shark", "Shark AI / Matrix"],
+  ["d_shape", "Flat front (Roomba s9, Neato, Ecovacs X2)"], ["slim", "Slim disc (Eufy RoboVac 11S/15C/30C)"]];
+
+// The robot as a clean line drawing, from above, facing up. 100 × 100.
+function vacSvg(shape, g, p, dark, wet) {
+  const body = "url(#vb)", line = dark ? "#D6DAF7" : "#2A3060", soft = dark ? "#5A6199" : "#B7BEE0";
+  const defs = `<defs><radialGradient id="vb" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="${dark ? "#3A4280" : "#FFFFFF"}"/><stop offset="1" stop-color="${dark ? "#1D2350" : "#DDE1F0"}"/></radialGradient></defs>`;
+  const brush = (x, y) => `<g class="sb" style="transform-origin:${x}px ${y}px"><circle cx="${x}" cy="${y}" r="2.2" fill="${line}"/>${[0, 72, 144, 216, 288].map((a) => `<line x1="${x}" y1="${y}" x2="${(x + 12 * Math.cos((a * Math.PI) / 180)).toFixed(1)}" y2="${(y + 12 * Math.sin((a * Math.PI) / 180)).toFixed(1)}" stroke="${line}" stroke-width="1.4" stroke-linecap="round" opacity=".8"/>`).join("")}</g>`;
+  const two = shape === "shark" || shape === "slim" || shape === "d_shape";
+  const brushes = two ? brush(16, 20) + brush(84, 20) : brush(17, 20);
+  const pads = wet ? `<g class="pads"><circle cx="33" cy="84" r="13" fill="#38BDF8" opacity=".35"/><circle cx="67" cy="84" r="13" fill="#38BDF8" opacity=".35"/>
+    <circle class="pd" cx="33" cy="84" r="13" fill="none" stroke="#38BDF8" stroke-width="1.6" stroke-dasharray="5 3" style="transform-origin:33px 84px"/><circle class="pd" cx="67" cy="84" r="13" fill="none" stroke="#38BDF8" stroke-width="1.6" stroke-dasharray="5 3" style="transform-origin:67px 84px"/></g>` : "";
+  const outline = shape === "d_shape" ? "M8 34 Q8 8 22 8 H78 Q92 8 92 34 V54 A42 42 0 0 1 8 54 Z" : "";
+  const shell = outline ? `<path d="${outline}" fill="${body}" stroke="${line}" stroke-width="2"/>` : `<circle cx="50" cy="50" r="${shape === "slim" ? 44 : 43}" fill="${body}" stroke="${line}" stroke-width="2"/>`;
+  const bumper = outline ? `<path d="M10 30 Q10 11 22 11 H78 Q90 11 90 30" fill="none" stroke="${soft}" stroke-width="3" stroke-linecap="round"/>`
+    : `<path d="M14 38 A38 38 0 0 1 86 38" fill="none" stroke="${soft}" stroke-width="3" stroke-linecap="round"/>`;
+  const tower = (cy, r) => `<circle cx="50" cy="${cy}" r="${r}" fill="${dark ? "#141831" : "#FFFFFF"}" stroke="${line}" stroke-width="1.4"/><g class="ld" style="transform-origin:50px ${cy}px"><path d="M50 ${cy} L50 ${cy - r + 2.5}" stroke="${g[1]}" stroke-width="2" stroke-linecap="round"/><circle cx="50" cy="${cy}" r="${r - 4}" fill="none" stroke="${soft}" stroke-width="1"/></g>`;
+  const top = {
+    lidar: tower(36, 11),
+    lidar_rear: tower(64, 11) + `<rect x="40" y="18" width="20" height="5" rx="2.5" fill="${soft}"/>`,
+    flush: `<circle cx="50" cy="38" r="10" fill="none" stroke="${soft}" stroke-width="1.2" stroke-dasharray="2 2"/><g class="ld" style="transform-origin:50px 38px"><path d="M50 38 L50 30" stroke="${g[1]}" stroke-width="1.6" stroke-linecap="round"/></g>`,
+    round: `<circle cx="50" cy="50" r="12" fill="none" stroke="${soft}" stroke-width="1.4"/><circle cx="50" cy="50" r="5" fill="${g[1]}" opacity=".85"/><path d="M38 70 H62" stroke="${soft}" stroke-width="2" stroke-linecap="round"/>`,
+    shark: `<path d="M24 26 Q50 14 76 26" fill="none" stroke="${g[1]}" stroke-width="3" stroke-linecap="round" opacity=".9"/><circle cx="50" cy="54" r="9" fill="none" stroke="${soft}" stroke-width="1.4"/><circle cx="50" cy="54" r="3.5" fill="${line}"/><path d="M30 72 Q50 80 70 72" fill="none" stroke="${soft}" stroke-width="1.6"/>`,
+    d_shape: `<rect x="34" y="30" width="32" height="14" rx="7" fill="none" stroke="${soft}" stroke-width="1.4"/><circle cx="50" cy="58" r="6" fill="${g[1]}" opacity=".85"/>`,
+    slim: `<circle cx="50" cy="50" r="7" fill="none" stroke="${soft}" stroke-width="1.4"/><circle cx="50" cy="50" r="2.5" fill="${g[1]}"/><path d="M26 74 Q50 84 74 74" fill="none" stroke="${soft}" stroke-width="1.6"/>`,
+  }[shape] || "";
+  return `<svg viewBox="0 0 100 100" aria-hidden="true" style="overflow:visible">${defs}${pads}${brushes}${shell}${bumper}${top}<circle cx="${shape === "d_shape" ? 50 : 50}" cy="${shape === "d_shape" ? 12 : 9}" r="1.6" fill="${g[1]}"/></svg>`;
+}
+
+class RoostVacuum extends RoostBase {
+  static get defaults() {
+    return { color: "purple", shape: "auto", image: "", view: "robot", rooms: [], show_rooms: true, show_care: true, show_chips: true, radius: 22, theme: "auto" };
+  }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a robot vacuum"); }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "sample", label: "Show sample data (try the card without the robot)", selector: { boolean: {} } },
+        { name: "entity", required: true, selector: { entity: { domain: "vacuum" } } },
+        { name: "name", selector: { text: {} } },
+        { type: "expandable", name: "", title: "Picture", icon: "mdi:robot-vacuum", schema: [
+          { name: "shape", label: "Drawing of the robot", selector: pick(VAC_SHAPES) },
+          { name: "image", label: "Or a picture of your robot from above (for example /local/robot.png)", selector: { text: {} } },
+          { name: "map", label: "Map from the robot (a camera or image entity, optional)", selector: { entity: { domain: ["camera", "image"] } } },
+          { name: "view", label: "Show first", selector: pick([["robot", "The robot on its floor"], ["map", "The map (when there is one)"]]) },
+        ] },
+        { type: "expandable", name: "", title: "Rooms to clean", icon: "mdi:floor-plan", schema: [
+          { name: "rooms", label: "Rooms (pick the Home Assistant area; map the robot's rooms to areas in the vacuum's settings first)", selector: { object: { multiple: true, label_field: "name", fields: {
+            name: { label: "Name", required: true, selector: { text: {} } },
+            icon: { label: "Icon", selector: { icon: {} } },
+            area: { label: "Area", selector: { area: {} } },
+            tap_action: { label: "Or what to do (for older robots: a script or a command)", selector: { ui_action: {} } },
+          } } } },
+          { name: "show_rooms", label: "Show the rooms", selector: { boolean: {} } },
+        ] },
+        { type: "expandable", name: "", title: "More readings (found by themselves; pick here to change)", icon: "mdi:tune", schema: [
+          { name: "battery", selector: { entity: { domain: "sensor" } } },
+          { type: "grid", name: "", schema: [{ name: "area_sensor", label: "Area cleaned", selector: { entity: { domain: "sensor" } } }, { name: "time_sensor", label: "Cleaning time", selector: { entity: { domain: "sensor" } } }] },
+          { name: "error_sensor", label: "Error", selector: { entity: { domain: "sensor" } } },
+          { name: "consumables", label: "Filter, brushes, mop pad (care)", selector: { entity: { multiple: true, domain: "sensor" } } },
+          { name: "selects", label: "Settings shown as chips (water flow, mop mode)", selector: { entity: { multiple: true, domain: "select" } } },
+          { name: "buttons", label: "Dock buttons (empty dustbin, wash mop)", selector: { entity: { multiple: true, domain: "button" } } },
+          { type: "grid", name: "", schema: [{ name: "show_chips", label: "Suction and settings chips", selector: { boolean: {} } }, { name: "show_care", label: "Care (filter, brushes)", selector: { boolean: {} } }] },
+        ] },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [...colourFields("color"), { type: "grid", name: "", schema: [{ name: "radius", selector: slider(0, 40, 2) }, THEME_FIELD] }] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("vacuum.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  connectedCallback() {
+    // the map is a picture that changes while the robot cleans
+    this._mapTick = setInterval(() => { if (this._showMap && this.st()?.state === "cleaning") { const im = this.shadowRoot?.querySelector(".map img"); if (im && this._mapSrc) im.src = `${this._mapSrc}${this._mapSrc.includes("?") ? "&" : "?"}t=${Date.now()}`; } }, 6000);
+  }
+
+  disconnectedCallback() { clearInterval(this._mapTick); clearTimeout(this._locT); }
+
+  // Everything that belongs to the robot: what the card is told, else what sits on the same device.
+  parts() {
+    const c = this._config, h = this._hass, id = c.entity;
+    const dev = h?.entities?.[id]?.device_id;
+    const mine = dev ? deviceEntities(h, dev) : [];
+    const S = (x) => h.states[x], nm = (x) => `${x} ${(S(x)?.attributes.friendly_name || "").toLowerCase()}`;
+    const sensors = mine.filter((x) => x.startsWith("sensor."));
+    const pickS = (re, test = () => true) => sensors.find((x) => re.test(nm(x)) && test(S(x)));
+    const CARE = /filter|brush|mop_pad|mop pad|mopping pad|\bpad\b|sensor_dirty|sensors? dirty|dust_bag|dust bag|strainer|cleaning_brush|dirty water|roller/;
+    return {
+      battery: c.battery || sensors.find((x) => S(x)?.attributes.device_class === "battery"),
+      area: c.area_sensor || pickS(/clean(ing|ed)?_?area|cleaned area|cleaning area/, (s) => /m²|m2|ft²/.test(s?.attributes.unit_of_measurement || "")),
+      time: c.time_sensor || pickS(/clean(ing)?_?(time|duration)/, (s) => s?.attributes.device_class === "duration" || /min|h|s/.test(s?.attributes.unit_of_measurement || "")),
+      error: c.error_sensor || pickS(/error/),
+      care: c.consumables || sensors.filter((x) => CARE.test(nm(x)) && !/total|count|last|reset/.test(nm(x)) && (/%|h|min|s|d/.test(S(x)?.attributes.unit_of_measurement || "") || S(x)?.attributes.device_class === "duration")),
+      selects: c.selects || mine.filter((x) => x.startsWith("select.") && !/map|language|volume|voice/.test(nm(x))),
+      buttons: c.buttons || mine.filter((x) => x.startsWith("button.") && !/reset|restart|identify|reboot/.test(nm(x))),
+      map: c.map || mine.find((x) => /^(camera|image)\./.test(x) && /map/.test(nm(x))),
+      mopOn: mine.find((x) => x.startsWith("binary_sensor.") && /mop(_pad)?_(attached|installed)|mop attached|mop installed/.test(nm(x)) && S(x)?.state === "on"),
+    };
+  }
+
+  watched() {
+    if (!this._hass) return [this._config.entity];
+    const q = this.parts();
+    return [this._config.entity, q.battery, q.area, q.time, q.error, q.map, q.mopOn, ...(q.care || []), ...(q.selects || [])].filter(Boolean);
+  }
+
+  extraSignature() { return `${this._showMap ? 1 : 0}|${(this._rooms || []).join(",")}|${this._careOpen ? 1 : 0}`; }
+
+  shape() {
+    const c = this._config;
+    if (c.shape && c.shape !== "auto") return c.shape;
+    const h = this._hass, d = h?.devices?.[h?.entities?.[c.entity]?.device_id];
+    const who = `${d?.manufacturer || ""} ${d?.model || ""} ${d?.name || ""} ${this.st()?.attributes.friendly_name || ""}`.toLowerCase();
+    if (/roomba|irobot/.test(who)) return /\bs9|s 9/.test(who) ? "d_shape" : "round";
+    if (/neato|botvac/.test(who)) return "d_shape";
+    if (/shark/.test(who)) return "shark";
+    if (/ecovacs|deebot/.test(who)) return /\bx2\b/.test(who) ? "d_shape" : "lidar_rear";
+    if (/eufy|anker|robovac/.test(who)) return /\b(x8|x9|x10|l35|l50|l60|s1|e20|e25|c20|omni|g40)/.test(who) ? "lidar" : "slim";
+    if (/dreame/.test(who) && /\bx(4|5)0|l40s? ultra|aqua10/.test(who)) return "flush";
+    if (/qrevo curv|saros/.test(who)) return "flush";
+    return "lidar";
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    if (this._menuOpen) return; // a list is open: redraw when it closes
+    const c = this._config, p = this.p, g = this.colour(), s = this.st(), a = s?.attributes || {}, q = this.parts(), S = (x) => (x ? this.st(x) : null);
+    const state = s?.state || "missing";
+    const offline = !s || UNAVAILABLE.includes(state);
+    const st2 = String(a.status || "").toLowerCase();
+    const spot = state === "cleaning" && /spot/.test(st2);
+    const errText = state === "error" ? (S(q.error)?.state && !/^(unknown|unavailable)$/.test(S(q.error).state) ? String(S(q.error).state).replace(/_/g, " ") : a.status || "Needs help") : "";
+    const mopSel = (q.selects || []).map((x) => S(x)).find((x) => x && /water|mop|scrub/.test(`${x.entity_id} ${x.attributes.friendly_name || ""}`.toLowerCase()));
+    const wet = !!q.mopOn || /mop/.test(st2) || (mopSel && !/^(off|none|vacuum|no|closed|0|unavailable|unknown)$/i.test(mopSel.state) && !/^vacuum$/i.test(mopSel.state));
+    const batS = S(q.battery);
+    const bat = batS ? num(batS.state) : num(a.battery_level);
+    const charging = state === "docked" && (bat == null || bat < 100 || /charg/.test(st2));
+    const word = offline ? "Offline" : { cleaning: spot ? "Spot cleaning" : "Cleaning", docked: charging ? "Charging" : "Docked", returning: "Going home", paused: "Paused", idle: "Ready", error: "Needs help" }[state] || state;
+    const rd = (x) => { const v = S(x); if (!v || UNAVAILABLE.includes(v.state)) return ""; const n = num(v.state); const u = v.attributes.unit_of_measurement || ""; return n == null ? v.state : `${fmt(n, decOf(v.state, u))}${/^(%|°|°C)$/.test(u) ? u : u ? ` ${u}` : ""}`; };
+    const areaTxt = rd(q.area) || (a.cleaned_area ? `${fmt(Number(a.cleaned_area), decOf(a.cleaned_area))} m²` : "");
+    const facts = [state === "cleaning" || state === "paused" || state === "returning" ? areaTxt : "", state === "cleaning" || state === "paused" ? rd(q.time) : "", a.fan_speed && state === "cleaning" ? String(a.fan_speed) : ""].filter(Boolean);
+    const shape = this.shape();
+    const pic = c.image === "entity" ? a.entity_picture : c.image;
+    const mapSt = S(q.map);
+    this._mapSrc = mapSt?.attributes.entity_picture || "";
+    if (this._showMap == null) this._showMap = c.view === "map" && !!this._mapSrc;
+    const showMap = this._showMap && this._mapSrc;
+    const rooms = (c.show_rooms !== false && c.rooms) || [];
+    const sel = (this._rooms || []).filter((i) => rooms[i]);
+    const busy = state === "cleaning" || state === "returning";
+    const mainLabel = state === "cleaning" ? "Pause" : state === "paused" ? "Resume" : state === "returning" ? "Pause" : sel.length ? `Clean ${sel.length === 1 ? rooms[sel[0]].name : `${sel.length} rooms`}` : "Start";
+    const mainIcon = state === "cleaning" || state === "returning" ? "mdi:pause" : "mdi:play";
+    // care: the weakest part first
+    const care = (q.care || []).map((x) => {
+      const v = S(x); if (!v || UNAVAILABLE.includes(v.state)) return null;
+      const n = num(v.state); if (n == null) return null;
+      const u = v.attributes.unit_of_measurement || "", dc = v.attributes.device_class;
+      let hours = null, pct = null;
+      if (u === "%") pct = n; else if (dc === "duration" || /^(h|min|s|d)$/.test(u)) hours = u === "min" ? n / 60 : u === "s" ? n / 3600 : u === "d" ? n * 24 : n;
+      const name = (v.attributes.friendly_name || x).replace(new RegExp(`^${(this.name(c.entity) || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`, "i"), "").replace(/\b(left|remaining|time left|life)\b/gi, "").trim();
+      return { id: x, name: name ? name.charAt(0).toUpperCase() + name.slice(1) : "Part", pct, hours, low: pct != null ? pct <= 15 : hours != null ? hours <= 10 : false };
+    }).filter(Boolean).sort((x, y) => (x.pct ?? (x.hours ?? 999) / 3) - (y.pct ?? (y.hours ?? 999) / 3));
+    const lowCare = care.filter((x) => x.low);
+    const chips = [];
+    if ((a.fan_speed_list || []).length) chips.push({ key: "fan", icon: "mdi:fan", label: a.fan_speed || "Suction", list: a.fan_speed_list, cur: a.fan_speed });
+    (q.selects || []).forEach((x) => { const v = S(x); if (v && (v.attributes.options || []).length) chips.push({ key: x, icon: /water|mop|scrub/.test(`${x} ${v.attributes.friendly_name || ""}`.toLowerCase()) ? "mdi:water" : "mdi:tune-variant", label: v.state, list: v.attributes.options, cur: v.state, title: (v.attributes.friendly_name || x).replace(this.name(c.entity) || "", "").trim() }); });
+    const shown = c.show_chips === false ? [] : chips.slice(0, 3), hidden = c.show_chips === false ? chips : chips.slice(3);
+    const sf = a.supported_features, can = (bit) => sf == null || (Number(sf) & bit) > 0;
+    const pos = { docked: [21, 50], returning: [21, 50], paused: [56, 48], idle: [42, 52], error: [52, 50], missing: [42, 52] }[state] || [42, 52];
+    const dur = 18, ph = `${(-((Date.now() / 1000) % dur)).toFixed(2)}s`; // the robot carries on from where it was after a redraw
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px;position:relative}
+      .top{display:flex;align-items:center;gap:12px}
+      .tx{flex:1;min-width:0}
+      .n{font-size:16px;font-weight:600}
+      .l{font-size:12.5px;color:${state === "error" ? "#F43F6B" : p.muted};margin-top:2px}
+      .bat{display:inline-flex;align-items:center;gap:4px;height:30px;padding:0 10px;border-radius:999px;background:${p.inset};font-size:12px;font-weight:600;color:${bat != null && bat <= 20 ? "#F43F6B" : p.text};flex:none}
+      .bat ha-icon{--mdc-icon-size:17px;color:${bat != null && bat <= 20 ? "#F43F6B" : charging ? "#34D399" : p.muted}}
+      ${charging ? ".bat ha-icon{animation:roost-breathe 1.8s ease-in-out infinite}" : ""}
+      .tg{width:34px;height:34px;border-radius:12px;border:1px solid ${p.border};background:${showMap ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.off};color:${showMap ? g[3] : p.muted};display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+      .tg ha-icon{--mdc-icon-size:18px}
+      .stage{position:relative;height:178px;border-radius:18px;overflow:hidden;background:${p.inset};border:1px solid ${p.border};container-type:inline-size}
+      .floor{position:absolute;inset:0;background-image:linear-gradient(${this.dark ? "rgba(255,255,255,.035)" : "rgba(40,48,96,.05)"} 1px,transparent 1px),linear-gradient(90deg,${this.dark ? "rgba(255,255,255,.035)" : "rgba(40,48,96,.05)"} 1px,transparent 1px);background-size:22px 22px}
+      .dust{position:absolute;width:2px;height:2px;border-radius:50%;background:${p.muted};opacity:.35}
+      .lane{position:absolute;left:22%;right:6%;height:18%;transform-origin:left center;transform:scaleX(0);
+        background:${wet ? "linear-gradient(90deg,rgba(56,189,248,.22),rgba(56,189,248,.12))" : `linear-gradient(90deg,${g[0]}24,${g[1]}14)`}}
+      .lane.r{transform-origin:right center}
+      .dock{position:absolute;left:3%;top:50%;width:13%;max-width:64px;min-width:40px;aspect-ratio:1/1.35;transform:translateY(-50%);border-radius:12px 12px 10px 10px;
+        background:${this.dark ? "#141831" : "#FFFFFF"};border:1.5px solid ${this.dark ? "#3A4170" : "#C9CEF2"};display:flex;align-items:flex-start;justify-content:center;padding-top:8%}
+      .dock::after{content:"";position:absolute;right:-3px;top:38%;width:4px;height:24%;border-radius:2px;background:${charging ? "#34D399" : this.dark ? "#3A4170" : "#C9CEF2"}}
+      .dock ha-icon{--mdc-icon-size:16px;color:${charging ? "#34D399" : p.muted}}
+      ${charging ? ".dock ha-icon{animation:roost-breathe 1.6s ease-in-out infinite}" : ""}
+      .bot{position:absolute;left:${pos[0]}%;top:${pos[1]}%;width:62px;height:62px;margin:-31px 0 0 -31px;z-index:2}
+      .body{position:absolute;inset:0;transform:rotate(${state === "returning" ? 270 : state === "docked" ? 90 : 0}deg);filter:drop-shadow(0 6px 10px rgba(0,0,0,${this.dark ? 0.45 : 0.18}))}
+      .body svg,.body img{width:100%;height:100%;display:block}
+      .body img{border-radius:50%;object-fit:cover}
+      .sb{animation:${busy ? "roost-spin .5s linear infinite" : "none"}}
+      .ld{animation:${busy ? "roost-spin 1.2s linear infinite" : "none"}}
+      .pd{animation:${state === "cleaning" && wet ? "roost-spin 1.4s linear infinite" : "none"}}
+      ${state === "cleaning" && !spot ? `
+      .bot{animation:roost-vlanes ${dur}s linear ${ph} infinite}
+      .body{animation:roost-vturn ${dur}s linear ${ph} infinite}
+      @keyframes roost-vlanes{0%{left:24%;top:22%}23%{left:90%;top:22%}29%{left:90%;top:40%}52%{left:24%;top:40%}58%{left:24%;top:58%}81%{left:90%;top:58%}87%{left:90%;top:76%}93.5%{left:57%;top:76%}100%{left:24%;top:22%}}
+      @keyframes roost-vturn{0%{transform:rotate(90deg)}22%{transform:rotate(90deg)}24%{transform:rotate(180deg)}28%{transform:rotate(180deg)}30%{transform:rotate(270deg)}51%{transform:rotate(270deg)}53%{transform:rotate(180deg)}57%{transform:rotate(180deg)}59%{transform:rotate(90deg)}80%{transform:rotate(90deg)}82%{transform:rotate(180deg)}86%{transform:rotate(180deg)}88%{transform:rotate(270deg)}93%{transform:rotate(320deg)}100%{transform:rotate(450deg)}}
+      .lane.a{animation:roost-vl1 ${dur}s linear ${ph} infinite}.lane.b{animation:roost-vl2 ${dur}s linear ${ph} infinite}.lane.c{animation:roost-vl3 ${dur}s linear ${ph} infinite}
+      @keyframes roost-vl1{0%{transform:scaleX(0)}23%,97%{transform:scaleX(1)}100%{transform:scaleX(0)}}
+      @keyframes roost-vl2{0%,29%{transform:scaleX(0)}52%,97%{transform:scaleX(1)}100%{transform:scaleX(0)}}
+      @keyframes roost-vl3{0%,58%{transform:scaleX(0)}81%,97%{transform:scaleX(1)}100%{transform:scaleX(0)}}` : ""}
+      ${spot ? `.orbit{position:absolute;left:55%;top:50%;width:0;height:0;animation:roost-spin 3s linear ${ph} infinite}.orbit .bot{left:0;top:0;animation:roost-vspiral 9s ease-in-out ${ph} infinite}
+      @keyframes roost-vspiral{0%,100%{transform:translateX(0)}50%{transform:translateX(52px)}}
+      .ring{position:absolute;left:55%;top:50%;width:150px;height:150px;margin:-75px 0 0 -75px;border-radius:50%;background:radial-gradient(circle,${wet ? "rgba(56,189,248,.18)" : `${g[0]}22`},transparent 70%)}` : ""}
+      ${state === "returning" ? `.bot{animation:roost-vhome 5s ease-in-out ${(-((Date.now() / 1000) % 5)).toFixed(2)}s infinite}@keyframes roost-vhome{0%{left:70%}80%,100%{left:21%}}
+      .path{position:absolute;left:18%;right:28%;top:50%;border-top:2px dashed ${g[1]};opacity:.55}` : ""}
+      ${state === "error" ? `.bot::before{content:"";position:absolute;inset:-10px;border-radius:50%;border:2px solid #F43F6B;animation:roost-ping 1.6s ease-out infinite}
+      .bot{animation:roost-wiggle .5s ease-in-out 2}` : ""}
+      ${state === "paused" ? `.bot::after{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid ${g[1]};animation:roost-breathe 1.6s ease-in-out infinite}` : ""}
+      .loc{position:absolute;inset:-8px;border-radius:50%;border:2px solid ${g[1]};opacity:0;pointer-events:none}
+      .bot.locate .loc{animation:roost-ping 1.1s ease-out 3}.bot.locate .loc.b{animation-delay:.35s}
+      .badge{position:absolute;right:-4px;top:-4px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;z-index:3}
+      .badge ha-icon{--mdc-icon-size:14px}
+      .say{position:absolute;left:12px;bottom:10px;right:12px;font-size:12px;color:${state === "error" ? "#F43F6B" : p.muted};text-align:right}
+      .map{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:${p.inset}}
+      .map img{max-width:100%;max-height:100%;object-fit:contain}
+      .rooms{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+      .rooms::-webkit-scrollbar{display:none}
+      .rm{flex:none;height:38px;padding:0 14px;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+      .rm ha-icon{--mdc-icon-size:17px}
+      .rm.on{background:linear-gradient(135deg,${ACTIVE[0]},${ACTIVE[1]});color:#fff;border-color:transparent;box-shadow:0 8px 20px -8px rgba(109,75,255,.9)}
+      .ctl{display:flex;gap:10px;align-items:center}
+      .go{flex:1;height:52px;border-radius:18px;border:0;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};font:inherit;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;box-shadow:0 12px 24px -12px ${g[2]}}
+      .go ha-icon{--mdc-icon-size:22px}
+      .rb{width:52px;height:52px;border-radius:18px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+      .rb.on{color:${g[1]}}
+      .rb ha-icon{--mdc-icon-size:22px}
+      .go:active,.rb:active,.rm:active,.chip:active{transform:scale(.95)}
+      .chips{display:flex;gap:8px}
+      .chip{flex:1 1 0;min-width:0;min-height:40px;padding:4px 10px;line-height:1.15;text-align:left;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+      .chip ha-icon{--mdc-icon-size:17px;color:${g[1]}}
+      @container (max-width: 300px){:host .chip .cw{display:none}}
+      .care{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:${p.inset};cursor:pointer;font-size:13px}
+      .care ha-icon{--mdc-icon-size:18px;color:${lowCare.length ? "#FF9F6B" : "#34D399"}}
+      .care b{flex:1;font-weight:600}
+      .care .cv{color:${p.muted};transition:transform .12s}
+      .care.open .cv{transform:rotate(180deg)}
+      .parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px}
+      .part{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-size:11.5px;color:${p.muted}}
+      .part .rg{position:relative;width:52px;height:52px}
+      .part .rg svg{width:100%;height:100%;transform:rotate(-90deg)}
+      .part .rg span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:${p.text}}
+      .menu{position:absolute;right:14px;bottom:14px;z-index:5;min-width:180px;max-width:calc(100% - 28px);max-height:260px;overflow:auto;padding:6px;border-radius:16px;border:1px solid ${p.border};
+        background:${this.dark ? "#1A1F3D" : "#FFFFFF"};box-shadow:0 18px 40px -12px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:2px}
+      .menu[hidden]{display:none}
+      .menu .h{font-size:11px;color:${p.muted};padding:6px 12px 2px;letter-spacing:.5px}
+      .mi{all:unset;padding:10px 12px;border-radius:10px;font-size:14px;cursor:pointer;color:${p.text};display:flex;align-items:center;gap:10px}
+      .mi ha-icon{--mdc-icon-size:18px;color:${p.muted}}
+      .mi:hover,.mi.on{background:${g[0]}2E}
+      .mi .ck{margin-left:auto;color:${g[1]}}
+    </style>
+    <div class="card">
+      <div class="top"><div class="tx"><div class="n t">${esc(c.name || this.name(c.entity, "Robot vacuum"))}</div>
+        <div class="l t" aria-live="polite">${esc(word)}${facts.length ? ` · ${esc(facts.join(" · "))}` : ""}</div></div>
+        ${bat != null ? `<span class="bat num"><ha-icon icon="${charging ? "mdi:battery-charging" : bat >= 95 ? "mdi:battery" : `mdi:battery-${Math.max(10, Math.round(bat / 10) * 10)}`}"></ha-icon>${Math.round(bat)}%</span>` : ""}
+        ${this._mapSrc ? `<button class="tg" data-map="1" aria-label="${showMap ? "Show the robot" : "Show the map"}"><ha-icon icon="${showMap ? "mdi:robot-vacuum" : "mdi:map-outline"}"></ha-icon></button>` : ""}</div>
+      <div class="stage">
+        ${showMap ? `<div class="map"><img src="${esc(this._mapSrc)}" alt="Map from the robot"></div>` : `<div class="floor"></div>
+        ${[[30, 30], [62, 26], [80, 46], [44, 64], [70, 72], [34, 80], [88, 30], [52, 42]].map(([x, y]) => `<span class="dust" style="left:${x}%;top:${y}%"></span>`).join("")}
+        ${state === "cleaning" && !spot ? '<span class="lane a" style="top:13%"></span><span class="lane b r" style="top:31%"></span><span class="lane c" style="top:49%"></span>' : ""}
+        ${spot ? '<span class="ring"></span>' : ""}
+        ${state === "returning" ? '<span class="path"></span>' : ""}
+        <div class="dock" aria-hidden="true"><ha-icon icon="${charging ? "mdi:lightning-bolt" : "mdi:home-outline"}"></ha-icon></div>
+        ${spot ? '<div class="orbit">' : ""}<div class="bot" role="img" aria-label="${esc(word)}"><span class="loc"></span><span class="loc b"></span>
+          <div class="body">${pic ? `<img src="${esc(pic)}" alt="">` : vacSvg(shape, g, p, this.dark, wet && (state === "cleaning" || state === "paused"))}</div>
+          ${state === "error" ? '<span class="badge" style="background:#F43F6B"><ha-icon icon="mdi:exclamation"></ha-icon></span>' : state === "paused" ? `<span class="badge" style="background:${g[1]}"><ha-icon icon="mdi:pause"></ha-icon></span>` : ""}</div>${spot ? "</div>" : ""}
+        ${errText ? `<span class="say t">${esc(errText.charAt(0).toUpperCase() + errText.slice(1))}</span>` : state === "docked" && bat != null && bat >= 100 ? '<span class="say t">Fully charged</span>' : ""}`}
+      </div>
+      ${rooms.length ? `<div class="rooms" role="group" aria-label="Rooms">${rooms.map((r, i) => `<button class="rm ${sel.includes(i) ? "on" : ""}" data-room="${i}" aria-pressed="${sel.includes(i)}">${r.icon ? `<ha-icon icon="${esc(r.icon)}"></ha-icon>` : ""}${esc(r.name || `Room ${i + 1}`)}</button>`).join("")}</div>` : ""}
+      ${offline ? "" : `<div class="ctl"><button class="go" data-go="1"><ha-icon icon="${mainIcon}"></ha-icon>${esc(mainLabel)}</button>
+        ${can(16) ? `<button class="rb ${state === "docked" || state === "returning" ? "on" : ""}" data-dock="1" aria-label="Send home to the dock"><ha-icon icon="mdi:home-import-outline"></ha-icon></button>` : ""}
+        <button class="rb" data-more="1" aria-label="More" aria-haspopup="true"><ha-icon icon="mdi:dots-horizontal"></ha-icon></button></div>`}
+      ${shown.length && !offline ? `<div class="chips">${shown.map((x, i) => `<button class="chip" data-chip="${i}" aria-haspopup="true" aria-label="${esc(x.title || "Suction")}: ${esc(x.label)}"><ha-icon icon="${x.icon}"></ha-icon><span class="cw t">${esc(String(x.label).replace(/_/g, " "))}</span></button>`).join("")}</div>` : ""}
+      ${c.show_care !== false && care.length ? `<div class="care ${this._careOpen ? "open" : ""}" role="button" tabindex="0" aria-expanded="${!!this._careOpen}"><ha-icon icon="${lowCare.length ? "mdi:wrench-clock" : "mdi:check-circle-outline"}"></ha-icon>
+        <b class="t">${lowCare.length ? `${esc(lowCare.map((x) => x.name).join(", "))} ${lowCare.length > 1 ? "need" : "needs"} care soon` : "Filter and brushes are fine"}</b><ha-icon class="cv" icon="mdi:chevron-down"></ha-icon></div>
+        ${this._careOpen ? `<div class="parts">${care.map((x) => { const f = x.pct != null ? x.pct / 100 : Math.min(1, (x.hours || 0) / 150); const col = x.low ? "#FF9F6B" : g[1]; return `<div class="part"><div class="rg"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="${p.track}" stroke-width="4"/><circle cx="18" cy="18" r="15" fill="none" stroke="${col}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(94.2 * Math.max(0.02, f)).toFixed(1)} 94.2"/></svg><span class="num">${x.pct != null ? `${Math.round(x.pct)}%` : `${Math.round(x.hours)} h`}</span></div><span class="t">${esc(x.name)}</span></div>`; }).join("")}</div>` : ""}` : ""}
+      <div class="menu" hidden role="menu"></div>
+    </div>`;
+    const r = this.shadowRoot, menu = r.querySelector(".menu");
+    const open = (title, items) => {
+      menu.innerHTML = `${title ? `<div class="h t">${esc(title)}</div>` : ""}${items.map((it, i) => `<button class="mi ${it.on ? "on" : ""}" role="menuitem" data-i="${i}">${it.icon ? `<ha-icon icon="${it.icon}"></ha-icon>` : ""}<span class="t">${esc(it.label)}</span>${it.on ? '<ha-icon class="ck" icon="mdi:check"></ha-icon>' : ""}</button>`).join("")}`;
+      menu.hidden = false; this._menuOpen = true;
+      const away = (e) => { if (!e.composedPath().includes(this)) { window.removeEventListener("pointerdown", away, true); menu.hidden = true; this._menuOpen = false; this._sig = null; this.hass = this._hass; } };
+      window.addEventListener("pointerdown", away, true);
+      menu.querySelectorAll(".mi").forEach((b) => b.addEventListener("click", (ev) => { ev.stopPropagation(); menu.hidden = true; this._menuOpen = false; this.vibrate(); items[+b.dataset.i].run(); this._sig = null; this.hass = this._hass; }));
+    };
+    const pickChip = (x) => open(x.title || "Suction", x.list.map((o) => ({ label: String(o).replace(/_/g, " "), on: o === x.cur, run: () => (x.key === "fan" ? this.call("vacuum", "set_fan_speed", { entity_id: c.entity, fan_speed: o }) : this.call("select", "select_option", { entity_id: x.key, option: o })) })));
+    r.querySelectorAll("[data-chip]").forEach((b) => b.addEventListener("click", (ev) => { ev.stopPropagation(); pickChip(shown[+b.dataset.chip]); }));
+    r.querySelector("[data-map]")?.addEventListener("click", () => { this._showMap = !this._showMap; this._sig = null; this.render(); });
+    r.querySelectorAll("[data-room]").forEach((b) => b.addEventListener("click", () => {
+      const i = +b.dataset.room, cur = new Set(this._rooms || []);
+      if (cur.has(i)) cur.delete(i); else cur.add(i);
+      this._rooms = [...cur]; this.vibrate(); this._sig = null; this.render();
+    }));
+    r.querySelector("[data-go]")?.addEventListener("click", () => {
+      this.vibrate();
+      if (state === "cleaning" || state === "returning") return this.call("vacuum", "pause", { entity_id: c.entity });
+      if (state !== "paused" && sel.length) {
+        this._rooms = [];
+        const areas = sel.map((i) => rooms[i].area).filter(Boolean);
+        if (areas.length) this.call("vacuum", "clean_area", { entity_id: c.entity, cleaning_area_id: areas });
+        const acts = sel.filter((i) => !rooms[i].area && rooms[i].tap_action);
+        acts.forEach((i) => this.run(rooms[i].tap_action, c.entity));
+        if (!areas.length && !acts.length) this.call("vacuum", "start", { entity_id: c.entity });
+        return undefined;
+      }
+      return this.call("vacuum", "start", { entity_id: c.entity });
+    });
+    r.querySelector("[data-dock]")?.addEventListener("click", () => { this.vibrate(); this.call("vacuum", "return_to_base", { entity_id: c.entity }); });
+    r.querySelector("[data-more]")?.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const items = [
+        ...(can(1024) ? [{ icon: "mdi:target", label: "Spot clean", run: () => this.call("vacuum", "clean_spot", { entity_id: c.entity }) }] : []),
+        ...(can(512) ? [{ icon: "mdi:map-marker-radius-outline", label: "Find my robot (it makes a sound)", run: () => { this.call("vacuum", "locate", { entity_id: c.entity }); const bt = r.querySelector(".bot"); if (bt) { bt.classList.remove("locate"); void bt.offsetWidth; bt.classList.add("locate"); } } }] : []),
+        ...((state === "cleaning" || state === "paused" || state === "returning") && can(8) ? [{ icon: "mdi:stop", label: "Stop", run: () => this.call("vacuum", "stop", { entity_id: c.entity }) }] : []),
+        ...(q.buttons || []).filter((x) => S(x)).map((x) => ({ icon: S(x).attributes.icon || "mdi:gesture-tap-button", label: (S(x).attributes.friendly_name || x).replace(this.name(c.entity) || "", "").trim() || x, run: () => this.call("button", "press", { entity_id: x }) })),
+        ...hidden.map((x) => ({ icon: x.icon, label: `${x.title || "Suction"}: ${String(x.label).replace(/_/g, " ")}`, run: () => setTimeout(() => pickChip(x), 0) })),
+      ];
+      open("", items);
+    });
+    const careEl = r.querySelector(".care");
+    careEl?.addEventListener("click", () => { this._careOpen = !this._careOpen; this._sig = null; this.render(); });
+    r.querySelector(".card").addEventListener("click", (ev) => { if (!menu.hidden && !ev.target.closest(".menu,[data-more],[data-chip]")) { menu.hidden = true; this._menuOpen = false; this._sig = null; this.hass = this._hass; } });
+    this._menuOpen = false;
   }
 }
 
@@ -5595,6 +6052,7 @@ const CARDS = [
   ["roost-energy", RoostEnergy, "Roost Energy", "Power used now, today against yesterday, and the hungriest devices."],
   ["roost-timer", RoostTimer, "Roost Timer", "A countdown ring for a timer, with start, pause, cancel and quick times."],
   ["roost-fan", RoostFan, "Roost Fan", "A fan that spins as fast as it is set, with speed buttons, swing and modes."],
+  ["roost-vacuum", RoostVacuum, "Roost Vacuum", "A robot vacuum on its little floor: cleans in lanes, mops, spirals, goes home and charges. Rooms, suction, mop settings, care of its brushes and its map."],
   ["roost-lock", RoostLock, "Roost Lock", "A lock or garage door: slide to open, tap to lock."],
   ["roost-agenda", RoostAgenda, "Roost Agenda", "Today's and the next days' calendar events. Bin day stands out."],
   ["roost-todo", RoostTodo, "Roost To-do", "A to-do or shopping list: tick off, add and clear."],

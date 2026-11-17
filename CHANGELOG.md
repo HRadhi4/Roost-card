@@ -2,6 +2,25 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.4.0
+- **New: Roost Vacuum**, a full card for robot vacuums.
+  - The robot is drawn from above, like the common models: round with a laser tower (Roborock, Dreame, Xiaomi, Eufy X, Tapo), tower at the back (Ecovacs), hidden tower (Dreame X40/X50), round without a tower (Roomba, Eufy G, Shark ION), Shark AI, flat front (Roomba s9, Neato) and slim discs (Eufy 11S/30C). It picks the right one from the brand, or you can use your own picture.
+  - It cleans in lanes on a little floor, mops with a wet trail, spirals for spot cleaning, drives home, charges, pauses and shows errors.
+  - Rooms (Home Assistant's area cleaning), suction, water flow and mop mode, dock buttons, care of the filter and brushes, battery, area and time, and the robot's map.
+  - It finds these on the robot's device by itself.
+  - Try it with sample data.
+- **Roost Fan**:
+  - a big square dial like the thermostat;
+  - the room's temperature and humidity;
+  - the chips stay on one row.
+- **Roost Remote**, show what you want:
+  - round pad or a swipe touch pad;
+  - play and skip keys, coloured keys and number keys;
+  - your own app shortcuts;
+  - button size;
+  - your own action for any key.
+- Lists (fan modes, vacuum settings) no longer close by themselves when the device updates.
+
 ## 1.3.9
 - **Works like a built-in card in Sections views**:
   - a card that still needs a device shows a friendly "open the settings to finish" note instead of a red error;
