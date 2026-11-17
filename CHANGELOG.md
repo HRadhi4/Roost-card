@@ -2,6 +2,16 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.7.0
+- **Sensors: calmer, and you choose what shows.**
+  - By default each reading now shows its icon, name, number, how it feels and its line. The hourly change and the lowest/highest are off; turn them on if you want them.
+  - “What it shows” now sits at the top of the editor, already open.
+  - **New:** each reading can hide its own parts (“Hide on this reading”), for example no line on the power plug.
+- **Water that moves like water.** The water tank, water heater and pet water bowl now have real ripples: the surface sways, settles and splashes when you tap it, and bubbles more while heating or pumping. It pauses when off screen and stays still if your phone asks for less motion.
+- **Friendlier text everywhere.** One set of text sizes and even spacing on every card, no dark inner shadows, and plain words instead of codes (for example “Heat pump” instead of “heat_pump”, “1 h” instead of “1 h 0 min”).
+- **Air purifier:** “Cleaning · Auto”, the unit under the ring, and the buttons in their own row so nothing is cut off.
+- **Water heater:** clearer words and the mode button no longer overflows.
+
 ## 1.6.7
 - **New: Roost Popup.** One popup for everything:
   - **Uses:** the doorbell with its camera, alarms, leaks, a door left open, the washing done, or any cards.

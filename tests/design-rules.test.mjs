@@ -17,5 +17,10 @@ for (const m of src.matchAll(/getGridOptions\(\)\s*\{([^}]*\})/g)) {
 if (/min_rows/.test(src)) problems.push('rule 4: no fixed minimum rows');
 if (!src.includes('"#6D4BFF", "#8B6CFF"')) problems.push("rule 1: the active purple #6D4BFF → #8B6CFF must exist");
 if (!/Space Grotesk/.test(src) || !/Inter/.test(src)) problems.push("rule 1: fonts Space Grotesk and Inter");
+// rule 12: one type scale for every card (plus the original dashboard's own sizes: greeting 25, room tile temperature 16, and the big display numbers)
+const SCALE = new Set([11, 12, 13, 14, 15, 17, 20, 24, 32, 40, 48, 16, 25]);
+for (const m of src.matchAll(/font-size:\s*([\d.]+)px/g)) if (!SCALE.has(Number(m[1]))) problems.push(`rule 12: text size ${m[1]}px is not on the scale (11 12 13 14 15 17 20 24, display 32 40 48)`);
+// rule 12: spacing on the 4 px grid (2 px steps allowed for fine tuning, never odd values)
+for (const m of src.matchAll(/padding:\s*([^;"`}]+)/g)) for (const v of m[1].matchAll(/(\d+(?:\.\d+)?)px/g)) if (Number(v[1]) % 2) problems.push(`rule 12: odd spacing ${v[1]}px in "${m[0].slice(0, 60)}"`);
 console.log(problems.length ? problems.map((p) => `FAIL ${p}`).join("\n") : "design rules: all checks passed");
 process.exit(problems.length ? 1 : 0);

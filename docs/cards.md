@@ -939,29 +939,21 @@ aspect: 3/4
 type: custom:roost-sensors
 style: line               # line (A), ring (B: a dial with the comfortable part in green), scale (C: one bar from cold to hot), rows (E: short rows for wall panels)
 columns: 3
-entities:
-  - sensor.living_temperature
-  - { entity: sensor.cabinet_temperature, name: Cabinet, above: 32 }
----
-type: custom:roost-buttons
-items:
-  - { name: Lights, icon: mdi:lightbulb-group, entity: light.living }
-  - { name: Movie, icon: mdi:movie, tap_action: { action: perform-action, perform_action: scene.turn_on, target: { entity_id: scene.movie } } }
-active_style: filled  # same choices as the nav bar: filled, soft, pill, line, dot or icon
-background: glass     # glass, solid or none
-show_graph: true          # a smooth line of the last hours under each reading
-show_range: true          # the lowest and highest in that time, with a dot for now
-hours: 24                 # how far back the line goes
-# each reading also gets a word for how it feels (Comfortable, Warm, Dry, Stuffy...) and its trend over the last hour
-color_by: comfort          # comfort (green when comfortable), type (warm for temperature, blue for humidity) or fixed (color: below)
+# what it shows: every part can be turned on or off (in the editor: "What it shows", at the top)
 show_icon: true
 show_name: true
 show_comfort: true         # the word: Comfortable, Warm, Dry, Stuffy...
-show_trend: true           # “↑ 1.4° in 1 h”
+show_graph: true           # a smooth line of the last hours (style A)
+show_trend: false          # “↑ 1.4° in 1 h” (off unless you turn it on)
+show_range: false          # the lowest and highest, with a dot for now (style A, off unless you turn it on)
 show_scale_words: true     # words under the scale (style C)
+hours: 24                  # how far back the line goes
+color_by: comfort          # comfort (green when comfortable), type (warm for temperature, blue for humidity) or fixed (color: below)
 entities:
+  - sensor.living_temperature
   - entity: sensor.bedroom_temperature
     name: Bedroom
+    hide: [trend, graph]     # hide parts on this reading only: icon, name, comfort, trend, graph, range, scale_words
     comfort_min: 21          # your own comfortable range: below it says Cool, above it Warm
     comfort_max: 25
     min: 15                  # where the ring, scale and row bar start and end
@@ -969,6 +961,13 @@ entities:
     color: teal              # one colour just for this reading
     above: 30                # turns orange and says High above this
     decimals: 1
+---
+type: custom:roost-buttons
+items:
+  - { name: Lights, icon: mdi:lightbulb-group, entity: light.living }
+  - { name: Movie, icon: mdi:movie, tap_action: { action: perform-action, perform_action: scene.turn_on, target: { entity_id: scene.movie } } }
+active_style: filled  # same choices as the nav bar: filled, soft, pill, line, dot or icon
+background: glass     # glass, solid or none
 ```
 
 

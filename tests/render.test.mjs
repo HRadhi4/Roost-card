@@ -292,6 +292,10 @@ if (!/Lemons/.test(gr2.shadowRoot.innerHTML)) { fails++; console.error("FAIL gro
 calls.length = 0; gr2.shadowRoot.querySelector('[data-k="s7"]').dispatchEvent(new window.Event("click"));
 await new Promise((r) => setTimeout(r, 5));
 if (!calls.some((x) => x[0] === "grocy" && x[1] === "remove_product_in_shopping_list" && x[2].product_id === 3)) { fails++; console.error("FAIL grocy service", JSON.stringify(calls)); }
+// Sensors: one reading can hide its own parts; trend and range are off unless asked.
+const sh = document.createElement("roost-sensors"); sh.setConfig({ entities: [{ entity: "sensor.cabinet", hide: ["comfort", "name"] }, { entity: "sensor.hum", name: "Humidity" }] }); document.body.appendChild(sh); sh.hass = hass(false);
+const shs = [...sh.shadowRoot.querySelectorAll(".sq")];
+if (shs[0].querySelector(".n.t") || shs[0].querySelector(".chip") || !shs[1].querySelector(".n.t") || sh.shadowRoot.querySelector(".rg")) { fails++; console.error("FAIL sensors hide"); }
 // Room: any cards under it, in one box, kept between redraws, and folded away when asked.
 const rk = document.createElement("roost-room");
 rk.setConfig({ name: "Living", temperature: "sensor.cabinet", cards: [{ type: "custom:roost-tile", entity: "light.kitchen" }, { type: "custom:roost-scene", entity: "scene.movie" }], cards_columns: 2 });
@@ -354,5 +358,5 @@ for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }],
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 31} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 32} checks passed`);
 process.exit(fails ? 1 : 0);
