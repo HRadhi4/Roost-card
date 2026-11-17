@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.3.3 — 2026-11-17
+- **To-do card fixed**: after switching pages the list stopped updating, so ticked or added items did not show. It now keeps listening, and ticks, new items and "Clear" show straight away.
+- **To-do card**: what you are typing is no longer lost when the list updates.
+- **Softer shadow in light mode** under the frosted bottom bar and Roost Buttons.
+
 ## 1.3.2 — 2026-11-17
 - **Frosted glass on every card**: each card now has a "See-through" setting (solid, frosted glass or fully clear) with sliders for how see-through it is and how strong the blur is. The nav bar gets the same sliders for its glass.
 - **Roost Buttons are coloured like the nav bar**: the same six looks when a button is on (filled, soft, pill, line, dot or icon only) and the same bar backgrounds (frosted glass, solid or none).

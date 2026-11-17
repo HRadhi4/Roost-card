@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.3.2";
+const ROOST_VERSION = "1.3.3";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1401,8 +1401,8 @@ class RoostNav extends RoostBase {
       :host{${fixed ? (rail ? "height:0;" : "height:calc(76px + env(safe-area-inset-bottom));") : ""}display:block}
       .edit{font-size:12px;color:${p.muted};text-align:center;margin:0 0 6px}
       nav{${pos};display:${rail ? "flex" : "grid"};${rail ? "flex-direction:column" : `grid-template-columns:repeat(${shown.length},minmax(0,1fr))`};gap:${rail ? 12 : 7}px;padding:${rail ? "14px 10px" : "8px"};border-radius:${Number(c.radius) + (rail ? 2 : 0)}px;
-        ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};box-shadow:0 18px 40px -16px rgba(0,0,0,.5);`
-    : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);-webkit-backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);box-shadow:0 18px 40px -12px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;`}
+        ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};box-shadow:0 18px 40px -16px ${this.dark ? "rgba(0,0,0,.5)" : "rgba(40,30,90,.16)"};`
+    : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);-webkit-backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);box-shadow:0 18px 40px -12px ${this.dark ? "rgba(0,0,0,.6)" : "rgba(40,30,90,.18)"}, 0 0 0 1px rgba(255,255,255,.04) inset;`}
         ${rail ? "width:max-content" : `width:${fixed ? "calc(100% - 24px)" : "100%"};max-width:536px`};${fixed ? "" : "margin:0 auto"}}
       a{position:relative;min-width:${rail ? 56 : 0}px;min-height:${Number(c.bar_height) || 54}px;border-radius:${c.active_style === "pill" ? 999 : Math.max(8, Number(c.radius) - 8)}px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
         color:${p.muted};text-decoration:none;font-size:clamp(8.5px, 2.7vw, 10.5px);font-weight:600;-webkit-tap-highlight-color:transparent;padding:4px 6px;transition:background .12s}
@@ -4465,7 +4465,12 @@ class RoostTodo extends RoostBase {
     this._unsub.catch?.(() => { this._items = []; this._sig = null; this.hass = this._hass; });
   }
 
-  disconnectedCallback() { this._unsub?.then?.((u) => u()).catch(() => {}); this._subFor = null; }
+  // A card that is moved on the page (switching views, a page or panel redrawing) is disconnected and connected again:
+  // listen again then, or the list would stop updating.
+  connectedCallback() { super.connectedCallback?.(); if (this._hass && this._config) { this.subscribe(); } }
+  disconnectedCallback() { super.disconnectedCallback?.(); this._unsub?.then?.((u) => u()).catch(() => {}); this._unsub = null; this._subFor = null; }
+  // Show a change straight away; the list from Home Assistant replaces it a moment later.
+  optimistic(fn) { this._items = fn(this._items || []); this._sig = null; this.hass = this._hass; }
 
   render() {
     if (!this._hass || !this._config) return;
@@ -4499,17 +4504,31 @@ class RoostTodo extends RoostBase {
       ${done.length ? `<button class="clr">Clear ${done.length} ticked</button>` : ""}
     </div>`;
     const r = this.shadowRoot;
+    if (this._draft) { const inp = r.querySelector(".add input"); inp.value = this._draft; if (this._typing) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); } }
+    r.querySelector(".add input").addEventListener("input", (e) => { this._draft = e.target.value; });
+    r.querySelector(".add input").addEventListener("focus", () => { this._typing = true; });
+    r.querySelector(".add input").addEventListener("blur", () => { this._typing = false; });
     r.querySelectorAll("[data-uid]").forEach((el) => el.addEventListener("click", () => {
       this.vibrate();
       const it = items.find((i) => i.uid === el.dataset.uid);
-      this.call("todo", "update_item", { entity_id: c.entity, item: it.uid, status: it.status === "completed" ? "needs_action" : "completed" });
+      if (!it || String(it.uid).startsWith("new-")) return;
+      const status = it.status === "completed" ? "needs_action" : "completed";
+      this.optimistic((list) => list.map((i) => (i.uid === it.uid ? { ...i, status } : i)));
+      this.call("todo", "update_item", { entity_id: c.entity, item: it.uid, status });
     }));
     r.querySelector(".add").addEventListener("submit", (e) => {
       e.preventDefault();
       const inp = r.querySelector(".add input"), v = inp.value.trim();
-      if (v) { this.vibrate(); this.call("todo", "add_item", { entity_id: c.entity, item: v }); inp.value = ""; }
+      if (v) {
+        this.vibrate(); this._draft = ""; inp.value = "";
+        this.optimistic((list) => [...list, { uid: `new-${Date.now()}`, summary: v, status: "needs_action" }]);
+        this.call("todo", "add_item", { entity_id: c.entity, item: v });
+      }
     });
-    r.querySelector(".clr")?.addEventListener("click", () => this.call("todo", "remove_completed_items", { entity_id: c.entity }));
+    r.querySelector(".clr")?.addEventListener("click", () => {
+      this.optimistic((list) => list.filter((i) => i.status !== "completed"));
+      this.call("todo", "remove_completed_items", { entity_id: c.entity });
+    });
   }
 }
 
@@ -4689,7 +4708,7 @@ class RoostButtons extends RoostBase {
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .bar{border-radius:${c.radius}px;color:${p.text};padding:6px;display:grid;grid-template-columns:repeat(${c.items.length},minmax(0,1fr));gap:4px;
         ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};`
-    : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);-webkit-backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);box-shadow:0 18px 40px -16px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.04) inset;`}}
+    : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);-webkit-backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);box-shadow:0 18px 40px -16px ${this.dark ? "rgba(0,0,0,.45)" : "rgba(40,30,90,.16)"}, 0 0 0 1px rgba(255,255,255,.04) inset;`}}
       @container (max-width: ${c.items.length * 66}px){:host .b span{display:none}:host .b{min-height:48px}}
       .b{min-height:${c.show_names ? 62 : 48}px;border-radius:${Math.max(8, c.radius - 6)}px;border:0;background:transparent;color:${p.muted};font:inherit;font-size:11px;font-weight:600;cursor:pointer;
         display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 2px;-webkit-tap-highlight-color:transparent;transition:transform .12s}
