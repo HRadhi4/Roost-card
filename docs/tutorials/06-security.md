@@ -10,6 +10,7 @@
 2. Choose the buttons you want: **Away**, **Home**, **Night**, **Holiday**.
 3. Add your **doors and windows**. The card warns you before arming if one is open.
 4. Keep **Ask before arming or disarming** on, so a pocket tap can't arm the house. If your alarm needs a code, a keypad appears.
+5. Prefer something smaller? Set **Style** to *A row of pills*: the Alarm title with **Disarm · Arm home · Arm away** underneath, exactly like the phone dashboard's Security box. It fits nicely inside a **Roost Panel**.
 
 ## Lock
 

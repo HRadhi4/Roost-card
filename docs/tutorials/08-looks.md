@@ -6,6 +6,20 @@ Every card follows Home Assistant's light or dark mode by itself. Add a **Roost 
 
 ![The Light/Dark button](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/theme.gif)
 
+## Frosted glass
+
+Every card can be **solid**, **frosted glass** or **fully clear**. Open **See-through (frosted glass)** in a card's editor and move the two sliders: how much shows through, and how strong the blur is. It looks best over a picture or a colourful background.
+
+![Frosted glass on a tile](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile.gif)
+
+The bottom bar (**Roost Nav**) is frosted glass already; the same sliders tune it.
+
+## Buttons that light up
+
+**Roost Nav** and **Roost Buttons** share the same choices for a button that is on: **filled** (with a glow), **soft**, **pill**, **a line under it**, **a dot under it**, or **only the icon** coloured. Their bar can be **frosted glass**, **solid** or **none**.
+
+![The six looks of a button that is on](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/buttons.gif)
+
 ## Colours
 
 Every colour setting offers ready-made colours (purple, blue, coral, green, amber, teal, pink, slate), **Selected purple**, or **My own colours** (pick a start and an end colour).

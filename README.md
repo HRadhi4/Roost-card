@@ -15,6 +15,8 @@
 <a href="https://my.home-assistant.io/redirect/hacs_repository/?owner=HRadhi4&repository=Roost-card&category=plugin"><img src="https://my.home-assistant.io/badges/hacs_repository.svg" alt="Open Roost Cards in HACS"></a>
 </p>
 
+<p align="center"><img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/tour.webp" width="300" alt="A tour of every Roost card on a phone"></p>
+
 ![Roost home screen in dark and light mode](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/home.png)
 
 ## Highlights
@@ -23,6 +25,7 @@
 - **Made for fingers.** Drag the thermostat dial and the light's brightness, slide to unlock, swipe between rooms.
 - **No code.** Every card has a visual editor: device, colours, looks, size, icon, shape, what a tap does.
 - **Never cut off.** Text never ends in "…"; long names wrap. Checked automatically before every release.
+- **Frosted glass.** Any card can be solid, frosted glass or fully clear, with sliders for how see-through and how blurred.
 - **Light and dark.** Follows your phone, or stays the way you choose. Stops moving when *Reduce motion* is on.
 - **Phone and tablet.** The bottom bar becomes a side rail on tablets, and every card rearranges itself when it sits in a narrow column.
 - **Full screen built in.** No top bar or sidebar, like an app, without a separate add-on.
@@ -54,15 +57,19 @@ Short, written, with pictures:
 6. [Security: alarm, lock, alerts and people](docs/tutorials/06-security.md)
 7. [Use it with Athom Hub (remote and presence map)](docs/tutorials/07-with-athom-hub.md)
 8. [Full screen, like an app](docs/tutorials/09-full-screen.md)
-9. [Looks, light and dark, tablets](docs/tutorials/08-looks.md)
+9. [Looks: frosted glass, light and dark, tablets](docs/tutorials/08-looks.md)
+10. [Clock and prayer times](docs/tutorials/10-clock-and-prayer.md)
+11. [Try cards before you own the device](docs/tutorials/11-try-without-devices.md)
 
 ## All 37 cards
+
+Each GIF shows the card in use, then in the other colour mode, then as frosted glass.
 
 | Card | What it is | See it |
 |---|---|:-:|
 | **Roost Tile** | A big tile with a switch. Shows the state, the power used and how long it has been on. Glows or spins when on. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile.gif" width="180" alt="Roost Tile"> |
 | **Roost Chips** | Status chips in one row: doors, alarm, air conditioner, TV. Lights become one bulb with a count, people become little bubbles (colour = home, grey = away). Tap the bulb or the bubbles for the list. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/chips.gif" width="180" alt="Roost Chips"> |
-| **Roost Thermostat** | An air conditioner card with a **dial you drag with your finger**, a power button, − and +, and mode buttons. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/thermostat.gif" width="180" alt="Roost Thermostat"> |
+| **Roost Thermostat** | An air conditioner card with a **dial you drag with your finger**, a power button, − and +, and mode buttons. The Nest look glows and shows a breeze while it runs. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/thermostat.gif" width="180" alt="Roost Thermostat"> |
 | **Roost Scene** | A coloured card or round button that runs a scene or script. A tick shows when it is done. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/scene.gif" width="180" alt="Roost Scene"> |
 | **Roost Hero** | A greeting with a sky that follows the sun (stars at night), the time, date, weather and a "what's next" countdown. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/hero.gif" width="180" alt="Roost Hero"> |
 | **Roost Row** | A long row with a ring (an AC's temperature or any number), a name, a state line and an arrow. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/row.gif" width="180" alt="Roost Row"> |
@@ -92,10 +99,10 @@ Short, written, with pictures:
 | **Roost To-do** | A to-do or shopping list: tick off, add and clear. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/todo.gif" width="180" alt="Roost To-do"> |
 | **Roost Camera** | A camera picture or live video, with a banner when someone rings the doorbell. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/camera.gif" width="180" alt="Roost Camera"> |
 | **Roost Sensors** | Many small readings in neat squares, orange when out of the range you set. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/sensors.gif" width="180" alt="Roost Sensors"> |
-| **Roost Buttons** | Several small actions in one rounded bar; a button lights up when its device is on. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/buttons.gif" width="180" alt="Roost Buttons"> |
+| **Roost Buttons** | Several small actions in one rounded bar; a button lights up when its device is on, in the same six looks as the bottom bar. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/buttons.gif" width="180" alt="Roost Buttons"> |
 | **Roost Full Screen** | Hides Home Assistant's top bar and sidebar so your dashboard feels like an app: by itself (invisible), as a button that maximizes and minimizes, or as the tap action of any card. Comes back while editing. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fullscreen.gif" width="180" alt="Roost Full Screen"> |
-| **Roost Page** | A whole phone page laid out like the original: even spacing, the night-sky background and room for the bottom bar. | |
-| **Roost Panel** | A rounded box with a title that holds other cards, such as a list of rooms. | |
+| **Roost Page** | A whole phone page laid out like the original: even spacing, the night-sky background and room for the bottom bar. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/page.gif" width="180" alt="Roost Page"> |
+| **Roost Panel** | A rounded box with a title that holds other cards, such as a list of rooms. It can fold open and closed. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/panel.gif" width="180" alt="Roost Panel"> |
 | **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="180" alt="Roost Rooms"> |
 
 

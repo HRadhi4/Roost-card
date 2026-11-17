@@ -23,6 +23,14 @@
 
 > **The bottom bar (Roost Nav)** floats at the bottom of the screen. While you edit, it sits in its own place with a small note, so you can tap it to change it.
 
+## Make it look like an app: Roost Page
+
+Want even spacing, the night-sky background and room for the bottom bar, exactly like the phone dashboard? Put a **Roost Page** in a **Panel** view and add your cards inside it. To group cards in a rounded box with a title (like the "Rooms" or "Security" box), use **Roost Panel**. Panels can fold open and closed.
+
+| Roost Page | Roost Panel |
+|:-:|:-:|
+| ![Roost Page](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/page.gif) | ![Roost Panel](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/panel.gif) |
+
 ## Prefer to paste?
 
 Edit the dashboard → three dots → **Raw configuration editor**, and paste this, then change the names to yours:

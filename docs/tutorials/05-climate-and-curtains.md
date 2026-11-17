@@ -8,6 +8,9 @@
 
 1. *Add card → Roost Thermostat* and pick your air conditioner.
 2. Optional: **Room temperature sensor** shows the room's real temperature under the setting.
+3. **Look:** *Nest dial* (the default) is the phone dashboard's own dial: a cyan-to-purple ring that glows and little breeze bars that breathe while the AC runs. *Classic* lets you pick your own dial colour.
+
+![The thermostat in dark, light and frosted glass](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/thermostat.gif)
 
 ## Curtains that really move
 
