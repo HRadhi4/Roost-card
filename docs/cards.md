@@ -320,15 +320,48 @@ show_run: true
 ### Roost Clock
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/clock.gif" width="320" alt="Roost clock card in action">
 
+A clock and nothing else, with eight faces: **digital, analog, minimal, flip, ring, words, neon and LCD**.
+
 ```yaml
 type: custom:roost-clock
-countdown_title: Next prayer
-times:
-  - { name: Fajr, short: F, entity: sensor.fajr }
-  - { name: Dhuhr, short: D, entity: sensor.dhuhr }
-  - { name: Maghrib, short: M, entity: sensor.maghrib }
+face: analog              # digital, analog, minimal, flip, ring, word, neon, lcd
+seconds: true
 hour24: false
+date_format: long         # long, short, numeric, none
+show_hijri: true
+timezone: Asia/Riyadh     # optional: another place
+label: Makkah             # optional
+numerals: western         # western, eastern (١٢٣), roman, none (analog faces)
+ticks: hours              # hours, all, none
+hands: classic            # classic, slim, bold
+smooth: true              # sweeping second hand
+size: large               # small, medium, large, huge
+world:                    # optional: world clocks underneath
+  - { label: London, timezone: Europe/London }
 ```
+
+### Roost Prayer Times
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/prayer.gif" width="320" alt="Roost prayer times card in action">
+
+Today's prayer times, the next one with a countdown ring, a line of the day and the Hijri date.
+The times can be **calculated on the spot** (no internet needed), fetched **online** (aladhan.com), or read from **your own sensors**.
+
+```yaml
+type: custom:roost-prayer
+source: calculate         # calculate, online, sensors
+method: makkah            # makkah, mwl, isna, egypt, karachi, gulf, kuwait, qatar, dubai, jafari, tehran, singapore, turkey, france, russia
+asr: standard             # standard or hanafi
+adjust: { fajr: 2, isha: -1 }   # move a time by minutes
+prayers: [fajr, sunrise, dhuhr, asr, maghrib, isha]   # also imsak, midnight, last_third
+layout: list              # list, tiles, compact
+names: english            # english, arabic, both
+numerals: western         # western or eastern (١٢٣)
+show_hijri: true
+hijri_offset: 0           # correct the Hijri day by ±1 or 2
+jumuah: true              # "Jumu'ah" instead of Dhuhr on Fridays
+# source: sensors →  fajr_entity: sensor.fajr_prayer  (and dhuhr_entity, asr_entity )
+```
+Your home's location is used unless you set `latitude` and `longitude`.
 
 ### Roost Alerts
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alerts.gif" width="320" alt="Roost alerts card in action">

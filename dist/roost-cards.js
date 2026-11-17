@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.2.9";
+const ROOST_VERSION = "1.3.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -522,6 +522,43 @@ class RoostEditor extends HTMLElement {
     this._form.data = this._data;
     this._form.schema = fitSchema(schema, this._data);
     this._form.computeLabel = label;
+    if (cls.hasCards) this.drawCards();
+  }
+
+  // Cards inside a Roost Page or Panel are edited here too, one tab per card, with Home Assistant's own card editor.
+  async drawCards() {
+    if (!this._stack && !this._stackLoading) {
+      this._stackLoading = true;
+      try {
+        if (!customElements.get("hui-vertical-stack-card") && window.loadCardHelpers) (await window.loadCardHelpers()).createCardElement({ type: "vertical-stack", cards: [] });
+        await customElements.whenDefined("hui-vertical-stack-card");
+        const el = await customElements.get("hui-vertical-stack-card").getConfigElement();
+        const head = document.createElement("div");
+        head.textContent = "Cards on it";
+        head.style.cssText = "font-weight:600;margin:20px 0 6px;font-size:15px";
+        el.addEventListener("config-changed", (ev) => {
+          ev.stopPropagation();
+          const cards = ev.detail?.config?.cards;
+          if (!Array.isArray(cards)) return;
+          this._config = { ...this._config, cards };
+          this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
+        });
+        this.append(head, el);
+        this._stack = el;
+      } catch (e) {
+        const note = document.createElement("p");
+        note.textContent = "The cards on it can be changed in the code editor (Show code editor).";
+        note.style.cssText = "opacity:.75;font-size:13px";
+        this.appendChild(note);
+        this._stack = note;
+      }
+      this._stackLoading = false;
+    }
+    if (this._stack?.setConfig) {
+      this._stack.hass = this._hass;
+      const cards = this._config.cards || [];
+      if (this._stackCards !== cards) { this._stackCards = cards; try { this._stack.setConfig({ type: "vertical-stack", cards }); } catch (e) { /* shown as code */ } }
+    }
   }
 }
 if (!customElements.get("roost-editor")) customElements.define("roost-editor", RoostEditor);
@@ -2137,7 +2174,7 @@ class RoostAutomations extends ticking(RoostBase, 60000) {
 
 // ------------------------------------------------------------------ Roost Clock
 // A big clock and date, with a line of the day's times (prayers or anything else) and a countdown to the next one.
-class RoostClock extends ticking(RoostBase, 15000) {
+class RoostClockClassic extends ticking(RoostBase, 15000) {
   static get defaults() { return { times: [], seconds: false, hour24: false, show_date: true, show_timeline: true, countdown_title: "Next", color: "active", radius: 22, frame: true, theme: "auto" }; }
 
   watched() { return (this._config.times || []).map((t) => t.entity).filter(Boolean); }
@@ -2241,6 +2278,498 @@ class RoostClock extends ticking(RoostBase, 15000) {
         <span class="now" style="left:${(mins(now) / 1440 * 100).toFixed(2)}%"></span></div>` : ""}
     </div>`;
   }
+}
+
+// ------------------------------------------------------------------ prayer time calculation
+// Standard astronomical method (sun position, equation of time), with the common calculation
+// authorities. All local: nothing leaves the house unless "online" is chosen.
+const PRAYER_METHODS = {
+  makkah: { name: "Umm al-Qura, Makkah", fajr: 18.5, isha: "90 min" },
+  mwl: { name: "Muslim World League", fajr: 18, isha: 17 },
+  isna: { name: "North America (ISNA)", fajr: 15, isha: 15 },
+  egypt: { name: "Egyptian General Authority", fajr: 19.5, isha: 17.5 },
+  karachi: { name: "University of Islamic Sciences, Karachi", fajr: 18, isha: 18 },
+  gulf: { name: "Gulf region", fajr: 19.5, isha: "90 min" },
+  kuwait: { name: "Kuwait", fajr: 18, isha: 17.5 },
+  qatar: { name: "Qatar", fajr: 18, isha: "90 min" },
+  dubai: { name: "Dubai", fajr: 18.2, isha: 18.2 },
+  jafari: { name: "Shia Ithna-Ashari (Qum)", fajr: 16, isha: 14, maghrib: 4, midnight: "jafari" },
+  tehran: { name: "University of Tehran", fajr: 17.7, isha: 14, maghrib: 4.5, midnight: "jafari" },
+  singapore: { name: "Singapore", fajr: 20, isha: 18 },
+  turkey: { name: "Turkey (Diyanet)", fajr: 18, isha: 17 },
+  france: { name: "France (UOIF)", fajr: 12, isha: 12 },
+  russia: { name: "Russia", fajr: 16, isha: 15 },
+};
+// Aladhan's numbers for the same authorities (for the online source)
+const ALADHAN_METHOD = { jafari: 0, karachi: 1, isna: 2, mwl: 3, makkah: 4, egypt: 5, tehran: 7, gulf: 8, kuwait: 9, qatar: 10, singapore: 11, france: 12, turkey: 13, russia: 14, dubai: 16 };
+
+const PrayerCalc = {
+  rad: (d) => (d * Math.PI) / 180,
+  deg: (r) => (r * 180) / Math.PI,
+  fix: (a, b) => { a -= b * Math.floor(a / b); return a < 0 ? a + b : a; },
+  sun(jd) {
+    const D = jd - 2451545.0, r = this.rad, d = this.deg;
+    const g = this.fix(357.529 + 0.98560028 * D, 360), q = this.fix(280.459 + 0.98564736 * D, 360);
+    const L = this.fix(q + 1.915 * Math.sin(r(g)) + 0.02 * Math.sin(r(2 * g)), 360);
+    const e = 23.439 - 0.00000036 * D;
+    const RA = this.fix(d(Math.atan2(Math.cos(r(e)) * Math.sin(r(L)), Math.cos(r(L)))) / 15, 24);
+    return { decl: d(Math.asin(Math.sin(r(e)) * Math.sin(r(L)))), eqt: q / 15 - RA };
+  },
+  julian(y, m, d) {
+    if (m <= 2) { y -= 1; m += 12; }
+    const A = Math.floor(y / 100), B = 2 - A + Math.floor(A / 4);
+    return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5;
+  },
+  // hours (local solar) for one day; date: a Date; lat/lng in degrees; tz: hours from UTC
+  times(date, lat, lng, tz, method, asrFactor = 1, elev = 0) {
+    const M = PRAYER_METHODS[method] || PRAYER_METHODS.mwl, r = this.rad, d = this.deg;
+    const jd0 = this.julian(date.getFullYear(), date.getMonth() + 1, date.getDate()) - lng / (15 * 24);
+    const midDay = (t) => this.fix(12 - this.sun(jd0 + t).eqt, 24);
+    const angleTime = (angle, t, ccw) => {
+      const decl = this.sun(jd0 + t).decl, noon = midDay(t);
+      const x = (-Math.sin(r(angle)) - Math.sin(r(decl)) * Math.sin(r(lat))) / (Math.cos(r(decl)) * Math.cos(r(lat)));
+      const T = d(Math.acos(Math.max(-1, Math.min(1, x)))) / 15;
+      return noon + (ccw ? -T : T);
+    };
+    const asrTime = (f, t) => { const decl = this.sun(jd0 + t).decl; return angleTime(-d(Math.atan(1 / (f + Math.tan(r(Math.abs(lat - decl)))))), t); };
+    const riseAngle = 0.833 + 0.0347 * Math.sqrt(Math.max(0, elev));
+    let t = { fajr: 5, sunrise: 6, dhuhr: 12, asr: 13, sunset: 18, maghrib: 18, isha: 18 };
+    for (let i = 0; i < 2; i++) {
+      const p = Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v / 24]));
+      t = {
+        fajr: angleTime(M.fajr, p.fajr, true), sunrise: angleTime(riseAngle, p.sunrise, true), dhuhr: midDay(p.dhuhr),
+        asr: asrTime(asrFactor, p.asr), sunset: angleTime(riseAngle, p.sunset), maghrib: M.maghrib ? angleTime(M.maghrib, p.maghrib) : angleTime(riseAngle, p.maghrib),
+        isha: typeof M.isha === "number" ? angleTime(M.isha, p.isha) : 0,
+      };
+    }
+    const shift = tz - lng / 15;
+    Object.keys(t).forEach((k) => { t[k] += shift; });
+    if (typeof M.isha === "string") t.isha = t.maghrib + parseFloat(M.isha) / 60;
+    // high latitudes: keep fajr and isha within the night (angle-based rule)
+    const night = 24 - (t.sunset - t.sunrise);
+    const cap = (time, base, angle, ccw) => { const portion = (angle / 60) * night; const diff = ccw ? base - time : time - base; return isNaN(time) || diff > portion ? base + (ccw ? -portion : portion) : time; };
+    t.fajr = cap(t.fajr, t.sunrise, M.fajr, true);
+    if (typeof M.isha === "number") t.isha = cap(t.isha, t.maghrib, M.isha, false);
+    t.imsak = t.fajr - 10 / 60;
+    const nextFajr = t.fajr + 24;
+    t.midnight = M.midnight === "jafari" ? t.sunset + (nextFajr - t.sunset) / 2 : t.sunset + (t.sunrise + 24 - t.sunset) / 2;
+    t.last_third = t.sunset + ((nextFajr - t.sunset) * 2) / 3;
+    return t;
+  },
+};
+
+const PRAYER_NAMES = {
+  imsak: ["Imsak", "الإمساك", "mdi:weather-night-partly-cloudy"], fajr: ["Fajr", "الفجر", "mdi:moon-waning-crescent"], sunrise: ["Sunrise", "الشروق", "mdi:weather-sunset-up"],
+  dhuhr: ["Dhuhr", "الظهر", "mdi:white-balance-sunny"], asr: ["Asr", "العصر", "mdi:weather-partly-cloudy"], maghrib: ["Maghrib", "المغرب", "mdi:weather-sunset-down"],
+  isha: ["Isha", "العشاء", "mdi:weather-night"], midnight: ["Midnight", "منتصف الليل", "mdi:moon-full"], last_third: ["Last third", "الثلث الأخير", "mdi:star-crescent"],
+};
+const easternDigits = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]);
+
+// ------------------------------------------------------------------ Roost Prayer Times
+// Today's prayer times, the next one with a countdown, and the Hijri date. Calculated on the spot
+// (any common method, your own adjustments), read from your sensors, or fetched online.
+class RoostPrayer extends ticking(RoostBase, 15000) {
+  static get defaults() {
+    return { source: "calculate", method: "makkah", asr: "standard", prayers: ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"], adjust: {}, names: "english", numerals: "western",
+      hour24: false, layout: "list", show_header: true, show_hijri: true, show_timeline: true, hijri_offset: 0, jumuah: true, title: "", color: "active", radius: 22, frame: true, theme: "auto" };
+  }
+
+  static getConfigForm() {
+    const prayerList = [["imsak", "Imsak"], ["fajr", "Fajr"], ["sunrise", "Sunrise"], ["dhuhr", "Dhuhr"], ["asr", "Asr"], ["maghrib", "Maghrib"], ["isha", "Isha"], ["midnight", "Midnight"], ["last_third", "Last third of the night"]];
+    return {
+      schema: [
+        { name: "title", label: "Title (optional)", selector: { text: {} } },
+        { name: "source", label: "Where the times come from", selector: pick([["calculate", "Calculated here (no internet needed)"], ["online", "Online (aladhan.com)"], ["sensors", "My sensors"]]) },
+        { type: "expandable", name: "", title: "Calculation", icon: "mdi:calculator-variant-outline", schema: [
+          { name: "method", label: "Method", selector: pick(Object.entries(PRAYER_METHODS).map(([k, v]) => [k, v.name])) },
+          { name: "asr", label: "Asr", selector: pick([["standard", "Standard (Shafi'i, Maliki, Hanbali)"], ["hanafi", "Hanafi"]]) },
+          { type: "grid", name: "", schema: [{ name: "latitude", label: "Latitude (empty = your home)", selector: { number: { mode: "box", step: "any" } } }, { name: "longitude", label: "Longitude", selector: { number: { mode: "box", step: "any" } } }] },
+          { name: "adjust", label: "Move a time by minutes", selector: { object: {} } },
+        ] },
+        { type: "expandable", name: "", title: "My sensors", icon: "mdi:clock-check-outline", schema: [
+          { type: "grid", name: "", schema: ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"].map((k) => ({ name: `${k}_entity`, label: PRAYER_NAMES[k][0], selector: { entity: { domain: "sensor" } } })) },
+        ] },
+        { name: "prayers", label: "Times to show", selector: { select: { multiple: true, mode: "list", options: prayerList.map(([value, label]) => ({ value, label })) } } },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+          { name: "layout", selector: pick([["list", "List"], ["tiles", "Tiles in a row"], ["compact", "One line"]]) },
+          { type: "grid", name: "", schema: [{ name: "names", label: "Names", selector: pick([["english", "English"], ["arabic", "Arabic"], ["both", "Both"]]) }, { name: "numerals", selector: pick([["western", "1 2 3"], ["eastern", "١ ٢ ٣"]]) }] },
+          { type: "grid", name: "", schema: [{ name: "hour24", label: "24-hour", selector: { boolean: {} } }, { name: "show_header", label: "Next prayer at the top", selector: { boolean: {} } }] },
+          { type: "grid", name: "", schema: [{ name: "show_hijri", label: "Hijri date", selector: { boolean: {} } }, { name: "hijri_offset", label: "Hijri day correction", selector: slider(-2, 2, 1, "days") }] },
+          { type: "grid", name: "", schema: [{ name: "show_timeline", label: "Day line", selector: { boolean: {} } }, { name: "jumuah", label: "Call Dhuhr \"Jumu'ah\" on Fridays", selector: { boolean: {} } }] },
+          ...colourFields("color", "Colour of the next prayer"),
+          { type: "grid", name: "", schema: [{ name: "radius", selector: slider(0, 40, 2) }, { name: "frame", label: "Card background", selector: { boolean: {} } }] },
+          THEME_FIELD,
+        ] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return { source: "calculate", method: "makkah" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  watched() { const c = this._config; return ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"].map((k) => c[`${k}_entity`]).filter(Boolean); }
+
+  extraSignature() { const d = new Date(); return `${d.toDateString()} ${d.getHours()}:${d.getMinutes()}|${this._online ? 1 : 0}`; }
+
+  place() {
+    const c = this._config, h = this._hass;
+    return { lat: Number(c.latitude ?? h?.config?.latitude ?? 26.2), lng: Number(c.longitude ?? h?.config?.longitude ?? 50.6), elev: Number(h?.config?.elevation ?? 0) };
+  }
+
+  // Date objects for one day, by key
+  day(date) {
+    const c = this._config, out = {};
+    if (c.source === "sensors") {
+      for (const k of ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"]) {
+        const s = this.st(c[`${k}_entity`]); if (!s || UNAVAILABLE.includes(s.state)) continue;
+        let d = new Date(s.state);
+        if (isNaN(d)) { const m = String(s.state).match(/^(\d{1,2}):(\d{2})/); if (!m) continue; d = new Date(date); d.setHours(+m[1], +m[2], 0, 0); }
+        else { const x = new Date(date); x.setHours(d.getHours(), d.getMinutes(), 0, 0); d = x; }
+        out[k] = d;
+      }
+    } else if (c.source === "online" && this._online && this._online.day === date.toDateString()) {
+      Object.assign(out, this._online.times);
+    }
+    if (!Object.keys(out).length || c.source === "calculate" || (c.source === "online" && !this._online)) {
+      const { lat, lng, elev } = this.place();
+      const tz = -new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12).getTimezoneOffset() / 60;
+      const h = PrayerCalc.times(date, lat, lng, tz, c.method, c.asr === "hanafi" ? 2 : 1, elev);
+      if (c.method === "makkah" && this.hijri(date).month === 9) h.isha += 0.5; // Umm al-Qura: 2 hours after Maghrib in Ramadan
+      for (const [k, v] of Object.entries(h)) {
+        if (!isFinite(v)) continue;
+        const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0); d.setMinutes(Math.round(v * 60));
+        if (!out[k]) out[k] = d;
+      }
+    }
+    for (const [k, m] of Object.entries(c.adjust || {})) if (out[k] && Number(m)) out[k] = new Date(out[k].getTime() + Number(m) * 60000);
+    return out;
+  }
+
+  async loadOnline() {
+    const c = this._config, today = new Date();
+    if (c.source !== "online" || this._loadingOnline || (this._online && this._online.day === today.toDateString())) return;
+    const key = `roost-prayer:${today.toDateString()}:${c.method}:${c.asr}`;
+    try {
+      const saved = JSON.parse(localStorage.getItem(key) || "null");
+      if (saved) { this._online = { day: saved.day, times: Object.fromEntries(Object.entries(saved.times).map(([k, v]) => [k, new Date(v)])) }; return; }
+    } catch (e) { /* no storage */ }
+    this._loadingOnline = true;
+    try {
+      const { lat, lng } = this.place();
+      const ds = `${String(today.getDate()).padStart(2, "0")}-${String(today.getMonth() + 1).padStart(2, "0")}-${today.getFullYear()}`;
+      const r = await fetch(`https://api.aladhan.com/v1/timings/${ds}?latitude=${lat}&longitude=${lng}&method=${ALADHAN_METHOD[c.method] ?? 3}&school=${c.asr === "hanafi" ? 1 : 0}`);
+      const j = await r.json(), tm = j?.data?.timings || {}, times = {};
+      const map = { Imsak: "imsak", Fajr: "fajr", Sunrise: "sunrise", Dhuhr: "dhuhr", Asr: "asr", Maghrib: "maghrib", Isha: "isha", Midnight: "midnight", Lastthird: "last_third" };
+      for (const [a, k] of Object.entries(map)) { const m = String(tm[a] || "").match(/(\d{1,2}):(\d{2})/); if (m) { const d = new Date(today); d.setHours(+m[1], +m[2], 0, 0); if (k === "midnight" || k === "last_third") { if (+m[1] < 12) d.setDate(d.getDate() + 1); } times[k] = d; } }
+      if (Object.keys(times).length) {
+        this._online = { day: today.toDateString(), times };
+        try { localStorage.setItem(key, JSON.stringify({ day: this._online.day, times })); } catch (e) { /* no storage */ }
+      }
+    } catch (e) { this._onlineFailed = true; }
+    this._loadingOnline = false; this._sig = null; if (this._hass) this.hass = this._hass;
+  }
+
+  hijri(date) {
+    const d = new Date(date.getTime() + Number(this._config.hijri_offset || 0) * 86400e3);
+    try {
+      const parts = new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", { day: "numeric", month: "numeric", year: "numeric" }).formatToParts(d);
+      const get = (t) => +parts.find((p) => p.type === t)?.value;
+      const months = ["Muharram", "Safar", "Rabi' al-Awwal", "Rabi' al-Thani", "Jumada al-Ula", "Jumada al-Akhirah", "Rajab", "Sha'ban", "Ramadan", "Shawwal", "Dhu al-Qi'dah", "Dhu al-Hijjah"];
+      const monthsAr = ["محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة"];
+      const m = get("month");
+      return { day: get("day"), month: m, year: get("year"), name: months[m - 1], nameAr: monthsAr[m - 1] };
+    } catch (e) { return { day: 0, month: 0, year: 0, name: "", nameAr: "" }; }
+  }
+
+  label(k, date) {
+    const c = this._config, fri = c.jumuah && k === "dhuhr" && date.getDay() === 5;
+    const en = fri ? "Jumu'ah" : PRAYER_NAMES[k][0], ar = fri ? "الجمعة" : PRAYER_NAMES[k][1];
+    return c.names === "arabic" ? ar : c.names === "both" ? `${en} · ${ar}` : en;
+  }
+
+  clock(d) {
+    const c = this._config;
+    let s = d.toLocaleTimeString(c.hour24 ? "en-GB" : "en-US", { hour: "numeric", minute: "2-digit", hour12: !c.hour24 });
+    if (c.names === "arabic" && !c.hour24) s = s.replace("AM", "ص").replace("PM", "م");
+    return c.numerals === "eastern" ? easternDigits(s) : s;
+  }
+
+  left(ms) {
+    const m = Math.max(0, Math.round(ms / 60000)), h = Math.floor(m / 60), r = m % 60;
+    const ar = this._config.names === "arabic", s = ar ? (h ? `${h} س ${r} د` : `${r} دقيقة`) : h ? `${h}h ${r}m` : `${r} min`;
+    return this._config.numerals === "eastern" ? easternDigits(s) : s;
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), now = new Date();
+    this.loadOnline();
+    const today = this.day(now), tomorrow = this.day(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+    const keys = (c.prayers || []).filter((k) => PRAYER_NAMES[k] && today[k]);
+    const order = ["imsak", "fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha", "midnight", "last_third"];
+    keys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    const real = keys.filter((k) => !["sunrise", "imsak", "midnight", "last_third"].includes(k));
+    let nextKey = real.find((k) => today[k] > now), nextAt = nextKey ? today[nextKey] : null;
+    if (!nextKey && real.length) { nextKey = real[0]; nextAt = tomorrow[nextKey]; }
+    let prevAt = now;
+    if (nextKey) {
+      const ri = real.indexOf(nextKey), last = today[real[real.length - 1]];
+      prevAt = ri > 0 ? today[real[ri - 1]] : nextAt.toDateString() === now.toDateString() ? new Date(last.getTime() - 86400e3) : last;
+    }
+    const span = nextAt && prevAt ? Math.max(1, nextAt - prevAt) : 1, done = nextAt ? Math.min(1, Math.max(0, (now - prevAt) / span)) : 0;
+    const hj = this.hijri(now), ar = c.names === "arabic";
+    const greg = now.toLocaleDateString(ar ? `ar-u-nu-${c.numerals === "eastern" ? "arab" : "latn"}` : "en-GB", { weekday: "long", day: "numeric", month: "long" });
+    const hijriText = hj.year ? (ar ? `${easternDigits(hj.day)} ${hj.nameAr} ${easternDigits(hj.year)}` : `${hj.day} ${hj.name} ${hj.year}`) : "";
+    const soon = nextAt && nextAt - now < 15 * 60000;
+    const R = 34, C = 2 * Math.PI * R;
+    const sky = (() => { const hr = now.getHours() + now.getMinutes() / 60, f = today.fajr, sr = today.sunrise, mg = today.maghrib, is = today.isha, v = (d) => (d ? d.getHours() + d.getMinutes() / 60 : null);
+      if (v(f) != null && hr >= v(f) && hr < (v(sr) ?? v(f) + 1.3)) return "linear-gradient(135deg,#2B2A6B 0%,#B05C8A 100%)";
+      if (v(sr) != null && v(mg) != null && hr >= v(sr) && hr < v(mg) - 0.7) return "linear-gradient(135deg,#2563EB 0%,#60A5FA 60%,#93C5FD 100%)";
+      if (v(mg) != null && hr >= v(mg) - 0.7 && hr < (v(is) ?? v(mg) + 1.3)) return "linear-gradient(135deg,#3B2A78 0%,#C2547A 60%,#F59E6B 100%)";
+      return "linear-gradient(135deg,#1B1E52 0%,#38287E 55%,#5B3290 100%)"; })();
+    const rowsHtml = keys.map((k) => {
+      const d = today[k], past = d <= now && k !== nextKey, isNext = k === nextKey && nextAt && nextAt.toDateString() === now.toDateString();
+      return `<div class="pr ${past ? "past" : ""} ${isNext ? "nx" : ""}" data-k="${k}">
+        <span class="pi"><ha-icon icon="${PRAYER_NAMES[k][2]}"></ha-icon></span>
+        <span class="pn t"${ar ? ' dir="rtl"' : ""}>${esc(this.label(k, now))}</span>
+        ${isNext ? `<span class="in">${ar ? "بعد " : "in "}${esc(this.left(nextAt - now))}</span>` : past ? '<ha-icon class="ok" icon="mdi:check"></ha-icon>' : ""}
+        <span class="pt num">${esc(this.clock(d))}</span></div>`;
+    }).join("");
+    const tilesHtml = keys.map((k) => { const d = today[k], isNext = k === nextKey && nextAt && nextAt.toDateString() === now.toDateString(), past = d <= now && !isNext;
+      return `<div class="tl ${isNext ? "nx" : ""} ${past ? "past" : ""}"><ha-icon icon="${PRAYER_NAMES[k][2]}"></ha-icon><span class="t">${esc(this.label(k, now))}</span><b class="num">${esc(this.clock(d))}</b></div>`; }).join("");
+    const pos = (d) => ((d.getHours() * 60 + d.getMinutes()) / 1440) * 100;
+    const line = c.show_timeline ? `<div class="line"><i class="lf" data-bar="now" style="width:${pos(now).toFixed(1)}%"></i>${real.map((k) => `<span class="mk ${k === nextKey ? "on" : ""}" style="left:${pos(today[k]).toFixed(1)}%"></span>`).join("")}<span class="nw" style="left:${pos(now).toFixed(1)}%"></span></div>` : "";
+    const head = c.show_header && nextKey ? `<div class="hd" style="background:${sky}">
+        <div class="hx"${ar ? ' dir="rtl"' : ""}><small>${ar ? "الصلاة القادمة" : "Next prayer"}</small><b class="t"${ar ? ' dir="rtl"' : ""}>${esc(this.label(nextKey, nextAt))}</b><span class="num">${esc(this.clock(nextAt))}</span>
+          <em class="t">${esc(greg)}${c.show_hijri && hijriText ? ` · ${esc(hijriText)}` : ""}</em></div>
+        <div class="ring ${soon ? "soon" : ""}"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="${R}" class="bg"/><circle cx="40" cy="40" r="${R}" class="fg" data-pop="${nextKey}" data-popkey="ring" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - done)).toFixed(1)}"/></svg><span class="num">${esc(this.left(nextAt - now))}</span></div>
+        ${line}</div>` : line ? `<div style="padding:4px 2px 2px">${line}</div>` : "";
+    const empty = !keys.length ? `<div class="empty t">${c.source === "sensors" ? "Choose your prayer time sensors in the card settings" : "No times for this place"}</div>` : "";
+    const src = c.source === "sensors" ? "" : `<div class="src t">${esc((PRAYER_METHODS[c.method] || {}).name || "")}${c.asr === "hanafi" ? " · Hanafi Asr" : ""}${c.source === "online" ? (this._online ? " · online" : this._onlineFailed ? " · offline, calculated here" : " · loading online") : ""}</div>`;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${c.frame ? `${panelCss(p, c.radius)};padding:12px` : "padding:0"};display:flex;flex-direction:column;gap:10px;color:${p.text}}
+      .ti{font-size:17px;font-weight:700;padding:4px 6px 0}
+      .hd{position:relative;border-radius:${Math.max(12, Number(c.radius) - 6)}px;padding:16px 16px 14px;color:#fff;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center;overflow:hidden}
+      .hd::after{content:"";position:absolute;inset:0;background:radial-gradient(120px 80px at 85% 20%,rgba(255,255,255,.18),transparent 70%);pointer-events:none}
+      .hx{display:flex;flex-direction:column;gap:2px;min-width:0;position:relative;z-index:1}
+      .hx small{font-size:12px;opacity:.85}
+      .hx b{font-family:${FONT_NUM};font-size:clamp(22px,8cqw,30px);font-weight:700;line-height:1.1}
+      .hx .num{font-size:15px;font-weight:600;opacity:.95}
+      .hx em{font-style:normal;font-size:12px;opacity:.8;margin-top:4px}
+      .ring{position:relative;width:84px;height:84px;z-index:1}
+      .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+      .ring .bg{fill:none;stroke:rgba(255,255,255,.18);stroke-width:6}
+      .ring .fg{fill:none;stroke:#fff;stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset .12s;filter:drop-shadow(0 0 6px rgba(255,255,255,.6))}
+      .ring.soon .fg{animation:roost-breathe 1.4s ease-in-out infinite}
+      .ring span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;text-align:center;padding:0 10px}
+      .line{grid-column:1/3;position:relative;height:6px;border-radius:999px;background:rgba(255,255,255,.2);margin:10px 4px 2px;z-index:1}
+      .card > div > .line, .card > .line{background:${p.track}}
+      .lf{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:rgba(255,255,255,.75)}
+      .mk{position:absolute;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:rgba(255,255,255,.55)}
+      .mk.on{width:12px;height:12px;margin:-6px 0 0 -6px;background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.25)}
+      .nw{position:absolute;top:-5px;width:2px;height:16px;margin-left:-1px;border-radius:2px;background:#fff}
+      .list{display:flex;flex-direction:column;gap:4px}
+      .pr{display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:8px 10px;border-radius:14px}
+      .pi{width:36px;height:36px;border-radius:12px;background:${p.inset};display:flex;align-items:center;justify-content:center;color:${p.muted};--mdc-icon-size:20px}
+      .pn{font-size:14.5px;font-weight:600}
+      .pt{font-size:14px;font-weight:700;font-family:${FONT_NUM}}
+      .in{font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.22)}
+      .ok{--mdc-icon-size:16px;color:#34D399}
+      .pr.past{opacity:.5}
+      .pr.nx{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 22px -12px ${g[2]}}
+      .pr.nx .pi{background:rgba(255,255,255,.22);color:inherit;animation:roost-pulse 2.4s ease-in-out infinite}
+      .tiles{display:grid;grid-template-columns:repeat(${Math.max(1, keys.length)},minmax(0,1fr));gap:6px}
+      .tl{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:14px;background:${p.inset};text-align:center;--mdc-icon-size:20px}
+      .tl span{font-size:11.5px;font-weight:600;color:${p.muted}}
+      .tl b{font-size:12.5px;font-family:${FONT_NUM}}
+      .tl.nx{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]}}
+      .tl.nx span{color:inherit;opacity:.85}
+      .tl.past{opacity:.5}
+      @container (max-width: 330px){:host .tiles{grid-template-columns:repeat(3,minmax(0,1fr))}:host .ring{width:70px;height:70px}}
+      .cp{display:flex;align-items:center;gap:10px;padding:6px 6px}
+      .cp ha-icon{color:${g[this.dark ? 1 : 0]}}
+      .cp b{font-size:15px}.cp span{margin-left:auto;font-size:13px;color:${p.muted};font-weight:600}
+      .src{font-size:11.5px;color:${p.muted};padding:0 6px 2px}
+      .empty{font-size:14px;color:${p.muted};text-align:center;padding:14px}
+    </style>
+    <div class="card">
+      ${c.title ? `<div class="ti t">${esc(c.title)}</div>` : ""}
+      ${c.layout === "compact" ? (nextKey ? `<div class="cp"><ha-icon icon="${PRAYER_NAMES[nextKey][2]}"></ha-icon><b class="t">${esc(this.label(nextKey, nextAt))} · <span class="num" style="margin:0;color:inherit">${esc(this.clock(nextAt))}</span></b><span>${ar ? "بعد " : "in "}${esc(this.left(nextAt - now))}</span></div>` : empty)
+        : `${head}${empty}${c.layout === "tiles" ? `<div class="tiles">${tilesHtml}</div>` : `<div class="list">${rowsHtml}</div>`}${src}`}
+    </div>`;
+    this.shadowRoot.querySelectorAll(".pr").forEach((el) => el.addEventListener("click", () => { const id = c[`${el.dataset.k}_entity`]; if (id) this.moreInfo(id); }));
+  }
+
+  getCardSize() { return 5; }
+}
+
+// ------------------------------------------------------------------ Roost Clock
+// A clock and nothing else, with many faces: digital, analog, minimal, flip, words, ring, neon and LCD.
+// Any time zone, world clocks underneath, 12 or 24 hours, and Western, Eastern-Arabic or Roman numbers.
+const CLOCK_WORDS = ["twelve", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven"];
+function clockParts(tz) {
+  const d = new Date();
+  try {
+    const f = new Intl.DateTimeFormat("en-GB", { timeZone: tz || undefined, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    const o = Object.fromEntries(f.formatToParts(d).map((x) => [x.type, x.value]));
+    return { h: +o.hour % 24, m: +o.minute, s: +o.second, weekday: o.weekday, day: o.day, month: o.month, year: o.year, date: d };
+  } catch (e) { return { h: d.getHours(), m: d.getMinutes(), s: d.getSeconds(), weekday: d.toLocaleDateString("en-GB", { weekday: "long" }), day: d.getDate(), month: d.toLocaleDateString("en-GB", { month: "long" }), year: d.getFullYear(), date: d }; }
+}
+
+class RoostClockFace extends RoostClockClassic {
+  static get defaults() {
+    return { ...super.defaults, face: "digital", hour24: false, seconds: false, date_format: "long", show_hijri: false, timezone: "", label: "", numerals: "western", ticks: "hours",
+      hands: "classic", smooth: true, size: "large", align: "center", world: [], color: "active", frame: true, radius: 22, theme: "auto" };
+  }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "face", label: "Clock face", selector: pick([["digital", "Digital"], ["analog", "Analog"], ["minimal", "Minimal analog"], ["flip", "Flip"], ["ring", "Ring"], ["word", "Words"], ["neon", "Neon"], ["lcd", "LCD"]]) },
+        { type: "grid", name: "", schema: [{ name: "hour24", label: "24-hour", selector: { boolean: {} } }, { name: "seconds", label: "Seconds", selector: { boolean: {} } }] },
+        { type: "grid", name: "", schema: [{ name: "date_format", label: "Date", selector: pick([["long", "Tuesday 17 November"], ["short", "Tue 17 Nov"], ["numeric", "17/11/2026"], ["none", "No date"]]) }, { name: "show_hijri", label: "Hijri date too", selector: { boolean: {} } }] },
+        { type: "grid", name: "", schema: [{ name: "timezone", label: "Time zone (empty = here, or e.g. Asia/Riyadh)", selector: { text: {} } }, { name: "label", label: "Label (e.g. Makkah)", selector: { text: {} } }] },
+        { type: "expandable", name: "", title: "Analog faces", icon: "mdi:clock-time-four-outline", schema: [
+          { type: "grid", name: "", schema: [{ name: "numerals", label: "Numbers", selector: pick([["western", "1 2 3"], ["eastern", "١ ٢ ٣"], ["roman", "I II III"], ["none", "None"]]) }, { name: "ticks", label: "Marks", selector: pick([["hours", "Hours"], ["all", "Every minute"], ["none", "None"]]) }] },
+          { type: "grid", name: "", schema: [{ name: "hands", selector: pick([["classic", "Classic"], ["slim", "Slim"], ["bold", "Bold"]]) }, { name: "smooth", label: "Sweeping seconds", selector: { boolean: {} } }] },
+        ] },
+        { name: "world", label: "World clocks underneath", selector: { object: { multiple: true, label_field: "label", fields: {
+          label: { label: "Name", required: true, selector: { text: {} } }, timezone: { label: "Time zone (e.g. Europe/London)", required: true, selector: { text: {} } } } } } },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+          { type: "grid", name: "", schema: [{ name: "size", selector: pick([["small", "Small"], ["medium", "Medium"], ["large", "Large"], ["huge", "Huge"]]) }, { name: "align", selector: pick([["center", "Centre"], ["left", "Left"]]) }] },
+          ...colourFields("color", "Accent colour"),
+          { type: "grid", name: "", schema: [{ name: "radius", selector: slider(0, 40, 2) }, { name: "frame", label: "Card background", selector: { boolean: {} } }] },
+          THEME_FIELD,
+        ] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return { face: "analog", seconds: true }; }
+
+  connectedCallback() {
+    super.connectedCallback();
+    const c = this._config || {};
+    const every = c.seconds && !["analog", "minimal"].includes(c.face) ? 1000 : 15000;
+    clearInterval(this._tick); this._tick = setInterval(() => { this._sig = null; if (this._hass) this.hass = this._hass; }, every);
+  }
+
+  setConfig(config) { this._raw = config || {}; super.setConfig(config); if (this.isConnected) this.connectedCallback(); }
+
+  extraSignature() { const t = clockParts(this._config.timezone); return `${t.h}:${t.m}${this._config.seconds && !["analog", "minimal"].includes(this._config.face) ? `:${t.s}` : ""}`; }
+
+  render() {
+    const c = this._config;
+    if (c && Array.isArray(c.times) && c.times.length && !(this._raw && "face" in this._raw)) { super.render(); return; } // older prayer-time setups keep working
+    if (!this._hass || !c) return;
+    const p = this.p, g = this.colour(), t = clockParts(c.timezone), num = (v) => (c.numerals === "eastern" ? easternDigits(v) : String(v));
+    const h12 = t.h % 12 || 12, hh = c.hour24 ? String(t.h).padStart(2, "0") : String(h12), mm = String(t.m).padStart(2, "0"), ss = String(t.s).padStart(2, "0"), ap = t.h < 12 ? "AM" : "PM";
+    const S = { small: 0.6, medium: 0.8, large: 1, huge: 1.3 }[c.size] || 1;
+    const dateText = c.date_format === "none" ? "" : c.date_format === "short" ? t.date.toLocaleDateString("en-GB", { timeZone: c.timezone || undefined, weekday: "short", day: "numeric", month: "short" })
+      : c.date_format === "numeric" ? t.date.toLocaleDateString("en-GB", { timeZone: c.timezone || undefined }) : `${t.weekday} ${t.day} ${t.month}`;
+    let hij = "";
+    if (c.show_hijri) { const x = RoostPrayer.prototype.hijri.call({ _config: { hijri_offset: 0 } }, t.date); if (x.year) hij = `${num(x.day)} ${x.name} ${num(x.year)}`; }
+    const sub = [c.label, dateText, hij].filter(Boolean).join(" · ");
+    const accent = g[this.dark ? 1 : 0];
+    let face = "";
+    const digits = `${num(hh)}:${num(mm)}`;
+    if (c.face === "analog" || c.face === "minimal") {
+      const min = c.face === "minimal", R = 100;
+      const ROMAN = ["XII", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"];
+      let marks = "";
+      const tk = min ? "hours" : c.ticks;
+      for (let i = 0; i < 60; i++) {
+        const hr = i % 5 === 0;
+        if (tk === "none" || (tk === "hours" && !hr)) continue;
+        const a = (i * 6 * Math.PI) / 180, r1 = hr ? (min ? 84 : 82) : 88, r2 = 92;
+        marks += min ? (hr ? `<circle cx="${(R + Math.sin(a) * 86).toFixed(1)}" cy="${(R - Math.cos(a) * 86).toFixed(1)}" r="${i % 15 === 0 ? 4 : 2.2}" class="dt"/>` : "")
+          : `<line x1="${(R + Math.sin(a) * r1).toFixed(1)}" y1="${(R - Math.cos(a) * r1).toFixed(1)}" x2="${(R + Math.sin(a) * r2).toFixed(1)}" y2="${(R - Math.cos(a) * r2).toFixed(1)}" class="${hr ? "tkh" : "tkm"}"/>`;
+      }
+      let nums = "";
+      if (!min && c.numerals !== "none") for (let i = 0; i < 12; i++) { const a = (i * 30 * Math.PI) / 180, txt = c.numerals === "roman" ? ROMAN[i] : num(i === 0 ? 12 : i); nums += `<text x="${(R + Math.sin(a) * 68).toFixed(1)}" y="${(R - Math.cos(a) * 68 + 5).toFixed(1)}" class="nm">${txt}</text>`; }
+      const sec = t.s, mAng = (t.m + sec / 60) * 6, hAng = ((t.h % 12) + t.m / 60 + sec / 3600) * 30, sAng = sec * 6;
+      const w = { classic: [7, 4.5, 1.6], slim: [4, 2.5, 1], bold: [11, 7, 2.4] }[c.hands] || [7, 4.5, 1.6];
+      const hand = (ang, len, wd, cls, period) => `<g transform="rotate(${ang.toFixed(2)} ${R} ${R})"><g class="sp" style="animation-duration:${period}s"><line x1="${R}" y1="${R + 12}" x2="${R}" y2="${R - len}" stroke-width="${wd}" class="${cls}"/></g></g>`;
+      face = `<div class="an" style="width:${Math.round(220 * S)}px"><svg viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="97" class="dial"/>${marks}${nums}
+        ${hand(hAng, 50, w[0], "hh", 43200)}${hand(mAng, 74, w[1], "mh", 3600)}
+        ${c.seconds ? (c.smooth ? hand(sAng, 82, w[2], "sh", 60) : `<g transform="rotate(${sAng} ${R} ${R})"><line x1="${R}" y1="${R + 16}" x2="${R}" y2="${R - 82}" stroke-width="${w[2]}" class="sh"/></g>`) : ""}
+        <circle cx="100" cy="100" r="${min ? 4 : 5.5}" class="pin"/></svg></div>`;
+      if (c.seconds && !c.smooth) { clearInterval(this._tick); this._tick = setInterval(() => { this._sig = null; if (this._hass) this.hass = this._hass; }, 1000); }
+    } else if (c.face === "flip") {
+      const ds = (hh.length < 2 && !c.hour24 ? ` ${hh}` : hh) + mm + (c.seconds ? ss : "");
+      const cells = [...ds].map((ch, i) => `<span class="fc ${ch === " " ? "blank" : ""}" data-pop="${ch}" data-popkey="f${i}"><b>${num(ch.trim())}</b></span>${i === 1 || (i === 3 && c.seconds) ? '<span class="fs">:</span>' : ""}`).join("");
+      face = `<div class="fl">${cells}${c.hour24 ? "" : `<span class="fap">${ap}</span>`}</div>`;
+    } else if (c.face === "ring") {
+      const R = 88, C = 2 * Math.PI * R, k = c.seconds ? t.s / 60 : t.m / 60;
+      face = `<div class="rg" style="width:${Math.round(220 * S)}px"><svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="${R}" class="rb"/><circle cx="100" cy="100" r="${R}" class="rf" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - k)).toFixed(1)}"/></svg>
+        <div class="rt"><b class="num">${digits}${c.hour24 ? "" : `<span class="ap2">${ap}</span>`}</b>${c.seconds ? `<small class="num">${num(ss)}</small>` : ""}</div></div>`;
+    } else if (c.face === "word") {
+      const m5 = Math.round(t.m / 5) * 5, base = m5 > 30 ? (t.h + 1) % 12 : t.h % 12, hw = CLOCK_WORDS[base];
+      const phrase = m5 === 0 || m5 === 60 ? ["It's", `<em>${hw}</em>`, "o'clock"] : m5 === 15 ? ["It's", "<em>quarter</em>", "past", `<em>${hw}</em>`] : m5 === 30 ? ["It's", "<em>half</em>", "past", `<em>${hw}</em>`]
+        : m5 === 45 ? ["It's", "<em>quarter</em>", "to", `<em>${hw}</em>`] : m5 < 30 ? ["It's", `<em>${["", "five", "ten", "", "twenty", "twenty-five"][m5 / 5]}</em>`, "past", `<em>${hw}</em>`] : ["It's", `<em>${["", "five", "ten", "", "twenty", "twenty-five"][(60 - m5) / 5]}</em>`, "to", `<em>${hw}</em>`];
+      face = `<div class="wd" data-pop="${m5}" data-popkey="wd">${phrase.join(" ")}</div><div class="wds num">${digits}${c.hour24 ? "" : ` ${ap}`}</div>`;
+    } else {
+      const cls = c.face === "neon" ? "neon" : c.face === "lcd" ? "lcd" : "dg";
+      face = `<div class="${cls}">${c.face === "lcd" ? `<span class="ghost" aria-hidden="true"><span class="big">${hh.length < 2 ? "8" : "88"}:88${c.seconds ? '<span class="sec">:88</span>' : ""}</span></span>` : ""}<span class="num big">${digits}${c.seconds ? `<span class="sec">:${num(ss)}</span>` : ""}</span>${c.hour24 ? "" : `<span class="ap">${ap}</span>`}</div>`;
+    }
+    const world = (c.world || []).filter((w) => w && w.timezone).map((w) => {
+      const x = clockParts(w.timezone), diffH = Math.round(((x.h * 60 + x.m) - (t.h * 60 + t.m)) / 60), dd = x.day !== t.day ? (diffH > 0 ? " · tomorrow" : " · yesterday") : "";
+      const shown = c.hour24 ? `${String(x.h).padStart(2, "0")}:${String(x.m).padStart(2, "0")}` : `${x.h % 12 || 12}:${String(x.m).padStart(2, "0")} ${x.h < 12 ? "AM" : "PM"}`;
+      return `<div class="wc"><span class="t">${esc(w.label)}</span><small>${diffH === 0 ? "same time" : `${diffH > 0 ? "+" : ""}${diffH < -12 ? diffH + 24 : diffH > 12 ? diffH - 24 : diffH}h`}${dd}</small><b class="num">${esc(num(shown))}</b></div>`;
+    }).join("");
+    const left = c.align === "left";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${c.frame ? `${panelCss(p, c.radius)};padding:18px` : "padding:4px"};display:flex;flex-direction:column;align-items:${left ? "flex-start" : "center"};gap:10px;color:${p.text};text-align:${left ? "left" : "center"}}
+      .sub{font-size:${(14 * S).toFixed(1)}px;color:${p.muted};font-weight:500}
+      .dg,.neon,.lcd{position:relative;display:flex;align-items:baseline;gap:6px;line-height:1}
+      .big{font-family:${FONT_NUM};font-weight:700;font-size:min(${Math.round(72 * S)}px,${Math.round(22 * S)}cqw);letter-spacing:-2px}
+      .sec{font-size:.42em;letter-spacing:0;color:${p.muted};margin-left:2px}
+      .ap{font-size:${Math.round(18 * S)}px;font-weight:700;color:${accent}}
+      .neon .big{color:#fff;text-shadow:0 0 6px ${g[1]},0 0 18px ${g[0]},0 0 36px ${g[0]};animation:roost-breathe 3.2s ease-in-out infinite}
+      .neon .sec{color:#fff}
+      .lcd{padding:10px 16px;border-radius:12px;background:${this.dark ? "#0D1A10" : "#C9D8B6"};border:1px solid ${this.dark ? "#1F3A24" : "#9DB089"}}
+      .lcd .big{font-family:ui-monospace,"Courier New",monospace;font-weight:700;letter-spacing:2px;color:${this.dark ? "#7CFF8A" : "#1C3018"};text-shadow:${this.dark ? "0 0 8px rgba(124,255,138,.55)" : "none"}}
+      .lcd .ghost{position:absolute;left:16px;top:10px;opacity:${this.dark ? 0.1 : 0.14};text-shadow:none}
+      .lcd .ghost .big{text-shadow:none}
+      .lcd .ap,.lcd .sec{color:${this.dark ? "#7CFF8A" : "#1C3018"}}
+      .an,.rg{position:relative;max-width:100%;aspect-ratio:1}
+      .an svg,.rg svg{width:100%;height:100%;display:block}
+      .dial{fill:${p.inset};stroke:${p.border};stroke-width:2}
+      .tkh{stroke:${p.text};stroke-width:3;stroke-linecap:round}.tkm{stroke:${p.muted};stroke-width:1.2;opacity:.6}
+      .dt{fill:${p.muted}}
+      .nm{font-family:${FONT_NUM};font-size:15px;font-weight:600;fill:${p.text};text-anchor:middle}
+      .hh,.mh{stroke:${p.text};stroke-linecap:round}.sh{stroke:${accent};stroke-linecap:round}
+      .pin{fill:${accent};stroke:${p.inset};stroke-width:2}
+      .sp{transform-origin:100px 100px;animation:roost-spin 60s linear infinite}
+      .rb{fill:none;stroke:${p.track};stroke-width:8}
+      .rf{fill:none;stroke:url(#none);stroke:${accent};stroke-width:8;stroke-linecap:round;transform:rotate(-90deg);transform-origin:100px 100px;filter:drop-shadow(0 0 6px ${g[2]})}
+      .rt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+      .rt b{font-family:${FONT_NUM};font-size:min(${Math.round(46 * S)}px,${Math.round(14 * S)}cqw);font-weight:700;letter-spacing:-1px}
+      .rt small{font-size:13px;color:${p.muted};font-weight:600}
+      .rt .ap2{font-size:12px;color:${accent};font-weight:700;margin-left:3px}
+      .fl{display:flex;align-items:center;gap:${Math.round(6 * S)}px}
+      .fc{position:relative;display:flex;align-items:center;justify-content:center;width:min(${Math.round(58 * S)}px,15cqw);height:min(${Math.round(80 * S)}px,21cqw);border-radius:12px;
+        background:linear-gradient(180deg,${this.dark ? "#262C52" : "#FFFFFF"} 0 50%,${this.dark ? "#1D2244" : "#F1F3FB"} 50% 100%);box-shadow:0 8px 18px -10px rgba(0,0,0,.6),inset 0 0 0 1px ${p.border}}
+      .fc::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(0,0,0,.35)}
+      .fc b{font-family:${FONT_NUM};font-weight:700;font-size:min(${Math.round(54 * S)}px,14cqw)}
+      .fc.blank{visibility:hidden;width:0;margin-left:-${Math.round(6 * S)}px}
+      .fs{font-family:${FONT_NUM};font-weight:700;font-size:min(${Math.round(40 * S)}px,10cqw);color:${p.muted};animation:roost-breathe 2s ease-in-out infinite}
+      .fap{font-size:14px;font-weight:700;color:${accent};align-self:flex-end}
+      .wd{font-family:${FONT_NUM};font-size:min(${Math.round(34 * S)}px,${Math.round(10 * S)}cqw);font-weight:600;line-height:1.2;color:${p.muted}}
+      .wd em{font-style:normal;color:${p.text};background:linear-gradient(135deg,${g[0]},${g[1]});-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+      .wds{font-size:13px;color:${p.muted};font-weight:600}
+      .world{width:100%;display:flex;flex-direction:column;gap:6px;margin-top:4px}
+      .wc{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;background:${p.inset};text-align:left}
+      .wc span{font-size:13.5px;font-weight:600}.wc small{font-size:11.5px;color:${p.muted}}.wc b{font-size:14px;font-family:${FONT_NUM}}
+    </style>
+    <div class="card">${face}${sub ? `<div class="sub t">${esc(sub)}</div>` : ""}${world ? `<div class="world">${world}</div>` : ""}</div>`;
+  }
+
+  getCardSize() { return 4; }
 }
 
 // ------------------------------------------------------------------ Roost Title
@@ -3540,12 +4069,13 @@ class RoostEnergy extends ticking(RoostBase, 300000) {
       .top{display:flex;gap:10px;flex-wrap:wrap}
       .box{flex:1 1 120px;min-width:0;padding:12px 14px;border-radius:16px;background:${p.inset}}
       .box small{display:block;font-size:12px;color:${p.muted}}
-      .box b{display:block;font-size:24px;font-weight:700;margin-top:2px}
+      .box b{display:block;font-size:clamp(17px, 7.5cqw, 24px);font-weight:700;margin-top:2px;overflow-wrap:anywhere}
+      .box b.wait{font-size:13px;font-weight:600;color:${p.muted};margin-top:6px}
       .box em{font-style:normal;font-size:12px;font-weight:600}
       .bolt{animation:roost-pulse 1.6s ease-in-out infinite;--mdc-icon-size:18px;color:${g[1]};vertical-align:-3px}
       .dv{display:flex;flex-direction:column;gap:9px}
       .row{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;cursor:pointer}
-      .row span{font-size:13.5px;font-weight:600;color:${p.text}}
+      .row span{font-size:13.5px;font-weight:600;color:${p.text};min-width:0;overflow-wrap:anywhere}
       .row b{font-size:13px;color:${p.muted}}
       .bar{grid-column:1/3;height:6px;border-radius:999px;background:${p.track};overflow:hidden}
       .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,${g[0]},${g[1]})}
@@ -3553,7 +4083,7 @@ class RoostEnergy extends ticking(RoostBase, 300000) {
     <div class="card">
       <div class="top">
         ${devs.length ? `<div class="box"><small>Using now</small><b class="num"><ha-icon class="bolt" icon="mdi:flash"></ha-icon> <span data-tw="tot">${kw(total)}</span></b></div>` : ""}
-        ${c.energy ? `<div class="box"><small>Today</small><b class="num">${today != null ? `${today.toFixed(today < 1 ? 2 : 1)} kWh` : "Loading"}</b>${diff != null ? `<em style="color:${diff > 0 ? "#FF9F6B" : "#3DD68C"}">${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)}% vs this time yesterday</em>` : yesterday != null ? `<em style="color:${p.muted}">Yesterday ${yesterday.toFixed(1)} kWh</em>` : ""}</div>` : ""}
+        ${c.energy ? `<div class="box"><small>Today</small>${today != null ? `<b class="num">${today.toFixed(today < 1 ? 2 : 1)} kWh</b>` : `<b class="wait">${this._days ? "No history yet" : "Loading"}</b>`}${diff != null ? `<em style="color:${diff > 0 ? "#FF9F6B" : "#3DD68C"}">${diff > 0 ? "▲" : "▼"} ${Math.abs(diff)}% vs this time yesterday</em>` : yesterday != null ? `<em style="color:${p.muted}">Yesterday ${yesterday.toFixed(1)} kWh</em>` : ""}</div>` : ""}
       </div>
       ${top.length ? `<div class="dv">${top.map((d) => `<div class="row" data-e="${esc(d.id)}"><span class="t">${esc(d.nm || d.s.attributes.friendly_name || d.id)}</span><b class="num" data-tw="${esc(d.id)}">${kw(d.w)}</b><span class="bar"><i data-bar="${esc(d.id)}" style="width:${((d.w / max) * 100).toFixed(0)}%"></i></span></div>`).join("")}</div>` : ""}
     </div>`;
@@ -4271,6 +4801,7 @@ RoostFull.start();
 // at most 560 px wide, and room at the bottom for the navigation bar. Put it in a "Panel" view.
 // A card can sit next to others with `type: grid` (8 px between them, as on the original).
 class RoostPage extends RoostBase {
+  static get hasCards() { return true; }
   static get defaults() { return { cards: [], gap: 16, side: 14, top: 16, bottom: 130, max_width: 560, background: true, theme: "auto" }; }
 
   static getConfigForm() {
@@ -4546,7 +5077,8 @@ const CARDS = [
   ["roost-curtain", RoostCurtain, "Roost Curtain", "A window with curtains that really slide open and closed, with a sky behind them."],
   ["roost-gauge", RoostGauge, "Roost Gauge", "A big ring for one reading, such as a temperature or a plug's power. It turns orange when too high."],
   ["roost-automations", RoostAutomations, "Roost Automations", "A list of automations with a switch and when each last ran."],
-  ["roost-clock", RoostClock, "Roost Clock", "A big clock and date with a line of the day's times (such as prayer times) and a countdown."],
+  ["roost-clock", RoostClockFace, "Roost Clock", "A clock with many faces: digital, analog, flip, ring, words, neon and LCD, any time zone and world clocks."],
+  ["roost-prayer", RoostPrayer, "Roost Prayer Times", "Today's prayer times with the next one, a countdown and the Hijri date, calculated with any method, from your sensors or online."],
   ["roost-title", RoostTitle, "Roost Title", "A section heading with an optional line under it and a “See all” link."],
   ["roost-theme", RoostTheme, "Roost Light/Dark", "A sun / moon button that switches this screen between light and dark."],
   ["roost-media", RoostMedia, "Roost Media", "TV and sound: power, what is playing, volume, mute and inputs."],

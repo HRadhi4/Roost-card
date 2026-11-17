@@ -1,7 +1,7 @@
 <h1 align="center">Roost Cards</h1>
 
 <p align="center"><b>Beautiful, animated dashboard cards for Home Assistant. Made for phones and tablets.</b><br>
-36 cards · a visual editor for every setting · light and dark · no code needed</p>
+37 cards · a visual editor for every setting · light and dark · no code needed</p>
 
 <p align="center">
 <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
@@ -55,7 +55,7 @@ Short, written, with pictures:
 8. [Full screen, like an app](docs/tutorials/09-full-screen.md)
 9. [Looks, light and dark, tablets](docs/tutorials/08-looks.md)
 
-## All 36 cards
+## All 37 cards
 
 | Card | What it is | See it |
 |---|---|:-:|
@@ -75,7 +75,8 @@ Short, written, with pictures:
 | **Roost Alarm** | The alarm in a big shield: arm and disarm with a question first, a keypad when it needs a code, and the doors. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alarm.gif" width="180" alt="Roost Alarm"> |
 | **Roost People** | Who is home: a picture or initials with a green ring when home, and for how long. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/people.gif" width="180" alt="Roost People"> |
 | **Roost Automations** | A list of automations with a switch, when each last ran, and an optional "run now" button. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/automations.gif" width="180" alt="Roost Automations"> |
-| **Roost Clock** | A big clock and date with a line of the day's times (such as prayer times) and a countdown to the next one. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/clock.gif" width="180" alt="Roost Clock"> |
+| **Roost Clock** | A clock with eight faces (digital, analog, minimal, flip, ring, words, neon, LCD), any time zone and world clocks. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/clock.gif" width="180" alt="Roost Clock"> |
+| **Roost Prayer Times** | Today's prayer times, the next one with a countdown and the Hijri date: calculated with any method, from your sensors, or online. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/prayer.gif" width="180" alt="Roost Prayer Times"> |
 | **Roost Alerts** | Only shows when something needs you: a low battery, a device gone offline, a door left open, or your own rules. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alerts.gif" width="180" alt="Roost Alerts"> |
 | **Roost Title** | A section heading with an optional line under it, a badge and a "See all" link. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/title.gif" width="180" alt="Roost Title"> |
 | **Roost Light/Dark** | A sun / moon button that switches this screen between light and dark. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/theme.gif" width="180" alt="Roost Light/Dark"> |

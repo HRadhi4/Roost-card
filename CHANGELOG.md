@@ -2,6 +2,18 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.3.0 — 2026-11-17
+**New: Roost Prayer Times**
+- Today's prayer times, the next one with a countdown ring, a line of the day, and the Hijri date.
+- Times **calculated on the spot** with any common method (Umm al-Qura, Muslim World League, Egypt, ISNA, Karachi, Gulf, Kuwait, Qatar, Dubai, Shia Ithna-Ashari, Tehran and more), Standard or Hanafi Asr, and your own minute adjustments. Or **online** (aladhan.com), or **your own sensors**.
+- List, tiles or one-line looks; English or Arabic names; Western or Eastern-Arabic numbers; 12 or 24 hours; Jumu'ah on Fridays; Imsak, midnight and the last third of the night if you want them.
+
+**Roost Clock is now a real clock** with eight faces: digital, analog, minimal, flip, ring, words, neon and LCD. Any time zone with a label, world clocks underneath, Hijri date, Western, Eastern-Arabic or Roman numbers, hand styles, sweeping seconds and four sizes. (Clocks that already showed prayer times keep working as before.)
+
+**Fixes**
+- **Roost Energy**: numbers shrink to fit narrow cards, and "Loading" no longer spills out of its box; a sensor without history says so.
+- **Roost Page and Roost Panel** can now be edited in the visual editor: their own settings, plus a tab for each card on them.
+
 ## 1.2.9 — 2026-11-17
 **Try a card without the device**
 - **Sample data**: Roost Fan, Lock, Camera, Timer and Remote can show pretend devices (`sample: true`, or "Show sample data" in the editor). They react to taps like the real thing, the sample doorbell rings now and then, and nothing is sent to Home Assistant.
