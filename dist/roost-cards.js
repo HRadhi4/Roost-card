@@ -2192,8 +2192,9 @@ class RoostRooms extends RoostBase {
       .pills{display:flex;gap:2px;justify-content:${c.pill_align === "start" ? "flex-start" : c.pill_align === "center" ? "center" : "space-between"};overflow-x:auto;scrollbar-width:none}
       ${Number(c.pill_width) > 0 ? `.pill{flex:0 0 ${Number(c.pill_width)}px!important;padding:0 8px!important;white-space:normal!important;line-height:1.15;text-align:center}` : c.pill_align === "fill" ? ".pill{flex:1 1 0!important;padding:0 8px!important;min-width:0;white-space:normal!important;line-height:1.15;text-align:center}" : ""}
       .pills::-webkit-scrollbar{display:none}
-      .head{display:flex;align-items:center;justify-content:space-between;gap:12px}
-      .head .bar{flex:0 1 auto;min-width:0;padding:4px}
+      .head{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
+      .head .bar{flex:${c.pill_align === "fill" ? "1 1 440px" : "0 1 auto"};min-width:0;padding:4px}
+      .head .clim{margin-left:auto}
       .clim{display:flex;gap:16px;font-size:14px;color:${p.muted};flex:none}
       .clim span{display:flex;align-items:center;gap:6px}.clim ha-icon{--mdc-icon-size:16px}
       .pill{position:relative;flex:0 0 auto;min-height:${ph}px;min-width:${ph + 8}px;border-radius:${rad}px;border:0;background:transparent;color:${p.muted};
