@@ -2839,7 +2839,8 @@ class RoostClockClassic extends ticking(RoostBase, 15000) {
       .dot i{display:block;width:8px;height:8px;border-radius:50%;background:${this.dark ? "#0B0D17" : "#fff"};border:2px solid ${this.dark ? "#C4B5FD" : "#8B6CFF"}}
       .dot.nx2 i{width:12px;height:12px;margin-top:-2px;border:0;background:#B794FF;box-shadow:0 0 10px #B794FF}
       .dot span{font-size:10px;color:${p.muted};white-space:nowrap}
-      .dot.l span{transform:translateX(-40%)}.dot.r span{transform:translateX(40%)}
+      .dot.l span{transform:translateX(calc(-50% - 2px))}.dot.r span{transform:translateX(calc(50% + 2px))}
+      .dot.nx2 span{margin-top:-2px}
       .now{position:absolute;top:5px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:${this.dark ? "#fff" : "#161936"};box-shadow:0 0 12px ${this.dark ? "rgba(255,255,255,.9)" : "rgba(22,25,54,.5)"}}
       .now::after{content:"";position:absolute;inset:0;border-radius:50%;background:inherit;animation:roost-ping 1.8s ease-out infinite}
     </style>
