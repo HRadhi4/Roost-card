@@ -2,6 +2,15 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.3.8
+- **Tablet and wall panel look**, like the tablet mockup:
+  - **Roost Nav**: a full-height side rail (Look → Side rail), a letter or a person's picture at the top, buttons that sit at the far end (for example Settings), and the page moves over so the rail never covers cards.
+  - **Roost Nav** no longer hides under Home Assistant's own side menu on a computer.
+  - **Roost Hero**: a house picture with lit windows, a sentence about the house ("Doors are closed, the alarm is off and no one is home.") and people chips.
+  - **Roost Rooms**: the room's temperature and humidity next to the room buttons.
+  - **Roost Clock**: a new face with the big time and the line of prayer times, worked out here with no sensors needed.
+- **Roost Rooms** buttons can show icons only, names only, icons and names, or icons with the name on the chosen room. New "Same width, filling the bar" line-up and a button width setting (0 = automatic).
+
 ## 1.3.7
 - **Full Screen** stays off once you leave it: opening another page or reloading no longer switches it back on. Press the button again to go back to full screen.
 - **Roost Nav** buttons like `#rooms` now jump to that part of the page (the Roost Title with the same name, or a new **Jump name** setting). Before, they only lit up and nothing moved.

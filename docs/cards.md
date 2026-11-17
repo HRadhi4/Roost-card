@@ -188,7 +188,9 @@ rooms:
   - name: Bedroom
     icon: mdi:bed-king
     entities: [light.bedroom]
-show_names: active         # active, all or none
+show_names: active         # active (icons, name on the chosen room), all (icons and names), names (names only) or none (icons only)
+pill_align: fill           # fill (same width, filling the bar), spread, start or center
+pill_width: 0              # button width in px, 0 = automatic
 pill_shape: pill           # pill, rounded or square
 pill_height: 44
 pill_icon_size: 22
@@ -520,6 +522,33 @@ Roost Fan, Lock, Camera, Timer and Remote can show pretend devices so you can tr
 type: custom:roost-fan
 sample: true
 ```
+
+### Tablet and wall panel
+The tablet look is a **Sections** view with 3 columns: one section 2 columns wide for the main cards, one section for the side cards.
+```yaml
+type: custom:roost-nav          # the side rail
+layout: rail
+rail_style: full               # full height, from top to bottom
+logo: person.saeed             # a picture at the top (or a letter, like H)
+show_labels: false
+items:
+  - { icon: mdi:home-variant, path: /dashboard-tablet/home, name: Home }
+  - { icon: mdi:view-grid, path: /dashboard-tablet/rooms, name: Rooms }
+  - { icon: mdi:cog, path: /config/dashboard, name: Settings, bottom: true }
+```
+```yaml
+type: custom:roost-hero
+house: true                    # the house picture with lit windows
+status_entities: [binary_sensor.front_door, alarm_control_panel.home, person.saeed, person.layla]
+people: [person.saeed, person.layla]
+```
+```yaml
+type: custom:roost-clock
+face: times                    # big time and the line of prayer times
+prayer_method: makkah
+countdown_title: Next prayer
+```
+In **Roost Rooms**, give each room a `temperature` and `humidity` sensor to show them next to the room buttons, and set `columns: 4` for one row of tiles.
 
 ### Roost Page
 A whole phone page laid out like the original dashboard: 14 px at the sides, 16 px between cards, the night-sky background and room for the bottom bar. Put it in a **Panel** view and list the page's cards in it. Cards that sit side by side go in a `grid` (8 px apart).

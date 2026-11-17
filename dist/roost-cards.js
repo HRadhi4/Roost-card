@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.3.7";
+const ROOST_VERSION = "1.3.8";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1159,9 +1159,41 @@ class RoostHero extends RoostBase {
   static get defaults() { return { sky: "auto", sun: "sun.sun", show_date: true, show_clock: true, show_orb: true, show_stars: true, show_sheen: true, min_height: 180, upcoming: [], upcoming_title: "Next", radius: 26, theme: "auto",
     greeting: "", show_greeting: true, show_name: true, greeting_size: 25, align: "left", show_weather: true, info: [], orb_size: 56, pill_style: "glass", tap_action: { action: "none" } }; }
 
-  watched() { return [this._config.weather, this._config.sun, ...(this._config.upcoming || []).map((u) => u.entity), ...(this._config.info || []).map((u) => u.entity)].filter(Boolean); }
+  watched() { const c = this._config; return [c.weather, c.sun, ...(c.upcoming || []).map((u) => u.entity), ...(c.info || []).map((u) => u.entity), ...(c.people || []), ...(c.status_entities || [])].filter(Boolean); }
 
   extraSignature() { return Math.floor(Date.now() / 30000); }
+
+  // "Doors are closed, the alarm is off and no one is home."
+  status() {
+    const c = this._config;
+    if (c.message) return c.message;
+    const ids = c.status_entities || [];
+    if (!ids.length) return "";
+    const out = [];
+    const DOORISH = ["door", "window", "garage_door", "opening", "lock", undefined, ""];
+    const MOVING = ["motion", "occupancy", "presence", "moving"];
+    const dc = (id) => this.st(id)?.attributes?.device_class;
+    const doors = ids.filter((id) => /^(lock|cover)\./.test(id) || (id.startsWith("binary_sensor.") && DOORISH.includes(dc(id))));
+    const moving = ids.filter((id) => id.startsWith("binary_sensor.") && MOVING.includes(dc(id)) && this.st(id)?.state === "on");
+    if (doors.length) {
+      const open = doors.filter((id) => { const s = this.st(id)?.state; return s === "on" || s === "open" || s === "unlocked" || s === "opening"; });
+      out.push(open.length ? `${open.map((id) => this.name(id)).join(" and ")} ${open.length > 1 ? "are" : "is"} open` : "Doors are closed");
+    }
+    if (moving.length) out.push(`someone is moving: ${moving.map((id) => this.name(id)).join(", ")}`);
+    ids.filter((id) => id.startsWith("alarm_control_panel.")).forEach((id) => {
+      const s = this.st(id)?.state || "";
+      out.push(s === "disarmed" ? "the alarm is off" : s.startsWith("armed") ? `the alarm is on (${s.replace("armed_", "").replace("_", " ")})` : s === "triggered" ? "THE ALARM IS RINGING" : "");
+    });
+    const people = ids.filter((id) => id.startsWith("person."));
+    if (people.length) {
+      const home = people.filter((id) => this.st(id)?.state === "home");
+      out.push(home.length ? `${home.map((id) => this.name(id).split(" ")[0]).join(" and ")} ${home.length > 1 ? "are" : "is"} home` : "no one is home");
+    }
+    const parts = out.filter(Boolean);
+    if (!parts.length) return "";
+    const text = parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}` : parts[0];
+    return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`;
+  }
 
   connectedCallback() { this._timer = setInterval(() => { if (this._hass) this.hass = this._hass; }, 30000); }
 
@@ -1180,6 +1212,9 @@ class RoostHero extends RoostBase {
         { type: "expandable", name: "", title: "Weather and readings", icon: "mdi:weather-partly-cloudy", schema: [
           { name: "weather", selector: { entity: { domain: "weather" } } },
           { name: "show_weather", label: "Show the weather line", selector: { boolean: {} } },
+          { name: "status_entities", label: "Say how the house is (doors, alarm, people), for example “Doors are closed and the alarm is off.”", selector: { entity: { multiple: true, domain: ["binary_sensor", "lock", "cover", "alarm_control_panel", "person"] } } },
+          { name: "message", label: "Or your own sentence", selector: { text: {} } },
+          { name: "people", label: "People chips (picture or first letter, and where they are)", selector: { entity: { multiple: true, domain: "person" } } },
           { name: "info", label: "Small readings under the weather (for example inside temperature)", selector: { object: { multiple: true, label_field: "name", fields: {
             entity: { label: "Reading", required: true, selector: { entity: {} } },
             name: { label: "Name (optional)", selector: { text: {} } },
@@ -1201,6 +1236,7 @@ class RoostHero extends RoostBase {
           { name: "sun", label: "Sun (for day and night)", selector: { entity: { domain: "sun" } } },
           { type: "grid", name: "", schema: [{ name: "radius", selector: slider(0, 40, 2) }, { name: "min_height", selector: slider(120, 280, 10) }] },
           { type: "grid", name: "", schema: [{ name: "show_orb", selector: { boolean: {} } }, { name: "show_stars", selector: { boolean: {} } }, { name: "show_sheen", selector: { boolean: {} } }] },
+          { name: "house", label: "House picture with lit windows (good on tablets)", selector: { boolean: {} } },
           { type: "grid", name: "", schema: [{ name: "orb_size", label: "Sun / moon size", selector: slider(28, 96, 2) }, { name: "pill_style", label: "Pill look", selector: pick([["glass", "Dark glass"], ["light", "Light glass"], ["none", "No background"]]) }] },
           ACTION_FIELD("tap_action"),
           THEME_FIELD,
@@ -1243,6 +1279,18 @@ class RoostHero extends RoostBase {
       const v = isNaN(parseFloat(st.state)) ? st.state : `${Math.round(parseFloat(st.state) * 10) / 10}${st.attributes.unit_of_measurement || ""}`;
       return `<span class="inf t" data-e="${esc(it.entity)}">${it.icon ? `<ha-icon icon="${esc(it.icon)}"></ha-icon>` : ""}${it.name ? `${esc(it.name)} ` : ""}<b>${esc(v)}</b></span>`;
     }).join("");
+    const say = this.status();
+    const PG = [["#38BDF8", "#6D4BFF"], ["#FF5577", "#FF9F6B"], ["#10B981", "#6EE7B7"], ["#F59E0B", "#FDE68A"]];
+    const chips = (c.people || []).map((id, k) => {
+      const st = this.st(id);
+      if (!st) return "";
+      const nm = this.name(id).split(" ")[0], pic = st.attributes.entity_picture;
+      const where = ["home", "unknown", "unavailable"].includes(st.state) ? "" : st.state === "not_home" ? "Away" : st.state;
+      return `<span class="who t" data-e="${esc(id)}"><span class="av" style="background:linear-gradient(135deg,${PG[k % 4][0]},${PG[k % 4][1]})">${pic ? `<img src="${esc(pic)}" alt="">` : esc(nm.charAt(0).toUpperCase())}</span>${esc(nm)}${where ? ` · ${esc(where)}` : ""}</span>`;
+    }).join("");
+    const house = c.house ? `<svg class="house" aria-hidden="true" width="230" height="130" viewBox="0 0 230 130"><path d="M10 130V70L70 28l60 42v60z" fill="${day ? "rgba(255,255,255,.18)" : "#120F33"}"/><path d="M120 130V58l45-32 45 32v72z" fill="${day ? "rgba(255,255,255,.12)" : "#0E0B2A"}"/>
+      <rect x="38" y="78" width="18" height="18" rx="3" fill="#FCD34D" class="win"/><rect x="82" y="78" width="18" height="18" rx="3" fill="#FCD34D" opacity=".35"/>
+      <rect x="148" y="70" width="16" height="16" rx="3" fill="#A78BFA" class="win" style="animation-delay:.8s;animation-duration:4.4s"/><rect x="174" y="96" width="16" height="34" rx="3" fill="${day ? "rgba(255,255,255,.2)" : "#2A2560"}"/><rect x="58" y="104" width="22" height="26" rx="3" fill="${day ? "rgba(255,255,255,.2)" : "#2A2560"}"/></svg>` : "";
     const w = this.st(c.weather);
     const temp = w?.attributes.temperature;
     const unit = (w?.attributes.temperature_unit || "°C").replace(/^°?/, "°");
@@ -1281,18 +1329,29 @@ class RoostHero extends RoostBase {
       .pill{display:flex;align-items:center;gap:10px;background:${c.pill_style === "none" ? "transparent" : c.pill_style === "light" ? "rgba(255,255,255,.22)" : "rgba(10,8,40,.3)"};${c.align === "center" ? "align-self:stretch;" : ""}border-radius:16px;padding:10px 12px;margin-top:6px;font-size:13px}
       .pill b.cd{font-size:14px;flex:none}
       @container (max-width: 260px){:host .pill{flex-wrap:wrap}:host .pill b.cd{flex-basis:100%;padding-left:22px}}
+      .house{position:absolute;right:-6px;bottom:-4px;pointer-events:none}
+      .house .win{animation:roost-breathe 3.2s ease-in-out infinite}
+      @keyframes roost-breathe{0%,100%{opacity:.55}50%{opacity:1}}
+      @container (max-width: 520px){:host .house{display:none}}
+      .say{font-size:15px;line-height:1.5;opacity:.9;max-width:470px}
+      .whos{display:flex;flex-wrap:wrap;gap:8px}
+      .who{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border-radius:999px;padding:5px 12px 5px 5px;font-size:13px;cursor:pointer}
+      .av{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;overflow:hidden;flex:none}
+      .av img{width:100%;height:100%;object-fit:cover}
       .dot{position:relative;width:10px;height:10px;border-radius:50%;background:#E9E2FF;flex:none}
       .dot span{position:absolute;inset:0;border-radius:50%;background:#E9E2FF;animation:roost-ping 1.8s ease-out infinite}
     </style>
-    <div class="card">${stars}${c.show_sheen ? '<span class="sheen"></span>' : ""}${c.show_orb ? '<span class="orb"></span>' : ""}
+    <div class="card">${stars}${c.show_sheen ? '<span class="sheen"></span>' : ""}${c.show_orb ? `<span class="orb"${c.house ? ' style="right:210px"' : ""}></span>` : ""}${house}
       <div class="body">
         ${top ? `<span class="top t">${esc(top)}</span>` : ""}
         ${c.show_greeting ? `<span class="hi t">${esc(part)}${who ? `, ${esc(who)}` : ""}</span>` : ""}
         ${c.show_weather && w && temp != null ? `<span class="wx t">${esc(Math.round(temp) + unit)}${cond ? ` · ${esc(cond)}` : ""}</span>` : ""}
         ${info ? `<div class="infos">${info}</div>` : ""}
+        ${say ? `<span class="say t">${esc(say)}</span>` : ""}
+        ${chips ? `<div class="whos">${chips}</div>` : ""}
         ${pill}
       </div></div>`;
-    this.shadowRoot.querySelectorAll(".inf").forEach((el) => el.addEventListener("click", (e) => { e.stopPropagation(); this.moreInfo(el.dataset.e); }));
+    this.shadowRoot.querySelectorAll(".inf,.who").forEach((el) => el.addEventListener("click", (e) => { e.stopPropagation(); this.moreInfo(el.dataset.e); }));
     if ((c.tap_action || {}).action && c.tap_action.action !== "none") {
       const card = this.shadowRoot.querySelector(".card");
       card.style.cursor = "pointer";
@@ -1308,13 +1367,73 @@ class RoostHero extends RoostBase {
 const slug = (v) => String(v || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\u0600-\u06ff]+/g, "-").replace(/^-+|-+$/g, "");
 
 class RoostNav extends RoostBase {
-  static get defaults() { return { items: [], layout: "auto", show_labels: true, fixed: true, color: "active", active_style: "filled", background: "glass", bar_height: 54, icon_size: 21, radius: 26, theme: "auto" }; }
+  static get defaults() { return { items: [], layout: "auto", show_labels: true, fixed: true, color: "active", active_style: "filled", background: "glass", bar_height: 54, icon_size: 21, radius: 26, rail_style: "floating", logo: "", push_content: true, theme: "auto" }; }
 
   validate(c) { if (!Array.isArray(c.items) || !c.items.length) throw new Error("Add at least one button"); }
 
   watched() { return []; }
 
-  extraSignature() { return `${location.pathname}${location.hash}|${window.innerWidth >= 768}|${this.editing()}`; }
+  extraSignature() { return `${location.pathname}${location.hash}|${window.innerWidth >= 768}|${this.editing()}|${RoostNav.sideEdge()}|${RoostNav.topEdge()}`; }
+
+  logoHtml() {
+    const l = String(this._config.logo || "").trim();
+    if (!l) return "";
+    const st = l.includes(".") ? this.st(l) : null;
+    if (st) {
+      const pic = st.attributes.entity_picture;
+      return `<span class="logo">${pic ? `<img src="${esc(pic)}" alt="">` : esc(this.name(l).charAt(0).toUpperCase())}</span>`;
+    }
+    return `<span class="logo">${esc(l.slice(0, 2))}</span>`;
+  }
+
+  // Where Home Assistant's own top bar ends (0 when it is hidden).
+  static topEdge() {
+    try {
+      const root = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main")?.shadowRoot
+        ?.querySelector("ha-panel-lovelace")?.shadowRoot?.querySelector("hui-root")?.shadowRoot;
+      const hd = root?.querySelector(".header, app-header, .toolbar");
+      if (!hd) return 0;
+      const r = hd.getBoundingClientRect();
+      return r.height > 4 && getComputedStyle(hd).display !== "none" ? Math.max(0, Math.round(r.bottom)) : 0;
+    } catch (e) { return 0; }
+  }
+
+  // Keeps the page's cards out from under a pinned side rail.
+  makeRoom(px) {
+    try {
+      const root = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main")?.shadowRoot
+        ?.querySelector("ha-panel-lovelace")?.shadowRoot?.querySelector("hui-root")?.shadowRoot;
+      if (!root) return;
+      let el = root.getElementById("roost-nav-room");
+      if (!px) { if (el) el.remove(); return; }
+      if (!el) { el = document.createElement("style"); el.id = "roost-nav-room"; root.appendChild(el); }
+      el.textContent = `#view{padding-left:${px}px!important;box-sizing:border-box}`;
+    } catch (e) { /* nothing to move */ }
+  }
+
+  // Where Home Assistant's own side menu ends (0 when it is hidden or folded away as a pop-out on phones).
+  // A pinned bar or rail starts after it, so the menu never covers the buttons.
+  static sideEdge() {
+    try {
+      const main = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main");
+      const bar = main?.shadowRoot?.querySelector("ha-sidebar");
+      if (!bar) return 0;
+      const r = bar.getBoundingClientRect();
+      if (r.width < 8 || r.right <= 0 || r.left >= window.innerWidth / 2 || getComputedStyle(bar).display === "none" || getComputedStyle(bar).visibility === "hidden") return 0;
+      return Math.round(r.right);
+    } catch (e) { return 0; }
+  }
+
+  watchSide() {
+    try {
+      const bar = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main")?.shadowRoot?.querySelector("ha-sidebar");
+      if (!bar || this._sideBar === bar || !window.ResizeObserver) return;
+      this._sideObs?.disconnect();
+      this._sideBar = bar;
+      this._sideObs = new ResizeObserver(() => { if (this._hass) { this._sig = null; this.hass = this._hass; } });
+      this._sideObs.observe(bar);
+    } catch (e) { /* no side menu to watch */ }
+  }
 
   // While the dashboard is being edited, the bar sits in its own place so it can be found and tapped to edit.
   editing() { return !!(this.preview || this.editMode || /[?&]edit=1/.test(location.search) || this.closest?.("hui-card-preview, hui-dialog-edit-card")); }
@@ -1332,13 +1451,9 @@ class RoostNav extends RoostBase {
     window.addEventListener("location-changed", this._onLoc);
     window.addEventListener("hashchange", this._onLoc);
     window.addEventListener("resize", this._onLoc);
+    setTimeout(() => this.watchSide(), 300);
   }
 
-  disconnectedCallback() {
-    window.removeEventListener("location-changed", this._onLoc);
-    window.removeEventListener("hashchange", this._onLoc);
-    window.removeEventListener("resize", this._onLoc);
-  }
 
   static getConfigForm() {
     return {
@@ -1349,12 +1464,18 @@ class RoostNav extends RoostBase {
           path: { label: "Opens (for example /dashboard-home/0 or #rooms)", required: true, selector: { text: {} } },
           match: { label: "Also lights up on these pages", selector: { select: { multiple: true, custom_value: true, options: [] } } },
           users: { label: "Only for these people (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
+          bottom: { label: "At the far end of the side rail (for example Settings)", selector: { boolean: {} } },
         } } } },
         { type: "grid", name: "", schema: [
           { name: "layout", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Bar on phones, rail on tablets" }, { value: "bar", label: "Always a bottom bar" }, { value: "rail", label: "Always a side rail" }] } } },
           { name: "show_labels", selector: { boolean: {} } },
         ] },
         { name: "fixed", label: "Pinned to the edge of the screen", selector: { boolean: {} } },
+        { type: "expandable", name: "", title: "Side rail (tablets and wall panels)", icon: "mdi:tablet", schema: [
+          { name: "rail_style", label: "Rail shape", selector: pick([["floating", "Floating in the middle of the side"], ["full", "Full height, from top to bottom"]]) },
+          { name: "logo", label: "At the top of the rail: a letter or word, or a person (their picture)", selector: { text: {} } },
+          { name: "push_content", label: "Move the page over so the rail never covers cards", selector: { boolean: {} } },
+        ] },
         { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
           ...colourFields("color", "Colour of the chosen button"),
           { name: "active_style", selector: pick([["filled", "Filled square with glow"], ["soft", "Soft tinted square"], ["pill", "Filled pill"], ["line", "Line under it"], ["dot", "Dot under it"], ["icon", "Coloured icon only"]]) },
@@ -1396,7 +1517,13 @@ class RoostNav extends RoostBase {
     } catch (e) { /* nothing to lift */ }
   }
 
-  disconnectedCallback() { if (this._lifted) { this._lifted = false; RoostNav.lifts = Math.max(0, (RoostNav.lifts || 1) - 1); setTimeout(() => { if (!RoostNav.lifts) this.liftToasts(false); }, 400); } }
+  disconnectedCallback() {
+    this._sideObs?.disconnect(); this._sideBar = null;
+    window.removeEventListener("location-changed", this._onLoc);
+    window.removeEventListener("hashchange", this._onLoc);
+    window.removeEventListener("resize", this._onLoc);
+    if (this._room) { this._room = 0; this.makeRoom(0); }
+    if (this._lifted) { this._lifted = false; RoostNav.lifts = Math.max(0, (RoostNav.lifts || 1) - 1); setTimeout(() => { if (!RoostNav.lifts) this.liftToasts(false); }, 400); } }
 
   render() {
     if (!this._hass || !this._config) return;
@@ -1410,7 +1537,11 @@ class RoostNav extends RoostBase {
     const uid = this._hass.user?.id;
     const mine = (list) => list.some((u) => u === uid || this._hass.states[u]?.attributes.user_id === uid);
     const shown = c.items.map((it, i) => ({ it, i })).filter(({ it }) => editing || !Array.isArray(it.users) || !it.users.length || mine(it.users));
-    const pos = fixed ? (rail ? "position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:4" : "position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4") : "";
+    const edge = fixed ? RoostNav.sideEdge() : 0;
+    if (fixed) this.watchSide();
+    const full = rail && c.rail_style === "full";
+    const top = full && fixed ? RoostNav.topEdge() : 0;
+    const pos = fixed ? (rail ? (full ? `position:fixed;left:${edge + 24}px;top:${top + 24}px;bottom:24px;z-index:4` : `position:fixed;left:${edge + 16}px;top:50%;transform:translateY(-50%);z-index:4`) : `position:fixed;left:calc(${edge}px + (100% - ${edge}px) / 2);bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4`) : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       :host{${fixed ? (rail ? "height:0;" : "height:calc(76px + env(safe-area-inset-bottom));") : ""}display:block}
       .edit{font-size:12px;color:${p.muted};text-align:center;margin:0 0 6px}
@@ -1435,8 +1566,13 @@ class RoostNav extends RoostBase {
       a{min-width:0}
       @container (max-width: ${shown.length * 64}px){:host a span{display:none}:host a{padding:4px 2px}:host nav{padding:5px;gap:2px}}
       @media (max-width: 360px){nav{gap:2px;padding:6px}a{padding:4px 2px}}
+      ${full ? `nav{align-items:center;padding:16px 12px;gap:10px;box-sizing:border-box;${fixed ? "" : "min-height:480px;"}}a{width:48px;min-width:48px;min-height:48px;padding:0}a span{display:none}` : ""}
+      .grow{flex:1 1 auto}
+      .logo{width:44px;height:44px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;margin-bottom:14px;overflow:hidden;
+        background:linear-gradient(135deg,${g[0]},#38BDF8);color:#fff;font-weight:700;font-size:20px;box-shadow:0 8px 24px -6px ${g[2]}}
+      .logo img{width:100%;height:100%;object-fit:cover}
     </style>
-    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${shown.map(({ it, i }) => `<a href="${esc(it.path)}" data-i="${i}" class="${this.active(it.path, it) ? "on" : ""}" aria-label="${esc(it.name || it.path)}">
+    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${rail ? this.logoHtml() : ""}${shown.map(({ it, i }, k) => `${rail && it.bottom && !shown.slice(0, k).some((x) => x.it.bottom) ? '<span class="grow"></span>' : ""}<a href="${esc(it.path)}" data-i="${i}" class="${this.active(it.path, it) ? "on" : ""}" aria-label="${esc(it.name || it.path)}">
       <ha-icon icon="${esc(it.icon || "mdi:circle")}"></ha-icon>${c.show_labels && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</a>`).join("")}</nav>`;
     const pillCss = { filled: `background:linear-gradient(135deg,${g[0]},${g[1]});box-shadow:0 10px 24px -8px color-mix(in srgb, ${g[0]} 95%, transparent), inset 0 1px 0 rgba(255,255,255,.35)`,
       pill: `background:linear-gradient(135deg,${g[0]},${g[1]});box-shadow:0 10px 22px -8px ${g[2]}`, soft: `background:${g[0]}2E` }[c.active_style];
@@ -1446,6 +1582,15 @@ class RoostNav extends RoostBase {
       const draw = () => this.slidePill(navEl, on, memo, `${pillCss};border-radius:${c.active_style === "pill" ? 999 : Math.max(8, Number(c.radius) - 8)}px`);
       if (on) (window.requestAnimationFrame || setTimeout)(draw);
     }
+    if (rail && fixed && c.push_content !== false) {
+      (window.requestAnimationFrame || setTimeout)(() => {
+        const nv = this.shadowRoot.querySelector("nav");
+        if (!nv) return;
+        const r = nv.getBoundingClientRect();
+        this._room = Math.max(0, Math.round(r.right - RoostNav.sideEdge() + 4));
+        this.makeRoom(this._room);
+      });
+    } else if (this._room) { this._room = 0; this.makeRoom(0); }
     this.shadowRoot.querySelectorAll("a").forEach((a) => a.addEventListener("click", (ev) => {
       const it = c.items[+a.dataset.i];
       ev.preventDefault();
@@ -1616,7 +1761,9 @@ class RoostRooms extends RoostBase {
     this._hass = hass;
     (this._cards || []).flat().forEach((el) => { el.hass = hass; });
     const counts = this._config?.show_count ? this._config.rooms.map((r) => this.onCount(r)).join(",") : "";
-    const sig = `${this.dark ? 1 : 0}|${this._active}|${counts}`;
+    const rm = this._config?.rooms?.[this._active] || {};
+    const clim = [rm.temperature, rm.humidity].map((id) => (id ? hass.states?.[id]?.state : "")).join(",");
+    const sig = `${this.dark ? 1 : 0}|${this._active}|${counts}|${clim}`;
     if (sig === this._sig) return;
     this._sig = sig;
     this.render();
@@ -1630,10 +1777,12 @@ class RoostRooms extends RoostBase {
           icon: { label: "Icon", selector: { icon: {} } },
           color: { label: "Colour of this room's button (empty = the card's colour)", selector: { select: { mode: "dropdown", options: COLOR_OPTIONS.filter((o) => o.value !== "custom") } } },
           entities: { label: "Devices in this room (each becomes a tile)", selector: { entity: { multiple: true } } },
+          temperature: { label: "Temperature sensor (shown next to the room buttons)", selector: { entity: { domain: "sensor" } } },
+          humidity: { label: "Humidity sensor", selector: { entity: { domain: "sensor" } } },
           cards: { label: "Extra cards (advanced, YAML list)", selector: { object: {} } },
         } } } },
         { type: "expandable", name: "", title: "Room buttons", icon: "mdi:gesture-tap-button", schema: [
-          { name: "show_names", label: "Room names on the buttons", selector: pick([["active", "Only on the chosen room"], ["all", "On every room"], ["none", "Icons only"]]) },
+          { name: "show_names", label: "What the room buttons show", selector: pick([["active", "Icons, and the name when chosen"], ["all", "Icons and names"], ["names", "Names only"], ["none", "Icons only"]]) },
           ...colourFields("color", "Colour of the chosen room"),
           { type: "grid", name: "", schema: [
             { name: "active_style", label: "How the chosen room looks", selector: pick([["filled", "Filled with glow"], ["soft", "Soft tint"], ["line", "Line under it"]]) },
@@ -1641,7 +1790,10 @@ class RoostRooms extends RoostBase {
           ] },
           { type: "grid", name: "", schema: [
             { name: "pill_shape", label: "Button shape", selector: pick([["pill", "Pill"], ["rounded", "Rounded square"], ["square", "Square"]]) },
-            { name: "pill_align", label: "Line up", selector: pick([["spread", "Spread across"], ["start", "Left"], ["center", "Centre"]]) },
+            { name: "pill_align", label: "Line up", selector: pick([["fill", "Same width, filling the bar"], ["spread", "Spread across"], ["start", "Left"], ["center", "Centre"]]) },
+          ] },
+          { type: "grid", name: "", schema: [
+            { name: "pill_width", label: "Button width (0 = automatic)", selector: slider(0, 240, 4) },
           ] },
           { type: "grid", name: "", schema: [
             { name: "pill_height", label: "Button height", selector: slider(32, 64, 2) },
@@ -1728,16 +1880,24 @@ class RoostRooms extends RoostBase {
     if (!this._config) return;
     if (!this._built) { if (!this._building) { this._building = true; this.build().finally(() => { this._building = false; }); } return; }
     const c = this._config, p = this.p;
-    const showName = (i) => c.show_names === "all" || (c.show_names === "active" && i === this._active);
+    const showName = (i) => c.show_names === "all" || c.show_names === "names" || (c.show_names === "active" && i === this._active);
     const room = c.rooms[this._active] || {};
     const g = room.color && room.color !== "custom" ? (room.color === "active" ? ACTIVE : COLORS[room.color] || this.colour()) : this.colour();
     const ph = Math.max(28, Number(c.pill_height) || 40);
     const rad = c.pill_shape === "square" ? 10 : c.pill_shape === "rounded" ? Math.round(ph * 0.34) : 999;
     const counts = c.show_count ? c.rooms.map((r) => this.onCount(r)) : [];
+    const rd = (id) => { const s = this.st(id); const v = s ? num(s.state) : null; return v == null ? null : fmt(v, 1); };
+    const t0 = room.temperature ? rd(room.temperature) : null, h0 = room.humidity ? rd(room.humidity) : null;
+    const clim = t0 != null || h0 != null ? `<div class="clim t">${h0 != null ? `<span><ha-icon icon="mdi:water-outline" style="color:#38BDF8"></ha-icon>${esc(Math.round(h0))}%</span>` : ""}${t0 != null ? `<span><ha-icon icon="mdi:thermometer" style="color:#FF9F6B"></ha-icon>${esc(t0)}°C</span>` : ""}</div>` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .bar{border-radius:${c.pill_shape === "pill" ? 999 : rad + 4}px;border:1px solid ${c.background === "none" ? "transparent" : p.border};background:${c.background === "none" ? "transparent" : c.background === "glass" ? `color-mix(in srgb, ${p.panel} 60%, transparent);backdrop-filter:blur(14px)` : p.panel};padding:4px;margin-bottom:16px}
       .pills{display:flex;gap:2px;justify-content:${c.pill_align === "start" ? "flex-start" : c.pill_align === "center" ? "center" : "space-between"};overflow-x:auto;scrollbar-width:none}
+      ${Number(c.pill_width) > 0 ? `.pill{flex:0 0 ${Number(c.pill_width)}px!important;padding:0 8px!important;white-space:normal!important;line-height:1.15;text-align:center}` : c.pill_align === "fill" ? ".pill{flex:1 1 0!important;padding:0 8px!important;min-width:0;white-space:normal!important;line-height:1.15;text-align:center}" : ""}
       .pills::-webkit-scrollbar{display:none}
+      .head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .head .bar{flex:0 1 auto;min-width:0;padding:4px}
+      .clim{display:flex;gap:16px;font-size:14px;color:${p.muted};flex:none}
+      .clim span{display:flex;align-items:center;gap:6px}.clim ha-icon{--mdc-icon-size:16px}
       .pill{position:relative;flex:0 0 auto;min-height:${ph}px;min-width:${ph + 8}px;border-radius:${rad}px;border:0;background:transparent;color:${p.muted};
         display:flex;align-items:center;justify-content:center;gap:6px;padding:0 17px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent}
       ${c.active_style === "soft" ? `.pill.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]}}`
@@ -1754,8 +1914,8 @@ class RoostRooms extends RoostBase {
       .room > .wide{grid-column:1/-1}
       .empty{grid-column:1/-1;padding:22px;border-radius:20px;border:1px dashed ${p.border};color:${p.muted};text-align:center;font-size:14px;line-height:1.4}
     </style>
-    <div class="bar"><div class="pills" role="tablist">${c.rooms.map((r, i) => `<button class="pill ${i === this._active ? "on" : ""}" role="tab" aria-selected="${i === this._active}" data-i="${i}" aria-label="${esc(r.name)}">
-      ${r.icon ? `<ha-icon icon="${esc(r.icon)}"></ha-icon>` : ""}${showName(i) || !r.icon ? `<span>${esc(r.name)}</span>` : ""}${counts[i] ? `<span class="cnt">${counts[i]}</span>` : ""}</button>`).join("")}</div></div>
+    ${clim ? '<div class="head">' : ""}<div class="bar"><div class="pills" role="tablist">${c.rooms.map((r, i) => `<button class="pill ${i === this._active ? "on" : ""}" role="tab" aria-selected="${i === this._active}" data-i="${i}" aria-label="${esc(r.name)}">
+      ${r.icon && c.show_names !== "names" ? `<ha-icon icon="${esc(r.icon)}"></ha-icon>` : ""}${showName(i) || !r.icon ? `<span>${esc(r.name)}</span>` : ""}${counts[i] ? `<span class="cnt">${counts[i]}</span>` : ""}</button>`).join("")}</div></div>${clim ? `${clim}</div>` : ""}
     ${c.rooms.map((r, i) => `<div class="room" data-room="${i}" ${i === this._active ? "" : "hidden"}>${(this._cards[i] || []).length ? "" : '<div class="empty t">No devices in this room yet. Edit the card and pick some under “Devices in this room”.</div>'}</div>`).join("")}`;
     this.shadowRoot.querySelectorAll(".room").forEach((box) => {
       const i = +box.dataset.room;
@@ -2265,6 +2425,7 @@ class RoostClockClassic extends ticking(RoostBase, 15000) {
           entity: { label: "Time (a sensor with a time)", required: true, selector: { entity: {} } },
           countdown: { label: "Count down to it", selector: { boolean: {} } },
         } } } },
+        { name: "prayer_method", label: "Or prayer times worked out here (no sensors needed)", selector: { select: { mode: "dropdown", options: [{ value: "", label: "Off" }, ...Object.entries(PRAYER_METHODS).map(([k, v]) => ({ value: k, label: v.name }))] } } },
         { name: "countdown_title", label: "Word before the next time", selector: { text: {} } },
         { type: "expandable", name: "", title: "Clock", icon: "mdi:clock-outline", schema: [
           { type: "grid", name: "", schema: [{ name: "hour24", label: "24-hour clock", selector: { boolean: {} } }, { name: "seconds", selector: { boolean: {} } }] },
@@ -2289,6 +2450,19 @@ class RoostClockClassic extends ticking(RoostBase, 15000) {
 
   getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
 
+  // Prayer times worked out here, for the line, when no time sensors are picked.
+  prayerTimes(now) {
+    const h = this._hass, c = this._config;
+    const lat = Number(h?.config?.latitude ?? 26.2), lng = Number(h?.config?.longitude ?? 50.6);
+    const tz = -new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12).getTimezoneOffset() / 60;
+    const t = PrayerCalc.times(now, lat, lng, tz, c.prayer_method, c.asr === "hanafi" ? 2 : 1, Number(h?.config?.elevation ?? 0));
+    return [["fajr", "Fajr", "F"], ["sunrise", "Sunrise", "S"], ["dhuhr", "Dhuhr", "D"], ["asr", "Asr", "A"], ["maghrib", "Maghrib", "M"], ["isha", "Isha", "I"]]
+      .filter(([k]) => isFinite(t[k])).map(([k, name, short]) => {
+        const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0); at.setMinutes(Math.round(t[k] * 60));
+        return { name, short, at, countdown: k !== "sunrise" };
+      });
+  }
+
   // today's time for a sensor (a full date, or "18:05")
   when(id) {
     const s = this.st(id);
@@ -2308,7 +2482,8 @@ class RoostClockClassic extends ticking(RoostBase, 15000) {
     const time = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: c.seconds ? "2-digit" : undefined, hour12: !c.hour24 });
     const [hm, ap] = c.hour24 ? [time, ""] : [time.replace(/\s?[AaPp]\.?[Mm]\.?$/, ""), (time.match(/[AaPp]\.?[Mm]\.?$/) || [""])[0]];
     const date = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-    const times = (c.times || []).map((t) => ({ ...t, at: this.when(t.entity) })).filter((t) => t.at);
+    let times = (c.times || []).map((t) => ({ ...t, at: this.when(t.entity) })).filter((t) => t.at);
+    if (!times.length && c.prayer_method) times = this.prayerTimes(now);
     const mins = (d) => d.getHours() * 60 + d.getMinutes();
     let next = times.filter((t) => t.countdown !== false && mins(t.at) > mins(now)).sort((a, b) => mins(a.at) - mins(b.at))[0];
     let nextAt = next ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), next.at.getHours(), next.at.getMinutes()) : null;
@@ -2697,13 +2872,23 @@ class RoostClockFace extends RoostClockClassic {
   static getConfigForm() {
     return {
       schema: [
-        { name: "face", label: "Clock face", selector: pick([["digital", "Digital"], ["analog", "Analog"], ["minimal", "Minimal analog"], ["flip", "Flip"], ["ring", "Ring"], ["word", "Words"], ["neon", "Neon"], ["lcd", "LCD"]]) },
+        { name: "face", label: "Clock face", selector: pick([["times", "Big time with a line of the day's times (prayer times; good on wall panels)"], ["digital", "Digital"], ["analog", "Analog"], ["minimal", "Minimal analog"], ["flip", "Flip"], ["ring", "Ring"], ["word", "Words"], ["neon", "Neon"], ["lcd", "LCD"]]) },
         { type: "grid", name: "", schema: [{ name: "hour24", label: "24-hour", selector: { boolean: {} } }, { name: "seconds", label: "Seconds", selector: { boolean: {} } }] },
         { type: "grid", name: "", schema: [{ name: "date_format", label: "Date", selector: pick([["long", "Tuesday 17 November"], ["short", "Tue 17 Nov"], ["numeric", "17/11/2026"], ["none", "No date"]]) }, { name: "show_hijri", label: "Hijri date too", selector: { boolean: {} } }] },
         { type: "grid", name: "", schema: [{ name: "timezone", label: "Time zone (empty = here, or e.g. Asia/Riyadh)", selector: { text: {} } }, { name: "label", label: "Label (e.g. Makkah)", selector: { text: {} } }] },
         { type: "expandable", name: "", title: "Analog faces", icon: "mdi:clock-time-four-outline", schema: [
           { type: "grid", name: "", schema: [{ name: "numerals", label: "Numbers", selector: pick([["western", "1 2 3"], ["eastern", "١ ٢ ٣"], ["roman", "I II III"], ["none", "None"]]) }, { name: "ticks", label: "Marks", selector: pick([["hours", "Hours"], ["all", "Every minute"], ["none", "None"]]) }] },
           { type: "grid", name: "", schema: [{ name: "hands", selector: pick([["classic", "Classic"], ["slim", "Slim"], ["bold", "Bold"]]) }, { name: "smooth", label: "Sweeping seconds", selector: { boolean: {} } }] },
+        ] },
+        { type: "expandable", name: "", title: "Line of times (with the first face)", icon: "mdi:timeline-clock-outline", schema: [
+          { name: "prayer_method", label: "Prayer times worked out here", selector: { select: { mode: "dropdown", options: [{ value: "", label: "Off (use the times below)" }, ...Object.entries(PRAYER_METHODS).map(([k, v]) => ({ value: k, label: v.name }))] } } },
+          { name: "times", label: "Or my own times (sensors)", selector: { object: { multiple: true, label_field: "name", fields: {
+            name: { label: "Name", required: true, selector: { text: {} } },
+            short: { label: "Short name on the line (1–2 letters)", selector: { text: {} } },
+            entity: { label: "Time (a sensor with a time)", required: true, selector: { entity: {} } },
+            countdown: { label: "Count down to it", selector: { boolean: {} } },
+          } } } },
+          { name: "countdown_title", label: "Word before the next time", selector: { text: {} } },
         ] },
         { name: "world", label: "World clocks underneath", selector: { object: { multiple: true, label_field: "label", fields: {
           label: { label: "Name", required: true, selector: { text: {} } }, timezone: { label: "Time zone (e.g. Europe/London)", required: true, selector: { text: {} } } } } } },
@@ -2733,7 +2918,7 @@ class RoostClockFace extends RoostClockClassic {
 
   render() {
     const c = this._config;
-    if (c && Array.isArray(c.times) && c.times.length && !(this._raw && "face" in this._raw)) { super.render(); return; } // older prayer-time setups keep working
+    if (c && (c.face === "times" || (((Array.isArray(c.times) && c.times.length) || c.prayer_method) && !(this._raw && "face" in this._raw)))) { super.render(); return; } // older prayer-time setups keep working
     if (!this._hass || !c) return;
     const p = this.p, g = this.colour(), t = clockParts(c.timezone), num = (v) => (c.numerals === "eastern" ? easternDigits(v) : String(v));
     const h12 = t.h % 12 || 12, hh = c.hour24 ? String(t.h).padStart(2, "0") : String(h12), mm = String(t.m).padStart(2, "0"), ss = String(t.s).padStart(2, "0"), ap = t.h < 12 ? "AM" : "PM";
