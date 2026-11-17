@@ -50,7 +50,7 @@ try {
 } catch (e) { /* fonts fall back to the system font */ }
 const FONT_NUM = "'Space Grotesk', Inter, -apple-system, 'Segoe UI', Roboto, sans-serif";
 const COLOR_OPTIONS = [{ value: "active", label: "Selected purple" }, ...Object.keys(COLORS).map((k) => ({ value: k, label: k[0].toUpperCase() + k.slice(1) })), { value: "custom", label: "My own colours" }];
-const SIZES = { small: 128, medium: 152, large: 176 };
+const SIZES = { compact: 100, small: 128, medium: 152, large: 176 };
 // Ready-made skies for the hero card: [gradient, name in the editor]
 const SKIES = {
   day: ["linear-gradient(115deg,#2563EB 0%,#60A5FA 50%,#FDBA74 100%)", "Day sky"],
@@ -911,7 +911,7 @@ class RoostTile extends RoostBase {
         { type: "expandable", name: "", title: "Colour and shape", icon: "mdi:palette", schema: [
           ...colourFields(),
           { type: "grid", name: "", schema: [
-            { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
+            { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "compact", label: "Compact (for wall panels)" }, { value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
             { name: "radius", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
           ] },
           { type: "grid", name: "", schema: [{ name: "fill", selector: FILL_OPTIONS }, { name: "glow", selector: GLOW_OPTIONS }] },
@@ -991,7 +991,7 @@ class RoostTile extends RoostBase {
     const center = c.align === "center";
     const bars = on && kind === "bars" ? `<span class="bars">${[0, 0.2, 0.4, 0.1].map((d) => `<i style="animation-delay:${d}s"></i>`).join("")}</span>` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .card{position:relative;min-height:${h}px;height:100%;border-radius:${c.radius}px;padding:16px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
+      .card{position:relative;min-height:${h}px;height:100%;border-radius:${c.radius}px;padding:${c.size === "compact" ? 12 : 16}px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
         display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden;transition:transform .12s;${center ? "align-items:center;text-align:center;" : ""}
         background:${on ? look.bg : p.off};color:${on ? look.fg : p.text};${on && look.blur ? "backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);" : ""}
         border:${on && c.fill === "outline" ? 2 : 1}px solid ${on ? look.border : c.off_tint ? `color-mix(in srgb, ${g[0]} 35%, ${p.border})` : p.border};box-shadow:${on ? look.shadow : "none"};opacity:${un ? 0.55 : 1}}
@@ -1015,7 +1015,7 @@ class RoostTile extends RoostBase {
       ${c.locked ? '<ha-icon class="lk" icon="mdi:lock" aria-label="Locked"></ha-icon>' : ""}${broken ? '<ha-icon class="lk" icon="mdi:battery-alert-variant-outline" style="color:#FF9F6B;--mdc-icon-size:20px" aria-label="Not working"></ha-icon>' : ""}${bars}
       <div><div class="nm t">${esc(this.name(c.entity))}</div>
         ${c.show_state || broken || !s ? `<div class="lb t">${esc(broken ? c.problem : s ? this.stateText(s, on, un) + (c.locked && !un ? " · protected" : "") : "Device not found")}</div>` : ""}
-        ${c.show_since && s && !UNAVAILABLE.includes(s.state) ? `<div class="ago t">${esc(since(s.last_changed))}</div>` : ""}</div>
+        ${c.show_since && c.size !== "compact" && s && !UNAVAILABLE.includes(s.state) ? `<div class="ago t">${esc(since(s.last_changed))}</div>` : ""}</div>
     </div>`;
     this.icon(this.shadowRoot.querySelector(".ic"), c.icon, c.entity);
     const tap = (c.locked || broken) && ["toggle", "perform-action", "call-service"].includes((c.tap_action || {}).action) ? { action: "more-info" }
@@ -1042,7 +1042,7 @@ class RoostChips extends RoostBase {
       schema: [
         { name: "entities", required: true, selector: { entity: { multiple: true } } },
         { type: "grid", name: "", schema: [
-          { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
+          { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "compact", label: "Compact (for wall panels)" }, { value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
           { name: "show_words", label: "Words next to door icons (“Closed”)", selector: { boolean: {} } },
           { name: "chip_shape", selector: pick([["pill", "Pill"], ["rounded", "Rounded square"], ["square", "Square"]]) },
           { name: "background", selector: pick([["solid", "Solid"], ["glass", "See-through glass"], ["none", "None"]]) },
@@ -1212,6 +1212,7 @@ class RoostThermostat extends RoostBase {
         ] },
         { type: "expandable", name: "", title: "Buttons", icon: "mdi:gesture-tap-button", schema: [
           { name: "show_power", selector: { boolean: {} } },
+          { name: "compact", label: "Compact: the buttons sit in the gap of the dial (for wall panels)", selector: { boolean: {} } },
           ACTION_FIELD("power_action", "The power button runs (for an AC sent by infrared, for example a script; empty = on and off)"),
           { name: "show_plus_minus", selector: { boolean: {} } },
           { name: "modes", selector: { select: { multiple: true, options: [
@@ -1259,14 +1260,14 @@ class RoostThermostat extends RoostBase {
     const breeze = nest && on ? [100, 125, 150].map((x, i) => `<rect x="${x - 1}" y="70" width="2" height="12" rx="1" fill="${this.dark ? "#9CD8FF" : "#1E5FB8"}" style="animation:roost-breathe 1.4s ease-in-out ${i * 0.4}s infinite"/>`).join("") : "";
     const pillOn = nest ? `background:${this.dark ? "#1F3A66" : "#DCEBFF"};color:${this.dark ? "#9CD8FF" : "#1E5FB8"}` : `background:${g[0]}33;color:${g[1]}`;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .card{${c.plain ? `padding:0;background:none;border:0;color:${p.text}` : `border-radius:${c.radius}px;padding:${nest ? 24 : 18}px;background:${p.panel};${p.fx || ""};border:1px solid ${p.border};color:${p.text}`}}
+      .card{${c.plain ? `padding:0;background:none;border:0;color:${p.text}` : `border-radius:${c.radius}px;padding:${c.compact ? 16 : nest ? 24 : 18}px;background:${p.panel};${p.fx || ""};border:1px solid ${p.border};color:${p.text}`}}
       .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
       .hd .n{font-size:15px;font-weight:600}
       .pill{font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;${on ? pillOn : `background:${p.inset};color:${p.muted}`}}
       svg{width:100%;max-width:${maxW}px;display:block;margin:${nest ? "10px auto 0" : "4px auto"};touch-action:none;user-select:none;-webkit-user-select:none;cursor:${noTemp || un ? "default" : "pointer"}}
       svg.on{animation:roost-arc 3s ease-in-out infinite}
       svg.drag #val{fill:#C084FC}
-      .ctl{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-top:${nest ? 10 : 6}px}
+      .ctl{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-top:${c.compact ? -52 : nest ? 10 : 6}px;position:relative}
       @container (max-width: 260px){:host .ctl{gap:8px}}
       .rb{width:min(52px,24cqw);height:min(52px,24cqw);border-radius:50%;border:0;background:${p.inset};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer}
       .rb.pw{width:min(${nest ? 68 : 64}px,30cqw);height:min(${nest ? 68 : 64}px,30cqw);background:${on ? (nest ? "linear-gradient(135deg,#2F6BFF,#8B6CFF)" : `linear-gradient(135deg,${g[0]},${g[1]})`) : p.inset};color:${on ? "#fff" : nest ? p.muted : p.text};box-shadow:${on ? (nest ? "0 14px 30px -8px rgba(90,110,255,.9)" : `0 12px 28px -10px ${g[2]}`) : "none"}}
