@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.5.1";
+const ROOST_VERSION = "1.5.2";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -5918,6 +5918,7 @@ class RoostEV extends ticking(RoostBase, 60000) {
       { type: "grid", name: "", schema: [{ name: "power", label: "Charging power", selector: { entity: { domain: "sensor" } } }, { name: "charging", label: "Charging on/off", selector: { entity: { domain: ["switch", "binary_sensor", "sensor"] } } }] },
       { type: "grid", name: "", schema: [{ name: "plugged", label: "Plugged in", selector: { entity: { domain: "binary_sensor" } } }, { name: "limit", label: "Charge limit", selector: { entity: { domain: ["number", "sensor"] } } }] },
       { type: "grid", name: "", schema: [{ name: "capacity", label: "Battery size (kWh, for the time to full)", selector: { number: { mode: "box" } } }, { name: "name", selector: { text: {} } }] },
+      { name: "image", label: "Picture of your car from the side (optional, for example /local/my-car.png; a see-through PNG looks best)", selector: { text: {} } },
       ...colourFields("color"), THEME_FIELD,
     ], computeLabel };
   }
@@ -5956,6 +5957,11 @@ class RoostEV extends ticking(RoostBase, 60000) {
       .car{position:relative;border-radius:18px;overflow:hidden;background:radial-gradient(120% 90% at 60% 110%,${g[0]}33,transparent 60%),${p.inset}}
       .car svg{display:block;width:100%;height:auto}
       .cell.next{animation:roost-breathe 1.2s ease-in-out infinite}
+      .photo{padding:12px 12px 14px;display:flex;flex-direction:column;align-items:center;gap:10px}
+      .photo img{width:100%;max-height:150px;object-fit:contain;filter:drop-shadow(0 12px 14px rgba(0,0,0,${this.dark ? 0.55 : 0.2}))}
+      .pack{display:flex;align-items:center;gap:4px;padding:5px 8px;border-radius:999px;background:${this.dark ? "rgba(11,13,23,.45)" : "rgba(255,255,255,.7)"}}
+      .pack i{display:block;width:18px;height:10px;border-radius:3px}
+      .pack .pb{--mdc-icon-size:16px;color:${g[1]};margin-left:2px;animation:roost-breathe 1.4s ease-in-out infinite}
       .flow{stroke-dasharray:2 10}
       ${charging ? `.flow{animation:roost-dash .7s linear infinite}@keyframes roost-dash{to{stroke-dashoffset:-12}}.led{animation:roost-breathe 1.4s ease-in-out infinite}
       .wave{animation:roost-wave 2.4s ease-in-out infinite}@keyframes roost-wave{0%{transform:translateX(-60px);opacity:0}30%{opacity:.9}100%{transform:translateX(150px);opacity:0}}
@@ -5965,7 +5971,11 @@ class RoostEV extends ticking(RoostBase, 60000) {
       ${head(charging ? "mdi:ev-station" : "mdi:car-electric", c.name || "Car", line)}
       <div class="hero"><div><div class="pc num" data-tw="ev">${lvl == null ? "" : `${Math.round(lvl)}<small>%</small>`}</div><div class="sub t">${lim < 100 ? `Charges to ${Math.round(lim)}%` : "Battery"}</div></div>
         ${this.val(c.range) ? `<div class="rg"><b class="num">${esc(this.val(c.range))}</b><span>range</span></div>` : ""}</div>
-      <div class="car" role="img" aria-label="Battery ${lvl == null ? "unknown" : `${Math.round(lvl)}%`}${charging ? ", charging" : ""}">
+      ${c.image ? `<div class="car photo" role="img" aria-label="Battery ${lvl == null ? "unknown" : `${Math.round(lvl)}%`}${charging ? ", charging" : ""}">
+        <img src="${esc(c.image)}" alt="${esc(c.name || "Car")}">
+        <div class="pack">${Array.from({ length: cells }, (_, k) => `<i class="cell ${charging && k === full && k < limCell ? "next" : ""}" style="background:${k < full ? `linear-gradient(90deg,${g[0]},${col})` : k < limCell ? p.track : "transparent"};${k < limCell ? "" : `border:1px dashed ${p.track}`}"></i>`).join("")}
+          ${charging ? '<ha-icon icon="mdi:lightning-bolt" class="pb"></ha-icon>' : ""}</div>
+      </div>` : `<div class="car" role="img" aria-label="Battery ${lvl == null ? "unknown" : `${Math.round(lvl)}%`}${charging ? ", charging" : ""}">
         <svg viewBox="-4 4 380 116" aria-hidden="true">
           <defs>
             <linearGradient id="evbody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${paint[0]}"/><stop offset=".42" stop-color="${paint[1]}"/><stop offset=".43" stop-color="${paint[1]}"/><stop offset="1" stop-color="${this.dark ? "#0E1530" : "#2A3060"}"/></linearGradient>
@@ -6004,7 +6014,7 @@ class RoostEV extends ticking(RoostBase, 60000) {
             ${rim(81)}${rim(272)}
           </g>
         </svg>
-      </div>
+      </div>`}
       <div class="stat">${stat("Charging at", charging && pw != null ? `${fmt(pw, 1)} kW` : "")}${stat("Full in", toFull != null ? minsText(toFull) : "")}</div>
       ${chS && chS.entity_id.startsWith("switch.") ? `<button class="big ${charging ? "off" : ""}" data-ch="1"><ha-icon icon="${charging ? "mdi:stop" : "mdi:lightning-bolt"}"></ha-icon>${charging ? "Stop charging" : "Start charging"}</button>` : ""}
     </div>`;

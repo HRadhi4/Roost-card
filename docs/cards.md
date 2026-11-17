@@ -529,6 +529,7 @@ charging: switch.car_charging   # a switch shows Start / Stop charging
 plugged: binary_sensor.car_plugged_in
 limit: number.car_charge_limit
 capacity: 64                    # battery size in kWh, for “full in”
+image: /local/my-car.png        # optional: your own car from the side instead of the drawing
 ```
 
 ### Roost Plant

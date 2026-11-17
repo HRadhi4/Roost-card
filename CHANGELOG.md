@@ -2,6 +2,9 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.5.2
+- **Roost Car**: use a picture of your own car instead of the drawing (Picture setting). The battery cells show under it and fill while it charges.
+
 ## 1.5.1
 - **Roost Car** has a new drawing: an original side view drawn to real sedan sizes.
   - Door lines, pillars, mirror, flush handles, lights and the charge port.
