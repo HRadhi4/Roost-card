@@ -238,6 +238,13 @@ stop_action:            # optional: what Stop does as well as stopping the curta
   target: { entity_id: script.curtain_stop }
 ```
 
+**Opens with the sun**
+```yaml
+open_at: sunrise     # or "06:30"
+close_at: sunset     # or "22:00"
+schedule: automation.curtains_with_the_sun   # the card shows the times and turns it on or off
+```
+
 ### Roost Gauge
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/gauge.gif" width="320" alt="Roost gauge card in action">
 
@@ -276,6 +283,21 @@ style: row               # row, card, or tile (the big coloured tile of the Room
 subtitle: TV off · curtain open   # optional: your own line instead of the automatic one
 tap_action: { action: navigate, navigation_path: "#living" }
 ```
+
+**Cards under the room** — any card, Roost or Home Assistant's own:
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/room-cards.gif" width="320" alt="Roost room card with cards under it">
+
+```yaml
+cards_look: inside      # inside (one box with the room) or below
+cards_columns: 2        # cards side by side (one on narrow phones)
+cards_fold: true        # folded away behind “3 more” until tapped
+cards:
+  - { type: custom:roost-tile, entity: light.living_lamp }
+  - { type: custom:roost-curtain, entity: cover.living_curtain }
+  - { type: tile, entity: climate.living_ac }    # Home Assistant's own cards work too
+```
+In the visual editor the cards are added under **Cards on it**, the same way as in a Roost Panel.
 
 ### Roost Light
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/light.gif" width="320" alt="Roost light card in action">
@@ -378,6 +400,28 @@ calendar_name: Al-Hadi calendar
 imsak_entity: sensor.my_calendar_imsak
 fajr_entity: sensor.my_calendar_fajr
 dhuhr_entity: sensor.islamic_prayer_times_dhuhr_prayer
+```
+
+**Adhan and Ramadan**
+```yaml
+adhan_speaker: media_player.living_room
+adhan_media: /local/adhan.mp3
+adhan_switches: [input_boolean.adhan_fajr, input_boolean.adhan_dhuhr, input_boolean.adhan_asr, input_boolean.adhan_maghrib, input_boolean.adhan_isha]
+ramadan: auto        # auto (in Ramadan), on or off: shows “Suhoor ends in …” and “Iftar in …”
+```
+Each prayer row gets a bell that turns its switch on or off. Play the adhan with an automation like this one (one per prayer, or use a template):
+```yaml
+triggers:
+  - trigger: time
+    at: sensor.fajr_prayer          # your prayer time sensor
+conditions:
+  - condition: state
+    entity_id: input_boolean.adhan_fajr
+    state: "on"
+actions:
+  - action: media_player.play_media
+    target: { entity_id: media_player.living_room }
+    data: { media_content_id: /local/adhan.mp3, media_content_type: music }
 ```
 Your home's location is used unless you set `latitude` and `longitude`.
 
@@ -504,6 +548,17 @@ battery: sensor.battery_power   # + giving, − charging (battery_invert: true i
 battery_level: sensor.battery_level
 ```
 
+**Electricity bill** (needs the daily energy reading)
+```yaml
+price: 0.016         # per kWh, or stepped prices:
+tiers:
+  - { upto: 3000, price: 0.003 }
+  - { upto: 5000, price: 0.009 }
+  - { price: 0.016 }
+currency: BD
+budget: 25           # optional: warns when the month is heading over it
+```
+
 ### Roost Irrigation
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/irrigation.gif" width="320" alt="Roost irrigation card in action">
 
@@ -577,6 +632,151 @@ Nothing leaves the house: there are no map pictures, only home, your places and 
 type: custom:roost-family
 entities: [person.saeed, person.layla, person.daniel]
 zones: [zone.work, zone.school]
+```
+
+### Roost Grocy
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/grocy.gif" width="320" alt="Roost Grocy card in action">
+
+Needs the [Grocy integration](https://github.com/custom-components/grocy) (from HACS). Its sensors are off at first: turn them on in **Settings → Devices & services → Grocy → entities**. With their usual names the card finds them by itself:
+
+```yaml
+type: custom:roost-grocy
+name: Kitchen
+tabs: [fridge, shopping, chores, tasks, meals]   # what to show, in this order
+soon: 5                 # “goes off soon” means within 5 days
+# only if your sensors have other names:
+# stock: sensor.grocy_stock
+# shopping: sensor.grocy_shopping_list
+# chores: sensor.grocy_chores
+# tasks: sensor.grocy_tasks
+# meals: sensor.grocy_meal_plan
+# expiring / expired / missing: binary_sensor.grocy_..._products
+done_by: 1              # optional: the Grocy user who does the chores
+list_id: 1              # optional: which shopping list
+```
+- **Fridge**: what goes off soonest first. Tap one for *Used one*, *Opened one* or *Went off, throw away*. *Running low · add to the shopping list* adds what is missing.
+- **Shopping**: tap to tick it off (it leaves the Grocy list).
+- **Chores** and **Tasks**: tap twice to mark done.
+- **Meals**: today, tomorrow and the next days from the meal plan.
+
+### Roost Tank
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tank.gif" width="320" alt="Roost tank card in action">
+
+```yaml
+type: custom:roost-tank
+kind: water                     # water, gas (LPG) or diesel
+level: sensor.roof_tank_level   # % or litres
+capacity: 2000                  # litres (or kg for gas)
+used_today: sensor.water_used_today
+daily_use: sensor.water_average_per_day   # or per_day: 420
+leak: binary_sensor.tank_leak
+pump: switch.water_pump
+low: 20                         # warn below this %
+```
+
+### Roost Pool
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pool.gif" width="320" alt="Roost pool card in action">
+
+```yaml
+type: custom:roost-pool
+temperature: sensor.pool_temperature
+chlorine: sensor.pool_chlorine  # ppm; 1–3 is good
+ph: sensor.pool_ph              # 7.2–7.6 is good
+pump: switch.pool_pump
+heater: switch.pool_heater
+light: light.pool
+```
+
+### Roost Pet
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pet.gif" width="320" alt="Roost pet card in action">
+
+```yaml
+type: custom:roost-pet
+name: Luna
+pet: cat                        # cat, dog, bird or fish
+feeder: button.feeder_feed      # a button, switch or script
+food: sensor.feeder_food_level
+water: sensor.fountain_water_level
+meals: sensor.feeder_meals_today
+```
+
+### Roost Nursery
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/nursery.gif" width="320" alt="Roost nursery card in action">
+
+```yaml
+type: custom:roost-nursery
+camera: camera.baby
+temperature: sensor.nursery_temperature
+humidity: sensor.nursery_humidity
+sound: sensor.nursery_sound     # dB (crying above loud: 60) or a crying binary sensor
+light: light.night_light
+music: media_player.nursery_speaker
+```
+
+### Roost Network
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/network.gif" width="320" alt="Roost network card in action">
+
+```yaml
+type: custom:roost-network
+kind: router                    # router (internet) or server
+download: sensor.speedtest_download
+upload: sensor.speedtest_upload
+ping: sensor.speedtest_ping
+clients: sensor.router_devices_online
+restart: button.router_restart  # tap twice to restart
+# server: cpu, memory, disk, temperature, uptime
+```
+
+### Roost Bins
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/bins.gif" width="320" alt="Roost bins card in action">
+
+```yaml
+type: custom:roost-bins
+bins:
+  - { name: General, colour: black, days: [Sunday, Wednesday] }
+  - { name: Recycling, colour: blue, days: [Thursday], every: 2, start: "2026-01-01" }
+  - { name: Garden, colour: green, entity: sensor.garden_bin_next }   # a date sensor or days to go
+```
+
+### Roost Medicine
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/medicine.gif" width="320" alt="Roost medicine card in action">
+
+```yaml
+type: custom:roost-medicine
+name: Grandma
+doses:
+  - { name: Vitamin D, time: "08:00", colour: amber, entity: input_boolean.grandma_vitamin_d }
+  - { name: Blood pressure, time: "14:00", colour: blue, entity: input_boolean.grandma_bp }
+```
+Give each dose an input_boolean (and an automation that turns them all off at midnight) so every screen sees the same ticks. Without it, ticks are kept on this screen only.
+
+### Roost Modes
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/modes.gif" width="320" alt="Roost modes card in action">
+
+```yaml
+type: custom:roost-modes
+modes:
+  - { name: Home, icon: mdi:home, entity: input_boolean.mode_home }
+  - name: Away
+    icon: mdi:walk
+    entity: input_boolean.mode_away
+    checks: [lock.front_door, binary_sensor.kitchen_window, light.living_room]   # should be locked, closed or off
+  - { name: Holiday, icon: mdi:airplane, entity: input_boolean.mode_holiday }
+  - { name: Guests, icon: mdi:account-multiple, entity: input_boolean.mode_guests, wifi_name: Guest house, wifi_password: your-guest-password }
+```
+The Wi-Fi code is made on the screen; the password stays in your dashboard and is not sent anywhere.
+
+### Roost Sleep
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/sleep.gif" width="320" alt="Roost sleep card in action">
+
+```yaml
+type: custom:roost-sleep
+bedtime: "22:30"
+alarm: sensor.phone_next_alarm  # the phone's next alarm, or an input_datetime
+routine: script.good_night
+duration: sensor.sleep_duration
+score: sensor.sleep_score
+temperature: sensor.bedroom_temperature
 ```
 
 ### Roost Vacuum

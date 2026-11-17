@@ -144,6 +144,9 @@ const cases = [
   ["roost-row", { entity: "sensor.power", name: "Power" }],
   ["roost-row", { entity: "switch.kettle" }],
   ["roost-nav", { items: [{ icon: "mdi:home", path: "#home" }, { icon: "mdi:cog", path: "#settings", name: "Settings" }], show_labels: true }],
+  ["roost-grocy", { sample: true }],
+  ["roost-grocy", { sample: true, tabs: ["chores", "meals"] }],
+  ["roost-grocy", {}],
 ];
 let fails = 0;
 for (const dark of [true, false]) {
@@ -267,10 +270,42 @@ if (names(form.schema).includes("color_start")) { fails++; console.error("FAIL e
 form.dispatchEvent(new window.CustomEvent("value-changed", { detail: { value: { ...form.data, color: "custom" } } }));
 if (!saved || saved.color !== "custom" || "radius" in saved || saved.entity !== "light.kitchen") { fails++; console.error("FAIL editor saves only the change", saved); }
 if (!names(form.schema).includes("color_start")) { fails++; console.error("FAIL editor shows own colours when chosen"); }
+// Grocy: food going off is listed first, a shopping item disappears when ticked, a chore needs two taps.
+const gr = document.createElement("roost-grocy"); gr.setConfig({ sample: true, tabs: ["fridge", "shopping", "chores"] }); document.body.appendChild(gr); gr.hass = hass(true);
+const grt = () => gr.shadowRoot.innerHTML.replace(/<style>[\s\S]*?<\/style>/g, "");
+if (!/Chicken[\s\S]*Yoghurt[\s\S]*Milk/.test(grt()) || !/1 gone off/.test(grt()) || !/running low/.test(grt())) { fails++; console.error("FAIL grocy fridge"); }
+gr.shadowRoot.querySelector('[data-tab="shopping"]').dispatchEvent(new window.Event("click"));
+const before = (grt().match(/data-k="s/g) || []).length;
+gr.shadowRoot.querySelector('[data-k^="s"]').dispatchEvent(new window.Event("click"));
+if ((grt().match(/data-k="s/g) || []).length !== before - 1) { fails++; console.error("FAIL grocy shopping tick", before); }
+gr.shadowRoot.querySelector('[data-tab="chores"]').dispatchEvent(new window.Event("click"));
+gr.shadowRoot.querySelector('[data-k^="c"]').dispatchEvent(new window.Event("click"));
+if (!/Tap again/.test(grt())) { fails++; console.error("FAIL grocy chore confirm"); }
+// Grocy with the integration's own names, found by itself.
+states["sensor.grocy_shopping_list"] = st("sensor.grocy_shopping_list", "1", { products: [{ id: 7, product_id: 3, amount: 2, note: "", product: { id: 3, name: "Lemons" } }], count: 1 });
+const gr2 = document.createElement("roost-grocy"); gr2.setConfig({}); document.body.appendChild(gr2); gr2.hass = hass(false);
+if (!/Lemons/.test(gr2.shadowRoot.innerHTML)) { fails++; console.error("FAIL grocy finds its sensors"); }
+calls.length = 0; gr2.shadowRoot.querySelector('[data-k="s7"]').dispatchEvent(new window.Event("click"));
+await new Promise((r) => setTimeout(r, 5));
+if (!calls.some((x) => x[0] === "grocy" && x[1] === "remove_product_in_shopping_list" && x[2].product_id === 3)) { fails++; console.error("FAIL grocy service", JSON.stringify(calls)); }
+// Room: any cards under it, in one box, kept between redraws, and folded away when asked.
+const rk = document.createElement("roost-room");
+rk.setConfig({ name: "Living", temperature: "sensor.cabinet", cards: [{ type: "custom:roost-tile", entity: "light.kitchen" }, { type: "custom:roost-scene", entity: "scene.movie" }], cards_columns: 2 });
+document.body.appendChild(rk); rk.hass = hass(true);
+await new Promise((r) => setTimeout(r, 20));
+const kid = rk.shadowRoot.querySelector(".wrap .kids roost-tile");
+if (!kid || !rk.shadowRoot.querySelector(".kids roost-scene") || !/repeat\(2/.test(rk.shadowRoot.innerHTML)) { fails++; console.error("FAIL room cards"); }
+rk._sig = null; rk.hass = hass(false);
+if (rk.shadowRoot.querySelector(".kids roost-tile") !== kid || !kid.hass) { fails++; console.error("FAIL room cards kept"); }
+const rf = document.createElement("roost-room"); rf.setConfig({ name: "Hall", cards: [{ type: "custom:roost-tile", entity: "light.hall" }], cards_fold: true });
+document.body.appendChild(rf); rf.hass = hass(true); await new Promise((r) => setTimeout(r, 20));
+if (!rf.shadowRoot.querySelector(".kids").hidden) { fails++; console.error("FAIL room fold"); }
+rf.shadowRoot.querySelector(".fold").dispatchEvent(new window.Event("click"));
+if (rf.shadowRoot.querySelector(".kids").hidden) { fails++; console.error("FAIL room unfold"); }
 // Errors for missing settings
 for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }], ["roost-rooms", { rooms: [] }]]) {
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 12} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 19} checks passed`);
 process.exit(fails ? 1 : 0);

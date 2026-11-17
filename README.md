@@ -1,7 +1,7 @@
 <h1 align="center">Roost Cards</h1>
 
 <p align="center"><b>Beautiful, animated dashboard cards for Home Assistant. Made for phones and tablets.</b><br>
-50 cards · a visual editor for every setting · light and dark · no code needed</p>
+60 cards · a visual editor for every setting · light and dark · no code needed</p>
 
 <p align="center">
 <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
@@ -51,10 +51,10 @@ Step by step, and without HACS: **[Install guide](docs/tutorials/01-install.md)*
 
 Recorded on a real Home Assistant (its built-in demo devices), so everything you see is the real editor and the real cards.
 
-| Build a dashboard in the visual editor (7 min) | Every card in action (3 min) |
+| Build a dashboard in the visual editor (7 min) | Every card in action (5 min) |
 |:-:|:-:|
 | [![Build a dashboard in the visual editor](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/video/roost-build-dashboard.jpg)](https://github.com/HRadhi4/Roost-card/blob/main/docs/video/roost-build-dashboard.mp4) | [![Every Roost card in action](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/video/roost-every-card.jpg)](https://github.com/HRadhi4/Roost-card/blob/main/docs/video/roost-every-card.mp4) |
-| Make a dashboard, add each card from the card list, pick your devices, open its options, save. Then use it on a phone. | All 37 cards on one page, each one tapped, dragged or switched so you can see what it does. |
+| Make a dashboard, add each card from the card list, pick your devices, open its options, save. Then use it on a phone. | Every card on one page, each one tapped, dragged or switched so you can see what it does. |
 
 ### Written, with pictures
 
@@ -71,7 +71,7 @@ Recorded on a real Home Assistant (its built-in demo devices), so everything you
 10. [Clock and prayer times](docs/tutorials/10-clock-and-prayer.md)
 11. [Try cards before you own the device](docs/tutorials/11-try-without-devices.md)
 
-## All 50 cards
+## All 60 cards
 
 Each GIF shows the card in use, then in the other colour mode, then as frosted glass.
 
@@ -87,7 +87,7 @@ Each GIF shows the card in use, then in the other colour mode, then as frosted g
 | **Roost Curtain** | A window with curtains that really slide open and closed, a sky behind them, and Open / Stop / Close buttons. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/curtain.gif" width="180" alt="Roost Curtain"> |
 | **Roost Gauge** | A big ring for one reading (a cabinet's temperature, a plug's power). Turns orange and glows when too high, with a second reading under it. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/gauge.gif" width="180" alt="Roost Gauge"> |
 | **Roost Graph** | A smooth line of a reading over the last hours, with the lowest and highest. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/graph.gif" width="180" alt="Roost Graph"> |
-| **Roost Room** | One room at a glance: temperature bar, humidity and what is on, open or running. Tap to open the room. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/room.gif" width="180" alt="Roost Room"> |
+| **Roost Room** | One room at a glance: temperature bar, humidity and what is on, open or running. Tap to open the room. Put any cards under it, in one box or folded away. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/room.gif" width="180" alt="Roost Room"> |
 | **Roost Light** | A light with brightness you drag, warm / neutral / cool buttons and colour dots. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/light.gif" width="180" alt="Roost Light"> |
 | **Roost Media** | TV and sound: power, what is playing (with moving sound bars), volume you drag, mute, play/pause and inputs. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/media.gif" width="180" alt="Roost Media"> |
 | **Roost Alarm** | The alarm in a big shield: arm and disarm with a question first, a keypad when it needs a code, and the doors. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alarm.gif" width="180" alt="Roost Alarm"> |
@@ -116,6 +116,16 @@ Each GIF shows the card in use, then in the other colour mode, then as frosted g
 | **Roost Printer** | Ink or toner levels as little bottles, or a 3D print growing layer by layer with time left and temperatures. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/printer.gif" width="180" alt="Roost Printer"> |
 | **Roost Moments** | Your day in moments (morning, day, evening, bedtime) with the scene that fits right now. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/moments.gif" width="180" alt="Roost Moments"> |
 | **Roost Family Map** | Where everyone is, drawn simply around home (no map service): places as circles, people as faces, how far away. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/family.gif" width="180" alt="Roost Family Map"> |
+| **Roost Grocy** | The kitchen from Grocy: food that goes off soon, the shopping list to tick off, chores, tasks and the meal plan. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/grocy.gif" width="180" alt="Roost Grocy"> |
+| **Roost Tank** | A water tank or gas cylinder: how full it is (the water sways), used today, days left, a leak warning and the pump. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tank.gif" width="180" alt="Roost Tank"> |
+| **Roost Pool** | The pool from above with light moving on the water: warmth, chlorine and pH with the good zone, pump, heater and light. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pool.gif" width="180" alt="Roost Pool"> |
+| **Roost Pet** | A pet feeder and water fountain: food and water left, when it last ate, meals today and “feed now”. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pet.gif" width="180" alt="Roost Pet"> |
+| **Roost Nursery** | The baby's room: camera, warmth and humidity, a banner when the baby cries, night light and lullaby. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/nursery.gif" width="180" alt="Roost Nursery"> |
+| **Roost Network** | The internet (download, upload, ping, devices online) or a server (CPU, memory, disk, heat), with a restart you tap twice. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/network.gif" width="180" alt="Roost Network"> |
+| **Roost Bins** | Which bin goes out next, drawn as coloured wheelie bins; tonight's one bounces. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/bins.gif" width="180" alt="Roost Bins"> |
+| **Roost Medicine** | Today's doses as pills to tick off, the next dose, and a warning for a missed one. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/medicine.gif" width="180" alt="Roost Medicine"> |
+| **Roost Modes** | House modes (home, away, holiday, guests): away checks doors and windows, guests get a Wi-Fi code to scan. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/modes.gif" width="180" alt="Roost Modes"> |
+| **Roost Sleep** | The night from bedtime to the alarm with the moon moving along, a good-night button and how last night went. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/sleep.gif" width="180" alt="Roost Sleep"> |
 | **Roost Vacuum** | A robot vacuum on its little floor: cleans in lanes (a wet trail when it mops), spirals for a spot clean, drives home and charges. Pick rooms, suction and mop settings; see when the filter or brushes need care; switch to the robot's map. Drawings of the common robots (Roborock, Dreame, Eufy, Shark, Roomba, Ecovacs) or your own picture. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/vacuum.gif" width="180" alt="Roost Vacuum"> |
 | **Roost Lock** | A lock or garage door: slide to unlock, tap to lock; says when it is jammed. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/lock.gif" width="180" alt="Roost Lock"> |
 | **Roost Agenda** | Today's and the next days' calendar events. Bin day (or any word you choose) stands out. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/agenda.gif" width="180" alt="Roost Agenda"> |

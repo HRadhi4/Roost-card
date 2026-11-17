@@ -11,11 +11,11 @@ Both videos are recorded on a real Home Assistant with its built-in demo devices
 3. Roost Hero, Chips, Thermostat, Light, Curtain, Media, Alarm, Buttons, Rooms and Nav: pick each one, choose your device, open its option groups, Save
 4. Tap **Done**, then use the dashboard on a phone: switch between the four rooms, drag the thermostat dial, slide the light, close the curtains, arm the alarm
 
-## Every card in action · 3 minutes
+## Every card in action · 5 minutes
 
 [![Every Roost card in action](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/video/roost-every-card.jpg)](https://github.com/HRadhi4/Roost-card/blob/main/docs/video/roost-every-card.mp4)
 
-All 37 cards on one Roost Page, each one used: buttons, scenes, light and dark, rooms, tiles, the thermostat, lights, fan, curtains, TV and remote, alarm with its keypad, lock, camera, people, alerts, clock, prayer times, weather, agenda, to-do, timer, energy, gauge, graph, sensors, automations, panel and the bottom bar.
+Every card on one page, each one used: buttons, scenes, light and dark, rooms, tiles, the thermostat, lights, the fan dial, curtains, TV and remote, alarm with its keypad, lock, camera, people, alerts, clock, prayer times, weather, agenda, to-do, timer, energy, sensors, the robot vacuum, water tank, pool, pet feeder, baby's room, internet, bins, medicine, house modes, sleep, the car, the family map and the bottom bar.
 
 Prefer to read? [Build a phone home screen](03-phone-home-screen.md) covers the same steps in writing.
 

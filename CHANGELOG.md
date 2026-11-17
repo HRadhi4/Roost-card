@@ -2,6 +2,25 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.6.0
+- **New: Roost Grocy**: the kitchen from Grocy, with food that goes off soon (use it, open it or throw it away), the shopping list to tick off, chores and tasks, and the meal plan.
+- **Room: any cards under it**: Roost cards or Home Assistant's own, in one box with the room or just below it, side by side, and folded away behind “3 more” if you like.
+- **Nine more new cards**:
+  - **Tank** (water tank or gas cylinder);
+  - **Pool**;
+  - **Pet** (feeder and water fountain);
+  - **Nursery**;
+  - **Network** (internet or a server, with a safe restart);
+  - **Bins**;
+  - **Medicine**;
+  - **Modes** (home, away, holiday, guests with a Wi-Fi code to scan);
+  - **Sleep**.
+- **Added to cards you already have** instead of making near-copies:
+  - **Prayer Times**: a bell on each prayer for the adhan, and a Ramadan countdown to suhoor and iftar with the day of the fast.
+  - **Energy**: this month's electricity bill so far, the likely total, last month and a budget, with stepped prices.
+  - **Curtain**: opens with the sunrise and closes at sunset, with the times and an on/off switch for the automation.
+- **The “every card” video** now shows the new cards (Grocy and the room's cards join it in the next batch).
+
 ## 1.5.2
 - **Roost Car**: use a picture of your own car instead of the drawing (Picture setting). The battery cells show under it and fill while it charges.
 
