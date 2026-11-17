@@ -7889,22 +7889,43 @@ class RoostCamera extends RoostBase {
 
 // ------------------------------------------------------------------ Roost Sensors
 // Many small readings in neat squares, each turning orange when outside the range you set.
-// How a reading feels, in a word and a colour: "Comfortable", "Warm", "Dry"... (null when there is no common scale)
-function comfortOf(dc, v, unit) {
-  if (v == null) return null;
-  if (dc === "temperature") {
-    const c = /F/.test(unit || "") ? (v - 32) / 1.8 : v;
-    return c < 18 ? ["Cold", COLORS.blue] : c < 20 ? ["Cool", COLORS.teal] : c <= 26 ? ["Comfortable", COLORS.green] : c < 29 ? ["Warm", COLORS.amber] : ["Hot", COLORS.coral];
+// How a reading feels: bands from low to high, each with a word, a short word for the scale and a colour.
+// Each band: [up to this value, word, short word, colour]. Custom "comfortable from / to" values replace them.
+const SENSOR_BANDS = {
+  temperature: { min: 14, max: 34, bands: [[18, "Cold", "Cold", "blue"], [20, "Cool", "Cool", "teal"], [26, "Comfortable", "Comfy", "green"], [29, "Warm", "Warm", "amber"], [Infinity, "Hot", "Hot", "coral"]] },
+  humidity: { min: 0, max: 100, bands: [[30, "Dry", "Dry", "amber"], [60, "Comfortable", "Comfy", "green"], [70, "Humid", "Humid", "teal"], [Infinity, "Very humid", "Wet", "blue"]] },
+  carbon_dioxide: { min: 400, max: 2000, bands: [[800, "Fresh", "Fresh", "green"], [1200, "Stuffy", "Stuffy", "amber"], [Infinity, "Open a window", "Bad", "coral"]] },
+  pm25: { min: 0, max: 75, bands: [[12, "Clean", "Clean", "green"], [35, "Moderate", "Fair", "amber"], [Infinity, "Poor", "Poor", "coral"]] },
+  battery: { min: 0, max: 100, bands: [[20, "Low", "Low", "coral"], [40, "Getting low", "Low-ish", "amber"], [Infinity, "Good", "Good", "green"]] },
+};
+const SENSOR_WORDS = { temperature: ["Cool", "Warm"], humidity: ["Dry", "Humid"] };
+
+// The scale of one reading: its ends and its bands (null bands when there is no common scale and nothing was set).
+function sensorScale(it, dc, unit, seen) {
+  const f = dc === "temperature" && /F/.test(unit || "");
+  const conv = (x) => (f && isFinite(x) ? x * 1.8 + 32 : x);
+  const base = SENSOR_BANDS[dc];
+  const has = (k) => it[k] != null && it[k] !== "";
+  let bands = base ? base.bands.map(([u, w, sh, col]) => [conv(u), w, sh, col]) : null;
+  if (has("comfort_min") || has("comfort_max")) {
+    const [lw, hw] = SENSOR_WORDS[dc] || ["Low", "High"];
+    const lo = has("comfort_min") ? Number(it.comfort_min) : -Infinity, hi = has("comfort_max") ? Number(it.comfort_max) : Infinity;
+    bands = [...(isFinite(lo) ? [[lo, lw, lw, dc === "humidity" ? "amber" : "blue"]] : []), [hi, dc === "battery" ? "Good" : "Comfortable", "Comfy", "green"], ...(isFinite(hi) ? [[Infinity, hw, hw, "coral"]] : [])];
   }
-  if (dc === "humidity") return v < 30 ? ["Dry", COLORS.amber] : v <= 60 ? ["Comfortable", COLORS.green] : v <= 70 ? ["Humid", COLORS.teal] : ["Very humid", COLORS.blue];
-  if (dc === "carbon_dioxide") return v < 800 ? ["Fresh", COLORS.green] : v < 1200 ? ["Stuffy", COLORS.amber] : ["Open a window", COLORS.coral];
-  if (dc === "pm25") return v < 12 ? ["Clean", COLORS.green] : v < 35 ? ["Moderate", COLORS.amber] : ["Poor", COLORS.coral];
-  if (dc === "battery") return v < 20 ? ["Low", COLORS.coral] : v < 40 ? ["Getting low", COLORS.amber] : ["Good", COLORS.green];
-  return null;
+  const [smn, smx] = seen && seen.length ? [Math.min(...seen), Math.max(...seen)] : [0, 100];
+  const pad = (smx - smn) * 0.25 || Math.abs(smx) * 0.25 || 1;
+  const min = has("min") ? Number(it.min) : base ? conv(base.min) : Math.floor(smn - pad);
+  const max = has("max") ? Number(it.max) : base ? conv(base.max) : Math.ceil(smx + pad);
+  return { min, max: max > min ? max : min + 1, bands };
 }
 
+function sensorBand(sc, v) { return sc.bands && v != null ? sc.bands.find((b) => v < b[0]) || sc.bands[sc.bands.length - 1] : null; }
+
 class RoostSensors extends RoostBase {
-  static get defaults() { return { entities: [], columns: 3, radius: 18, show_graph: true, show_range: true, hours: 24, theme: "auto" }; }
+  static get defaults() {
+    return { entities: [], style: "line", columns: 3, radius: 18, show_icon: true, show_name: true, show_comfort: true, show_trend: true,
+      show_graph: true, show_range: true, show_scale_words: true, hours: 24, color_by: "comfort", color: "purple", theme: "auto" };
+  }
 
   validate(c) { if (!Array.isArray(c.entities) || !c.entities.length) throw new Error("Pick some readings"); }
 
@@ -7917,30 +7938,45 @@ class RoostSensors extends RoostBase {
   static getConfigForm() {
     return {
       schema: [
+        { name: "style", label: "Style", selector: pick([["line", "A · Line of the day: comfort word, a line of the last hours, today's low and high"], ["ring", "B · Comfort ring: a dial with the comfortable part in green"], ["scale", "C · Comfort scale: one bar from cold to hot, with a dot for now"], ["rows", "E · Compact rows: short rows for wall panels"]]) },
         { name: "entities", label: "Readings", selector: { object: { multiple: true, label_field: "name", fields: {
           entity: { label: "Reading", required: true, selector: { entity: {} } },
           name: { label: "Name", selector: { text: {} } },
           icon: { label: "Icon", selector: { icon: {} } },
-          above: { label: "Warn above", selector: { number: { mode: "box" } } },
-          below: { label: "Warn below", selector: { number: { mode: "box" } } },
+          color: { label: "Colour (empty = by how it feels)", selector: { select: { mode: "dropdown", options: COLOR_OPTIONS.filter((o) => !["custom", "active"].includes(o.value)) } } },
+          comfort_min: { label: "Comfortable from", selector: { number: { mode: "box", step: "any" } } },
+          comfort_max: { label: "Comfortable up to", selector: { number: { mode: "box", step: "any" } } },
+          min: { label: "Scale starts at (ring, scale and rows)", selector: { number: { mode: "box", step: "any" } } },
+          max: { label: "Scale ends at", selector: { number: { mode: "box", step: "any" } } },
+          above: { label: "Warn above", selector: { number: { mode: "box", step: "any" } } },
+          below: { label: "Warn below", selector: { number: { mode: "box", step: "any" } } },
+          decimals: { label: "Decimals", selector: { number: { min: 0, max: 2, mode: "box" } } },
         } } } },
-        { type: "grid", name: "", schema: [{ name: "columns", label: "Side by side", selector: { number: { min: 1, max: 6, mode: "box" } } }, { name: "radius", selector: slider(0, 32, 2) }] },
-        { type: "grid", name: "", schema: [{ name: "show_graph", label: "A line of the last hours", selector: { boolean: {} } }, { name: "show_range", label: "Today's lowest and highest", selector: { boolean: {} } }] },
-        { name: "hours", label: "Hours on the line", selector: slider(3, 72, 3) },
-        THEME_FIELD,
+        { type: "expandable", name: "", title: "What it shows", icon: "mdi:eye-outline", schema: [
+          { type: "grid", name: "", schema: [{ name: "show_icon", label: "Icon", selector: { boolean: {} } }, { name: "show_name", label: "Name", selector: { boolean: {} } }] },
+          { type: "grid", name: "", schema: [{ name: "show_comfort", label: "How it feels (Comfortable, Warm, Dry)", selector: { boolean: {} } }, { name: "show_trend", label: "Change in the last hour", selector: { boolean: {} } }] },
+          { type: "grid", name: "", schema: [{ name: "show_graph", label: "Line of the last hours (style A)", selector: { boolean: {} } }, { name: "show_range", label: "Lowest and highest (style A)", selector: { boolean: {} } }] },
+          { type: "grid", name: "", schema: [{ name: "show_scale_words", label: "Words under the scale (style C)", selector: { boolean: {} } }, { name: "hours", label: "Hours of history", selector: slider(3, 72, 3) }] },
+        ] },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+          { name: "color_by", label: "Colours", selector: pick([["comfort", "By how it feels (green when comfortable)"], ["fixed", "One colour for every reading"], ["type", "By kind (warm for temperature, blue for humidity)"]]) },
+          ...colourFields("color", "The one colour"),
+          { type: "grid", name: "", schema: [{ name: "columns", label: "Side by side", selector: { number: { min: 1, max: 6, mode: "box" } } }, { name: "radius", selector: slider(0, 32, 2) }] },
+          THEME_FIELD,
+        ] },
       ],
       computeLabel,
     };
   }
 
-  static getStubConfig(hass) { return { entities: Object.keys(hass.states).filter((id) => id.startsWith("sensor.") && num(hass.states[id].state) != null).slice(0, 6) }; }
+  static getStubConfig(hass) { return { entities: Object.keys(hass.states).filter((id) => id.startsWith("sensor.") && num(hass.states[id].state) != null).slice(0, 4) }; }
 
   getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
 
   // the last hours of every reading, fetched in one go and kept for ten minutes
   async loadHistory() {
     const c = this._config, h = this._hass;
-    if (!h?.callWS || this._histLoading || (!c.show_graph && !c.show_range)) return;
+    if (!h?.callWS || this._histLoading) return;
     if (this._histAt && Date.now() - this._histAt < 600000) return;
     this._histLoading = true;
     try {
@@ -7973,57 +8009,136 @@ class RoostSensors extends RoostBase {
       <path d="${line} L${xy[xy.length - 1][0].toFixed(1)},${H} L0,${H} Z" fill="url(#${gid})"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linecap="round"/></svg>`;
   }
 
+  // everything one reading needs, whichever style draws it
+  reading(it) {
+    const c = this._config, s = this.sx(it.entity), v = s ? num(s.state) : null, dc = s?.attributes.device_class;
+    const unit = s?.attributes.unit_of_measurement || "";
+    const icons = { temperature: "mdi:thermometer", humidity: "mdi:water-percent", power: "mdi:flash", energy: "mdi:lightning-bolt", battery: "mdi:battery", carbon_dioxide: "mdi:molecule-co2", pm25: "mdi:blur", illuminance: "mdi:brightness-5", pressure: "mdi:gauge", voltage: "mdi:sine-wave", current: "mdi:current-ac" };
+    const kind = { temperature: "coral", humidity: "blue", power: "amber", energy: "green", battery: "green", carbon_dioxide: "slate", pm25: "purple", illuminance: "amber", voltage: "purple" };
+    const hist = this._hist?.[it.entity] || [];
+    const seen = [...hist.map((x) => x[1]), ...(v != null ? [v] : [])];
+    const sc = sensorScale(it, dc, unit, seen);
+    const has = (k) => it[k] != null && it[k] !== "";
+    const hi = has("above") && v != null && v > Number(it.above), lo = has("below") && v != null && v < Number(it.below);
+    const band = hi ? [Infinity, "High", "High", "coral"] : lo ? [-Infinity, "Low", "Low", "coral"] : sensorBand(sc, v);
+    const g = it.color && COLORS[it.color] ? COLORS[it.color]
+      : c.color_by === "fixed" ? this.colour()
+        : c.color_by === "type" ? COLORS[kind[dc] || "purple"]
+          : band ? COLORS[band[3]] : COLORS[kind[dc] || "purple"];
+    const dec = has("decimals") ? Number(it.decimals) : Math.min(2, decOf(s?.state, unit));
+    const hourAgo = hist.filter(([t]) => t <= Date.now() - 3600e3).pop() || hist[0];
+    const d = v != null && hourAgo ? v - hourAgo[1] : null;
+    const step = Math.max(0.1, 10 ** -Math.max(0, dec));
+    const trend = d == null ? "" : Math.abs(d) < step ? "Steady" : `${d > 0 ? "↑" : "↓"} ${fmt(Math.abs(d), dec)}${/^(°|%)/.test(unit) ? unit.replace(/^°.*/, "°") : ` ${unit}`} in 1 h`;
+    const frac = v == null ? 0 : Math.max(0, Math.min(1, (v - sc.min) / (sc.max - sc.min)));
+    return { s, v, dc, unit, sc, band, warn: hi || lo, g, col: g[this.dark ? 1 : 0], dec, trend, frac, seen,
+      name: it.name || s?.attributes.friendly_name || it.entity, icon: it.icon || s?.attributes.icon || icons[dc] || "mdi:information-outline" };
+  }
+
+  valueHtml(it, r, big) {
+    if (!r.s) return '<span class="v t">Device not found</span>';
+    if (r.v == null) return `<span class="v t">${esc(UNAVAILABLE.includes(r.s.state) ? "Offline" : r.s.state)}</span>`;
+    return `<span class="v num" style="font-size:${big}px"><span data-tw="${esc(it.entity)}">${esc(fmt(r.v, r.dec))}</span><small>${esc(unitGap(r.unit))}</small></span>`;
+  }
+
+  // a scale coloured like its bands, for style C and the ring
+  bandGradient(r) {
+    const { sc } = r;
+    if (!sc.bands) return `linear-gradient(90deg,${r.g[0]},${r.g[1]})`;
+    let prev = sc.min; const stops = [];
+    for (const [u, , , col] of sc.bands) {
+      const a = Math.max(sc.min, prev), b = Math.min(sc.max, u);
+      if (b > a) stops.push(`${COLORS[col][this.dark ? 1 : 0]} ${(((a + b) / 2 - sc.min) / (sc.max - sc.min) * 100).toFixed(0)}%`);
+      prev = u;
+    }
+    return stops.length > 1 ? `linear-gradient(90deg,${stops.join(",")})` : `linear-gradient(90deg,${r.g[0]},${r.g[1]})`;
+  }
+
+  ring(it, r) {
+    const R = 46, C = 2 * Math.PI * R, arc = C * 0.75, { sc } = r;
+    const good = sc.bands ? (() => { let prev = sc.min; for (const [u, , , col] of sc.bands) { if (col === "green") return [Math.max(prev, sc.min), Math.min(u, sc.max)]; prev = u; } return null; })() : null;
+    const f = (x) => Math.max(0, Math.min(1, (x - sc.min) / (sc.max - sc.min)));
+    const ang = ((135 + 270 * r.frac) * Math.PI) / 180, kx = 60 + R * Math.cos(ang), ky = 60 + R * Math.sin(ang);
+    const gid = `rg${Math.abs([...it.entity].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) | 0, 3))}`;
+    return `<svg class="dial" viewBox="0 0 120 120" aria-hidden="true">
+      <defs><linearGradient id="${gid}" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${r.g[0]}"/><stop offset="1" stop-color="${r.g[1]}"/></linearGradient></defs>
+      <g transform="rotate(135 60 60)"><circle cx="60" cy="60" r="${R}" fill="none" stroke="${this.p.track}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${arc.toFixed(1)} ${C.toFixed(1)}"/>
+      ${good && good[1] > good[0] ? `<circle cx="60" cy="60" r="${R}" fill="none" stroke="${COLORS.green[1]}" stroke-opacity=".35" stroke-width="10" stroke-dasharray="${(arc * (f(good[1]) - f(good[0]))).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-arc * f(good[0])).toFixed(1)}"/>` : ""}
+      <circle cx="60" cy="60" r="${R}" fill="none" stroke="url(#${gid})" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(arc * r.frac).toFixed(1)} ${C.toFixed(1)}"/></g>
+      ${r.v != null ? `<circle cx="${kx.toFixed(1)}" cy="${ky.toFixed(1)}" r="7" fill="${this.dark ? "#EEF0FF" : "#FFFFFF"}" stroke="${r.g[0]}" stroke-width="3"/>` : ""}
+    </svg>`;
+  }
+
   render() {
     if (!this._hass || !this._config) return;
     this.loadHistory();
-    const c = this._config, p = this.p;
-    const icons = { temperature: "mdi:thermometer", humidity: "mdi:water-percent", power: "mdi:flash", energy: "mdi:lightning-bolt", battery: "mdi:battery", carbon_dioxide: "mdi:molecule-co2", pm25: "mdi:blur", illuminance: "mdi:brightness-5", pressure: "mdi:gauge", voltage: "mdi:sine-wave", current: "mdi:current-ac" };
-    const tint = { temperature: COLORS.coral, humidity: COLORS.blue, power: COLORS.amber, energy: COLORS.green, battery: COLORS.green, carbon_dioxide: COLORS.slate, pm25: COLORS.purple, illuminance: COLORS.amber, voltage: COLORS.purple };
-    const cols = Math.max(1, Number(c.columns) || 3);
+    const c = this._config, p = this.p, st = c.style || "line";
+    const cols = Math.max(1, Number(c.columns) || 3), minW = { line: 140, ring: 150, scale: 150, rows: 200 }[st] || 140;
+    const head = (it, r, extra = "") => `${c.show_icon || c.show_name || (c.show_comfort && r.band) ? `<div class="hd">${c.show_icon ? `<span class="ic"><ha-icon icon="${esc(r.icon)}"></ha-icon></span>` : ""}${c.show_name ? `<span class="n t">${esc(r.name)}</span>` : '<span class="n"></span>'}${extra}${c.show_comfort && r.band ? `<span class="chip">${esc(r.band[1])}</span>` : ""}</div>` : ""}`;
+    const trend = (r) => (c.show_trend && r.trend ? `<span class="tr t">${esc(r.trend)}</span>` : "");
+    const tile = (it) => {
+      const r = this.reading(it);
+      const style = `--a0:${r.g[0]};--a1:${r.g[1]};--ac:${r.col}`;
+      const open = `class="sq ${st} ${r.warn ? "warn" : ""}" data-e="${esc(it.entity)}" role="button" tabindex="0" aria-label="${esc(r.name)}" style="${style}"`;
+      if (st === "ring") {
+        return `<div ${open}>${head(it, r)}<div class="rw">${this.ring(it, r)}<div class="rc">${this.valueHtml(it, r, 24)}</div></div>${trend(r)}</div>`;
+      }
+      if (st === "scale") {
+        const words = c.show_scale_words && r.sc.bands ? r.sc.bands.filter(([u], i, a) => (i === 0 ? true : a[i - 1][0] < r.sc.max) && (u > r.sc.min)).map((b) => b[2]) : [];
+        return `<div ${open}>${head(it, r)}<div class="row">${this.valueHtml(it, r, 34)}${trend(r)}</div>
+          <div class="sc"><div class="scb" style="background:${this.bandGradient(r)}">${r.v != null ? `<i data-glide="${esc(it.entity)}" style="left:${(r.frac * 100).toFixed(1)}%"></i>` : ""}</div>
+          ${words.length ? `<div class="scw">${words.map((w) => `<span class="t">${esc(w)}</span>`).join("")}</div>` : `<div class="scw"><span class="num">${esc(fmt(r.sc.min, r.dec))}</span><span class="num">${esc(fmt(r.sc.max, r.dec))}</span></div>`}</div></div>`;
+      }
+      if (st === "rows") {
+        return `<div ${open}>${c.show_icon ? `<span class="ic"><ha-icon icon="${esc(r.icon)}"></ha-icon></span>` : ""}<div class="mid"><div class="top">${c.show_name ? `<span class="n t">${esc(r.name)}</span>` : ""}${c.show_comfort && r.band ? `<span class="w t">${esc(r.band[1])}</span>` : ""}</div>
+          <div class="bar"><i data-bar="${esc(it.entity)}" style="width:${(r.frac * 100).toFixed(1)}%"></i></div>${c.show_trend && r.trend ? `<span class="tr t">${esc(r.trend)}</span>` : ""}</div>${this.valueHtml(it, r, 22)}</div>`;
+      }
+      // style A: line of the day
+      const vals = r.seen, mn = vals.length ? Math.min(...vals) : null, mx = vals.length ? Math.max(...vals) : null;
+      const pos = mn != null && mx > mn ? ((r.v - mn) / (mx - mn)) * 100 : 50;
+      return `<div ${open}><span class="strip"></span>${head(it, r)}<div class="row">${this.valueHtml(it, r, 26)}${trend(r)}</div>
+        ${c.show_graph && r.v != null ? this.spark(it.entity, r.v, r.col) : ""}
+        ${c.show_range && mn != null && mx > mn ? `<div class="rg"><span class="num">${esc(fmt(mn, r.dec))}</span><span class="rb"><i data-glide="${esc(it.entity)}r" style="left:${pos.toFixed(1)}%"></i></span><span class="num">${esc(fmt(mx, r.dec))}</span></div>` : ""}</div>`;
+    };
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(140px,calc((100% - ${(cols - 1) * 8}px) / ${cols})),1fr));gap:8px}
-      .sq{${panelCss(p, c.radius)};position:relative;overflow:hidden;padding:14px 14px 12px;display:flex;flex-direction:column;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(${minW}px,calc((100% - ${(cols - 1) * 8}px) / ${cols})),1fr));gap:8px}
+      .sq{${panelCss(p, c.radius)};position:relative;overflow:hidden;padding:14px 14px 12px;display:flex;flex-direction:column;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s;min-width:0}
       .sq:active{transform:scale(.97)}
-      .sq::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--a0),var(--a1));opacity:.9}
-      .hd{display:flex;align-items:center;gap:10px}
+      .strip{position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--a0),var(--a1));opacity:.9}
+      .hd{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;min-width:0}
       .ic{width:34px;height:34px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--a0) 20%, transparent);color:var(--ac);--mdc-icon-size:19px}
-      .n{flex:1;min-width:0;font-size:13px;font-weight:600;color:${p.muted};line-height:1.25}
-      .row{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;flex-wrap:wrap}
-      .v{font-size:26px;font-weight:700;line-height:1;letter-spacing:-.5px}
-      .v small{font-size:13px;font-weight:600;color:${p.muted};margin-left:2px;letter-spacing:0}
-      .chip{font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:color-mix(in srgb, var(--a0) 22%, transparent);color:var(--ac);white-space:nowrap}
+      .n{flex:1 1 auto;min-width:0;font-size:13px;font-weight:600;color:${p.muted};line-height:1.25;overflow-wrap:break-word;word-break:normal}
+      .chip{flex:none;margin-left:auto;font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:color-mix(in srgb, var(--a0) 22%, transparent);color:var(--ac);white-space:nowrap}
+      .row{display:flex;align-items:flex-end;justify-content:space-between;gap:4px 8px;flex-wrap:wrap}
+      .v{font-weight:700;line-height:1;letter-spacing:-.5px;font-size:15px}
+      .v small{font-size:13px;font-weight:600;color:${p.muted};margin-left:1px;letter-spacing:0}
       .tr{font-size:11px;font-weight:600;color:${p.muted};white-space:nowrap}
-      .sp{display:block;width:100%;height:34px;margin:0 -2px}
+      .sp{display:block;width:100%;height:34px}
       .rg{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;font-size:11px;color:${p.muted}}
-      .bar{position:relative;height:4px;border-radius:999px;background:${p.track}}
-      .bar i{position:absolute;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--a1);box-shadow:0 0 0 3px color-mix(in srgb, var(--a0) 30%, transparent)}
+      .rb{position:relative;height:4px;border-radius:999px;background:${p.track}}
+      .rb i,.scb i{position:absolute;top:50%;border-radius:50%;background:${this.dark ? "#EEF0FF" : "#FFFFFF"}}
+      .rb i{width:10px;height:10px;margin:-5px 0 0 -5px;background:var(--a1);box-shadow:0 0 0 3px color-mix(in srgb, var(--a0) 30%, transparent)}
+      .rw{position:relative;width:min(100%,150px);margin:0 auto}
+      .dial{display:block;width:100%;height:auto}
+      .rc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+      .rc .v{text-align:center}
+      .sq.ring .tr{align-self:center;margin-top:-10px}
+      .sc{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+      .scb{position:relative;height:10px;border-radius:999px}
+      .scb i{width:18px;height:18px;margin:-9px 0 0 -9px;border:3px solid ${this.dark ? "#141831" : "#FFFFFF"};box-sizing:border-box;box-shadow:0 0 10px var(--a1)}
+      .scw{display:flex;justify-content:space-between;gap:4px;font-size:10px;font-weight:600;color:${p.muted}}
+      @container (max-width: 230px){:host .scw span:not(:first-child):not(:last-child){display:none}}
+      .sq.rows{flex-direction:row;align-items:center;gap:12px;padding:12px 14px}
+      .rows .mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+      .rows .top{display:flex;justify-content:space-between;align-items:baseline;gap:4px 8px;flex-wrap:wrap}
+      .rows .w{font-size:11px;font-weight:700;color:var(--ac);white-space:nowrap}
+      .bar{height:4px;border-radius:999px;background:${p.track};overflow:hidden}
+      .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--a0),var(--a1))}
+      .rows .v{flex:none;text-align:right}
       .warn{border-color:#FF9F6B}
       .warn .ic{animation:roost-breathe 1.6s ease-in-out infinite}
     </style>
-    <div class="grid">${this.items().map((it) => {
-      const s = this.sx(it.entity), v = s ? num(s.state) : null, dc = s?.attributes.device_class;
-      const unit = s?.attributes.unit_of_measurement || "";
-      const hi = it.above != null && it.above !== "" && v != null && v > it.above, lo = it.below != null && it.below !== "" && v != null && v < it.below;
-      const cf = hi ? ["High", COLORS.coral] : lo ? ["Low", COLORS.coral] : comfortOf(dc, v, unit);
-      const g = cf ? cf[1] : tint[dc] || COLORS.purple;
-      const dec = it.decimals ?? decOf(s?.state, unit);
-      const hist = (this._hist?.[it.entity] || []);
-      // trend over the last hour
-      const hourAgo = hist.filter(([t]) => t <= Date.now() - 3600e3).pop() || hist[0];
-      const d = v != null && hourAgo ? v - hourAgo[1] : null;
-      const step = Math.max(0.1, 10 ** -Math.max(0, dec));
-      const trend = d == null ? "" : Math.abs(d) < step ? "Steady" : `${d > 0 ? "↑" : "↓"} ${fmt(Math.abs(d), dec)}${unit.startsWith("°") ? "°" : ` ${unit}`} in 1 h`;
-      const vals = [...hist.map((x) => x[1]), ...(v != null ? [v] : [])];
-      const mn = vals.length ? Math.min(...vals) : null, mx = vals.length ? Math.max(...vals) : null;
-      const pos = mn != null && mx > mn ? ((v - mn) / (mx - mn)) * 100 : 50;
-      const col = g[this.dark ? 1 : 0];
-      return `<div class="sq ${hi || lo ? "warn" : ""}" data-e="${esc(it.entity)}" role="button" tabindex="0" style="--a0:${g[0]};--a1:${g[1]};--ac:${col}">
-        <div class="hd"><span class="ic"><ha-icon icon="${esc(it.icon || s?.attributes.icon || icons[dc] || "mdi:information-outline")}"></ha-icon></span><span class="n t">${esc(it.name || s?.attributes.friendly_name || it.entity)}</span>${cf ? `<span class="chip">${esc(cf[0])}</span>` : ""}</div>
-        <div class="row"><span class="v num">${!s ? "?" : v != null ? `<span data-tw="${esc(it.entity)}">${esc(fmt(v, dec))}</span><small>${esc(unitGap(unit).trim())}</small>` : esc(UNAVAILABLE.includes(s.state) ? "Offline" : s.state)}</span>${trend ? `<span class="tr t">${esc(trend)}</span>` : ""}</div>
-        ${c.show_graph && v != null ? this.spark(it.entity, v, col) : ""}
-        ${c.show_range && mn != null && mx > mn ? `<div class="rg"><span class="num">${esc(fmt(mn, dec))}</span><span class="bar"><i data-glide="${esc(it.entity)}" style="left:${pos.toFixed(1)}%"></i></span><span class="num">${esc(fmt(mx, dec))}</span></div>` : ""}
-      </div>`;
-    }).join("")}</div>`;
+    <div class="grid">${this.items().map(tile).join("")}</div>`;
     this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
   }
 }

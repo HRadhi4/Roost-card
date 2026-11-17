@@ -147,6 +147,10 @@ const cases = [
   ["roost-grocy", { sample: true }],
   ["roost-grocy", { sample: true, tabs: ["chores", "meals"] }],
   ["roost-grocy", {}],
+  ["roost-sensors", { style: "ring", entities: ["sensor.cabinet", "sensor.hum", "sensor.power", "sensor.offline"] }],
+  ["roost-sensors", { style: "scale", entities: ["sensor.cabinet", { entity: "sensor.hum", comfort_min: 35, comfort_max: 55 }, "sensor.power"] }],
+  ["roost-sensors", { style: "rows", color_by: "fixed", color: "teal", entities: ["sensor.cabinet", "sensor.hum", { entity: "sensor.power", min: 0, max: 3000 }] }],
+  ["roost-sensors", { style: "line", show_icon: false, show_name: false, entities: [{ entity: "sensor.cabinet", above: 30 }] }],
 ];
 let fails = 0;
 for (const dark of [true, false]) {
