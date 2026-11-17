@@ -302,10 +302,31 @@ document.body.appendChild(rf); rf.hass = hass(true); await new Promise((r) => se
 if (!rf.shadowRoot.querySelector(".kids").hidden) { fails++; console.error("FAIL room fold"); }
 rf.shadowRoot.querySelector(".fold").dispatchEvent(new window.Event("click"));
 if (rf.shadowRoot.querySelector(".kids").hidden) { fails++; console.error("FAIL room unfold"); }
+// Rooms: a room opens from its link, a hidden room has no button, offline sensors say so.
+const rl = document.createElement("roost-rooms");
+rl.setConfig({ remember: false, rooms: [{ name: "Living", link: "#living", temperature: "sensor.offline", entities: ["light.kitchen"] }, { name: "Entrance", link: "#entrance", entities: ["light.hall"] }, { name: "Automations", link: "#automations", hidden: true, entities: ["automation.morning"] }] });
+document.body.appendChild(rl); rl.hass = hass(true); await new Promise((r) => setTimeout(r, 20));
+if (rl.shadowRoot.querySelectorAll(".pill").length !== 2 || !/No room sensor online/.test(rl.shadowRoot.innerHTML)) { fails++; console.error("FAIL rooms hidden / sensor note"); }
+window.location.hash = "#automations"; window.dispatchEvent(new window.HashChangeEvent("hashchange"));
+if (rl._active !== 2 || rl.shadowRoot.querySelector('.room[data-room="2"]').hidden) { fails++; console.error("FAIL rooms link", rl._active); }
+rl.shadowRoot.querySelectorAll(".pill")[1].dispatchEvent(new window.Event("click"));
+if (window.location.hash !== "#entrance") { fails++; console.error("FAIL rooms sets link", window.location.hash); }
+window.location.hash = "";
+// Any card can say it is not working right now.
+const bk = document.createElement("roost-tile"); bk.setConfig({ entity: "cover.curtain", out_of_order: "The remote's battery is dead" }); document.body.appendChild(bk); bk.hass = hass(true);
+if (!/Not working right now[\s\S]*battery is dead/.test(bk.shadowRoot.innerHTML)) { fails++; console.error("FAIL out of order note"); }
+// Hero: a person with location off.
+states["person.off"] = st("person.off", "unknown");
+const hl = document.createElement("roost-hero"); hl.setConfig({ people: ["person.off"] }); document.body.appendChild(hl); hl.hass = hass(true);
+if (!/Location off/.test(hl.shadowRoot.innerHTML)) { fails++; console.error("FAIL hero location off"); }
+// Thermostat power through a script.
+const tp = document.createElement("roost-thermostat"); tp.setConfig({ entity: "climate.living", power_action: { action: "perform-action", perform_action: "script.turn_on", target: { entity_id: "script.ac_power" } } }); document.body.appendChild(tp); tp.hass = hass(true);
+calls.length = 0; tp.shadowRoot.querySelector(".pw").dispatchEvent(new window.Event("click")); await new Promise((r) => setTimeout(r, 5));
+if (!calls.some((x) => x[0] === "script" && x[1] === "turn_on")) { fails++; console.error("FAIL thermostat power action", JSON.stringify(calls)); }
 // Errors for missing settings
 for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }], ["roost-rooms", { rooms: [] }]]) {
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 19} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 25} checks passed`);
 process.exit(fails ? 1 : 0);

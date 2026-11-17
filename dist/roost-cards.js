@@ -435,9 +435,25 @@ class RoostBase extends HTMLElement {
     this._sig = sig;
     this.render();
     this.motion();
+    this.brokenNote();
   }
 
   get hass() { return this._hass; }
+
+  // "Not working right now": a calm note over the card with the reason, so nobody keeps tapping a broken device.
+  brokenNote() {
+    const note = this._config?.out_of_order, root = this.shadowRoot;
+    if (!note || !root) return;
+    root.querySelector(".roost-broken")?.remove();
+    const host = root.querySelector(".card,.r,ha-card,.wrap") || root.lastElementChild;
+    if (!host) return;
+    if (window.getComputedStyle(host).position === "static") host.style.position = "relative";
+    const el = document.createElement("div");
+    el.className = "roost-broken"; el.setAttribute("role", "status");
+    el.style.cssText = "position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px;box-sizing:border-box;text-align:center;border-radius:inherit;background:rgba(10,8,30,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);color:#fff";
+    el.innerHTML = `<ha-icon icon="mdi:alert-circle-outline" style="--mdc-icon-size:28px;color:#FF9F6B"></ha-icon><b style="font-size:14px">Not working right now</b><span style="font-size:12px;opacity:.85;line-height:1.35">${esc(note)}</span>`;
+    host.appendChild(el);
+  }
 
   // ---- small shared helpers for the newer cards
   // a reading as words: "1460 W", "22.5°", "64%", "" when there is none
@@ -750,6 +766,9 @@ function fitSchema(schema, data) {
 }
 
 // How see-through a card is: solid, frosted glass (blurs what is behind) or clear. Added to every card's editor.
+const BROKEN_FIELDS = { type: "expandable", name: "", title: "Not working right now", icon: "mdi:alert-circle-outline", schema: [
+  { name: "out_of_order", label: "A note over the card (for example “The curtain remote's battery is dead”); empty = working", selector: { text: {} } },
+] };
 const SURFACE_FIELDS = (nav) => ({ type: "expandable", name: "", title: "See-through (frosted glass)", icon: "mdi:blur", schema: [
   ...(nav ? [] : [{ name: "surface", label: "Background", selector: pick([["solid", "Solid"], ["frosted", "Frosted glass"], ["clear", "Clear (no background)"]]) }]),
   { type: "grid", name: "", schema: [{ name: "opacity", label: "How solid (%)", selector: slider(0, 100, 5, "%") }, { name: "blur", label: "Blur", selector: slider(0, 40, 2) }] },
@@ -766,7 +785,8 @@ class RoostEditor extends HTMLElement {
     const form = cls.getConfigForm();
     const label = form.computeLabel;
     const noSurface = ["roost-page", "roost-fullscreen", "roost-title", "roost-theme"].includes(cls.tag);
-    const schema = noSurface ? form.schema : [...form.schema, SURFACE_FIELDS(cls.tag === "roost-nav")];
+    const noBroken = noSurface || ["roost-nav", "roost-page", "roost-panel", "roost-rooms"].includes(cls.tag);
+    const schema = noSurface ? form.schema : [...form.schema, ...(noBroken ? [] : [BROKEN_FIELDS]), SURFACE_FIELDS(cls.tag === "roost-nav")];
     this._data = { ...cls.defaults, ...this._config };
     if (!this._form) {
       this._form = document.createElement("ha-form");
@@ -1152,6 +1172,7 @@ class RoostThermostat extends RoostBase {
         ] },
         { type: "expandable", name: "", title: "Buttons", icon: "mdi:gesture-tap-button", schema: [
           { name: "show_power", selector: { boolean: {} } },
+          ACTION_FIELD("power_action", "The power button runs (for an AC sent by infrared, for example a script; empty = on and off)"),
           { name: "show_plus_minus", selector: { boolean: {} } },
           { name: "modes", selector: { select: { multiple: true, options: [
             { value: "cool", label: "Cool" }, { value: "heat", label: "Heat" }, { value: "dry", label: "Dry" },
@@ -1298,7 +1319,7 @@ class RoostThermostat extends RoostBase {
       const v = Math.max(mn, Math.min(mx, (this._value ?? set ?? 24) + Number(b.dataset.d) * step));
       this.vibrate(); this.paint(v); this.setTemp(v);
     }));
-    root.querySelector(".pw")?.addEventListener("click", () => { this.vibrate(); this.call("climate", this.info.on ? "turn_off" : "turn_on", { entity_id: c.entity }); });
+    root.querySelector(".pw")?.addEventListener("click", () => { this.vibrate(); if (c.power_action && c.power_action.action && c.power_action.action !== "none") this.run(c.power_action); else this.call("climate", this.info.on ? "turn_off" : "turn_on", { entity_id: c.entity }); });
     root.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("climate", "set_hvac_mode", { entity_id: c.entity, hvac_mode: b.dataset.m }); }));
     this.press(root.querySelector(".hd"), () => this.moreInfo(c.entity), () => this.moreInfo(c.entity));
   }
@@ -1531,7 +1552,7 @@ class RoostHero extends RoostBase {
       const st = this.sx(id);
       if (!st) return "";
       const nm = this.name(id).split(" ")[0], pic = st.attributes.entity_picture;
-      const where = ["home", "unknown", "unavailable"].includes(st.state) ? "" : st.state === "not_home" ? "Away" : st.state;
+      const where = st.state === "home" ? "" : UNAVAILABLE.includes(st.state) ? "Location off" : st.state === "not_home" ? "Away" : st.state;
       return `<span class="who t" data-e="${esc(id)}"><span class="av" style="background:linear-gradient(135deg,${PG[k % 4][0]},${PG[k % 4][1]})">${pic ? `<img src="${esc(pic)}" alt="">` : esc(nm.charAt(0).toUpperCase())}</span>${esc(nm)}${where ? ` · ${esc(where)}` : ""}</span>`;
     }).join("");
     const house = c.house ? `<svg class="house" aria-hidden="true" width="230" height="130" viewBox="0 0 230 130"><path d="M10 130V70L70 28l60 42v60z" fill="${day ? "rgba(255,255,255,.18)" : "#120F33"}"/><path d="M120 130V58l45-32 45 32v72z" fill="${day ? "rgba(255,255,255,.12)" : "#0E0B2A"}"/>
@@ -1991,6 +2012,30 @@ class RoostRooms extends RoostBase {
     }
   }
 
+  // A room can open from a link (#entrance), so a side rail or any button can show it.
+  connectedCallback() {
+    super.connectedCallback?.();
+    this._onHash = () => this.fromHash(true);
+    window.addEventListener("hashchange", this._onHash);
+    window.addEventListener("location-changed", this._onHash);
+    this.fromHash(false);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback?.();
+    window.removeEventListener("hashchange", this._onHash);
+    window.removeEventListener("location-changed", this._onHash);
+  }
+
+  fromHash(redraw) {
+    const rooms = this._config?.rooms || [], h = location.hash;
+    if (!h) return;
+    const i = rooms.findIndex((r) => r.link && (r.link === h || `#${String(r.link).replace(/^#/, "")}` === h));
+    if (i < 0 || i === this._active) return;
+    this._active = i;
+    if (redraw) { this._sig = null; if (this._hass) this.hass = this._hass; }
+  }
+
   memKey() { return `roost-rooms:${(this._config.rooms || []).map((r) => r.name).join("|")}`; }
 
   // the devices of a room: the ones picked in the editor, plus any card that names a device
@@ -2027,6 +2072,8 @@ class RoostRooms extends RoostBase {
           temperature: { label: "Temperature sensor (shown next to the room buttons)", selector: { entity: { domain: "sensor" } } },
           humidity: { label: "Humidity sensor", selector: { entity: { domain: "sensor" } } },
           cards: { label: "Extra cards (advanced, YAML list)", selector: { object: {} } },
+          link: { label: "Opens from a link (for example #entrance, for the side rail)", selector: { text: {} } },
+          hidden: { label: "No button in the bar (reached only from its link, for example an Automations page)", selector: { boolean: {} } },
         } } } },
         { type: "expandable", name: "", title: "Room buttons", icon: "mdi:gesture-tap-button", schema: [
           { name: "show_names", label: "What the room buttons show", selector: pick([["active", "Icons, and the name when chosen"], ["all", "Icons and names"], ["names", "Names only"], ["none", "Icons only"]]) },
@@ -2116,8 +2163,12 @@ class RoostRooms extends RoostBase {
 
   go(i) {
     (this._pillMemo = this._pillMemo || {}).go = Date.now();
-    const n = this._config.rooms.length;
-    this._active = (i + n) % n;
+    const rooms = this._config.rooms, n = rooms.length, step = i >= this._active ? 1 : -1;
+    let k = (i + n) % n, guard = 0;
+    while (rooms[k]?.hidden && guard++ < n) k = (k + step + n) % n;
+    this._active = k;
+    const link = rooms[k]?.link;
+    if (link) { try { history.replaceState(history.state, "", `${location.pathname}${location.search}#${String(link).replace(/^#/, "")}`); window.dispatchEvent(new Event("location-changed")); } catch (e) { /* old browser */ } }
     if (this._config.remember) { try { localStorage.setItem(this.memKey(), this._config.rooms[this._active].name); } catch (e) { /* private mode */ } }
     this.vibrate();
     this._sig = null;
@@ -2136,7 +2187,8 @@ class RoostRooms extends RoostBase {
     const counts = c.show_count ? c.rooms.map((r) => this.onCount(r)) : [];
     const rd = (id) => { const s = this.sx(id); const v = s ? num(s.state) : null; return v == null ? null : fmt(v, 1); };
     const t0 = room.temperature ? rd(room.temperature) : null, h0 = room.humidity ? rd(room.humidity) : null;
-    const clim = t0 != null || h0 != null ? `<div class="clim t">${h0 != null ? `<span><ha-icon icon="mdi:water-outline" style="color:#38BDF8"></ha-icon>${esc(Math.round(h0))}%</span>` : ""}${t0 != null ? `<span><ha-icon icon="mdi:thermometer" style="color:#FF9F6B"></ha-icon>${esc(t0)}°C</span>` : ""}</div>` : "";
+    const sensorsOff = (room.temperature || room.humidity) && t0 == null && h0 == null;
+    const clim = sensorsOff ? `<div class="clim t"><span><ha-icon icon="mdi:access-point-network-off"></ha-icon>No room sensor online</span></div>` : t0 != null || h0 != null ? `<div class="clim t">${h0 != null ? `<span><ha-icon icon="mdi:water-outline" style="color:#38BDF8"></ha-icon>${esc(Math.round(h0))}%</span>` : ""}${t0 != null ? `<span><ha-icon icon="mdi:thermometer" style="color:#FF9F6B"></ha-icon>${esc(t0)}°C</span>` : ""}</div>` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .bar{border-radius:${c.pill_shape === "pill" ? 999 : rad + 4}px;border:1px solid ${c.background === "none" ? "transparent" : p.border};background:${c.background === "none" ? "transparent" : c.background === "glass" ? `color-mix(in srgb, ${p.panel} 60%, transparent);backdrop-filter:blur(14px)` : p.panel};padding:4px;margin-bottom:16px}
       .pills{display:flex;gap:2px;justify-content:${c.pill_align === "start" ? "flex-start" : c.pill_align === "center" ? "center" : "space-between"};overflow-x:auto;scrollbar-width:none}
@@ -2156,14 +2208,14 @@ class RoostRooms extends RoostBase {
       .pill ha-icon{--mdc-icon-size:${Number(c.pill_icon_size) || 20}px}
       .cnt{position:absolute;top:3px;right:4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#FCD34D;color:#2A1800;font-size:10px;font-weight:700;line-height:16px;text-align:center}
       .room{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:${Number(c.gap) || 8}px;touch-action:pan-y}
-      @container (max-width: 300px){:host .room{grid-template-columns:minmax(0,1fr)}}
+      @container (max-width: 300px){:host .room{grid-template-columns:minmax(0,1fr)}:host .room > *{grid-column:auto!important}}
       .room[hidden]{display:none}
       .room > *{min-width:0}
       .room > .wide{grid-column:1/-1}
       .empty{grid-column:1/-1;padding:22px;border-radius:20px;border:1px dashed ${p.border};color:${p.muted};text-align:center;font-size:14px;line-height:1.4}
     </style>
-    ${clim ? '<div class="head">' : ""}<div class="bar"><div class="pills" role="tablist">${c.rooms.map((r, i) => `<button class="pill ${i === this._active ? "on" : ""}" role="tab" aria-selected="${i === this._active}" data-i="${i}" aria-label="${esc(r.name)}">
-      ${r.icon && c.show_names !== "names" ? `<ha-icon icon="${esc(r.icon)}"></ha-icon>` : ""}${showName(i) || !r.icon ? `<span>${esc(r.name)}</span>` : ""}${counts[i] ? `<span class="cnt">${counts[i]}</span>` : ""}</button>`).join("")}</div></div>${clim ? `${clim}</div>` : ""}
+    ${clim ? '<div class="head">' : ""}<div class="bar"><div class="pills" role="tablist">${c.rooms.map((r, i) => (r.hidden ? "" : `<button class="pill ${i === this._active ? "on" : ""}" role="tab" aria-selected="${i === this._active}" data-i="${i}" aria-label="${esc(r.name)}">
+      ${r.icon && c.show_names !== "names" ? `<ha-icon icon="${esc(r.icon)}"></ha-icon>` : ""}${showName(i) || !r.icon ? `<span>${esc(r.name)}</span>` : ""}${counts[i] ? `<span class="cnt">${counts[i]}</span>` : ""}</button>`)).join("")}</div></div>${clim ? `${clim}</div>` : ""}
     ${c.rooms.map((r, i) => `<div class="room" data-room="${i}" ${i === this._active ? "" : "hidden"}>${(this._cards[i] || []).length ? "" : '<div class="empty t">No devices in this room yet. Edit the card and pick some under “Devices in this room”.</div>'}</div>`).join("")}`;
     this.shadowRoot.querySelectorAll(".room").forEach((box) => {
       const i = +box.dataset.room;
@@ -2171,6 +2223,7 @@ class RoostRooms extends RoostBase {
         const cfg = this._cfgs[i][k] || {};
         const wrap = document.createElement("div");
         if (cfg.wide || cfg.grid_options?.columns === "full" || cfg.grid_options?.columns === 12) wrap.className = "wide";
+        else if (Number(cfg.span) > 1) wrap.style.gridColumn = `span ${Math.min(Number(cfg.span), Math.max(1, c.columns))}`;
         wrap.appendChild(el);
         box.appendChild(wrap);
       });
@@ -3435,6 +3488,7 @@ class RoostTheme extends RoostBase {
     return {
       schema: [
         { name: "include_auto", label: "Also “Automatic” (follow the phone's own setting)", selector: { boolean: {} } },
+        { name: "entity", label: "Also switch this helper (on = dark), for automations or other screens", selector: { entity: { domain: "input_boolean" } } },
         { name: "show_label", label: "Show the word (Light / Dark)", selector: { boolean: {} } },
         { name: "full_width", label: "As wide as the card", selector: { boolean: {} } },
         { type: "grid", name: "", schema: [{ name: "shape", selector: pick([["rounded", "Rounded square"], ["circle", "Circle"], ["pill", "Pill"]]) }, { name: "size", selector: slider(32, 64, 2) }] },
@@ -3469,6 +3523,7 @@ class RoostTheme extends RoostBase {
       // light -> dark -> (automatic) -> light
       const nextDark = mode === "light" ? true : mode === "dark" && c.include_auto ? undefined : false;
       this.fire("settheme", { dark: nextDark });
+      if (c.entity && nextDark !== undefined) this.call("input_boolean", nextDark ? "turn_on" : "turn_off", { entity_id: c.entity });
     });
   }
 }
@@ -8221,7 +8276,7 @@ class RoostPanel extends RoostPage {
       { type: "grid", name: "", schema: [{ name: "icon", selector: { icon: {} } }, { name: "picture", label: "Or a picture (for example /local/strip.png)", selector: { text: {} } }] },
       { name: "entities", label: "Devices listed as rows with their state", selector: { entity: { multiple: true } } },
       { type: "grid", name: "", schema: [{ name: "collapsible", label: "Folds open and closed", selector: { boolean: {} } }, { name: "open", label: "Starts open", selector: { boolean: {} } }] },
-      { name: "gap", label: "Space between cards", selector: slider(0, 32) },
+      { type: "grid", name: "", schema: [{ name: "gap", label: "Space between cards", selector: slider(0, 32) }, { name: "columns", label: "Cards side by side", selector: slider(1, 6) }] },
       THEME_FIELD,
     ], computeLabel };
   }
@@ -8273,7 +8328,9 @@ class RoostPanel extends RoostPage {
       .hd .tx{flex:1;min-width:0}
       .hd .st{font-size:12px;margin-top:2px;color:${p.muted}}
       .hd .ar{flex:none;color:#8B6CFF;--mdc-icon-size:24px;transition:transform .12s;${open && fold ? "transform:rotate(180deg)" : ""}}
-      .body{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+      .body{display:grid;grid-template-columns:repeat(${Math.max(1, Math.min(6, Number(c.columns) || 1))},minmax(0,1fr));gap:10px}
+      @container (max-width: 420px){:host .body{grid-template-columns:repeat(${Math.min(2, Math.max(1, Number(c.columns) || 1))},minmax(0,1fr))}}
+      .body > *{min-width:0}
       .body[hidden]{display:none}
       .rw{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid ${p.border};cursor:pointer}
       .ri{width:38px;height:38px;border-radius:12px;background:${p.inset};display:flex;align-items:center;justify-content:center;flex:none;--mdc-icon-size:20px}
@@ -8283,7 +8340,7 @@ class RoostPanel extends RoostPage {
       ${(c.entities || []).length ? `<div>${c.entities.map((e) => this.row(e)).join("")}</div>` : ""}
       ${this._cards.length ? `<div class="body" ${open ? "" : "hidden"}></div>` : ""}</div>`;
     const body = this.shadowRoot.querySelector(".body");
-    if (body) this._cards.forEach((el) => { const w = document.createElement("div"); w.appendChild(el); body.appendChild(w); });
+    if (body) this._cards.forEach((el, i) => { const w = document.createElement("div"); const cf = (c.cards || [])[i] || {}; if (cf.wide) w.style.gridColumn = "1/-1"; w.appendChild(el); body.appendChild(w); });
     this.shadowRoot.querySelectorAll("[data-icon]").forEach((el) => this.icon(el, null, el.dataset.icon));
     this.shadowRoot.querySelectorAll(".rw").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
     const hd = this.shadowRoot.querySelector(".hd");
