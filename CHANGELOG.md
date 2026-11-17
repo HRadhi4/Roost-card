@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.3.7
+- **Full Screen** stays off once you leave it: opening another page or reloading no longer switches it back on. Press the button again to go back to full screen.
+- **Roost Nav** buttons like `#rooms` now jump to that part of the page (the Roost Title with the same name, or a new **Jump name** setting). Before, they only lit up and nothing moved.
+- **Roost Title** has a new **Jump name** setting for those buttons.
+- Docs: how to keep the Roost look in a normal Sections view, so every card has its own edit button.
+
 ## 1.3.6 — 2026-11-17
 - **Roost Rooms** starts with four rooms (Living, Bedroom, Kitchen, Bathroom), each filled with a mix of your lights, air conditioners, curtains, TVs, fans and plugs.
 - Editor: the room list and the bottom bar's button list now have proper titles.

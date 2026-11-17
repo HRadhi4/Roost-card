@@ -27,6 +27,8 @@
 
 Want even spacing, the night-sky background and room for the bottom bar, exactly like the phone dashboard? Put a **Roost Page** in a **Panel** view and add your cards inside it. To group cards in a rounded box with a title (like the "Rooms" or "Security" box), use **Roost Panel**. Panels can fold open and closed.
 
+**Tip: if you like to tap a card and edit it on the spot**, skip the Roost Page and use a normal **Sections** view with one column instead. Open the view's settings (the pencil next to its name), choose **Sections**, set the number of columns to 1, and paste the night-sky background from [the Roost Page notes](../cards.md#roost-page). Every card then keeps its own edit button.
+
 | Roost Page | Roost Panel |
 |:-:|:-:|
 | ![Roost Page](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/page.gif) | ![Roost Panel](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/panel.gif) |

@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.3.6";
+const ROOST_VERSION = "1.3.7";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1305,6 +1305,8 @@ class RoostHero extends RoostBase {
 
 // ------------------------------------------------------------------ Roost Nav
 // A bottom bar on phones and a side rail on tablets ("auto"), or always one of them.
+const slug = (v) => String(v || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\u0600-\u06ff]+/g, "-").replace(/^-+|-+$/g, "");
+
 class RoostNav extends RoostBase {
   static get defaults() { return { items: [], layout: "auto", show_labels: true, fixed: true, color: "active", active_style: "filled", background: "glass", bar_height: 54, icon_size: 21, radius: 26, theme: "auto" }; }
 
@@ -1449,13 +1451,44 @@ class RoostNav extends RoostBase {
       ev.preventDefault();
       const mk = (c.items || []).map((x) => x.path).join("|"); ((RoostNav.memo = RoostNav.memo || {})[mk] = RoostNav.memo[mk] || {}).go = Date.now();
       this.vibrate();
-      if (it.path.startsWith("#")) location.hash = it.path;
+      if (it.path.startsWith("#")) { if (location.hash === it.path) RoostNav.jump(it.path, it.path === c.items[0]?.path); else location.hash = it.path; }
       else { history.pushState(null, "", it.path); this.fire("location-changed", { replace: false }); }
       this._sig = null; this.hass = this._hass;
     }));
   }
 
   getCardSize() { return this._config?.fixed && !this.editing() ? 0 : 1; }
+
+  // "#rooms" scrolls to the Roost Title on this page called "Rooms" (or whose "Jump name" is rooms).
+  // The first button goes back to the top when there is no title for it.
+  static jump(hash, first) {
+    const want = slug(String(hash).replace(/^#/, ""));
+    if (!want) return;
+    const found = [], walk = (root, depth) => {
+      if (!root || depth > 14 || found.length) return;
+      for (const el of root.querySelectorAll("*")) {
+        if (el.localName === "roost-title" && el._config) {
+          const c = el._config;
+          if (slug(c.anchor || "") === want || slug(c.title || "") === want) { found.push(el); return; }
+        }
+        if (el.shadowRoot) walk(el.shadowRoot, depth + 1);
+        if (found.length) return;
+      }
+    };
+    walk(document, 0);
+    if (found[0]) found[0].scrollIntoView({ behavior: "smooth", block: "start" });
+    else if (first) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      const walkTop = (root, d) => { if (!root || d > 14) return; for (const el of root.querySelectorAll("*")) { if (el.scrollTop > 0 && el.scrollHeight > el.clientHeight) el.scrollTo({ top: 0, behavior: "smooth" }); if (el.shadowRoot) walkTop(el.shadowRoot, d + 1); } };
+      walkTop(document, 0);
+    }
+  }
+}
+if (!window.__roostJump) {
+  window.__roostJump = true;
+  window.addEventListener("hashchange", () => {
+    setTimeout(() => RoostNav.jump(location.hash, true), 60);
+  });
 }
 
 // ------------------------------------------------------------------ Roost Row
@@ -2834,6 +2867,7 @@ class RoostTitle extends RoostBase {
         { type: "grid", name: "", schema: [{ name: "icon", selector: { icon: {} } }, { name: "size", label: "Title size", selector: slider(13, 30) }] },
         { name: "badge", label: "Small badge next to it (for example “3 on”)", selector: { text: {} } },
         { name: "back", label: "Back button: where it goes (for example #rooms, or “back”)", selector: { text: {} } },
+        { name: "anchor", label: "Jump name: a Roost Nav button set to #this-name scrolls here (empty = the title)", selector: { text: {} } },
         { type: "expandable", name: "", title: "Link on the right", icon: "mdi:link", schema: [
           { name: "link_text", label: "Link words (for example “See all”)", selector: { text: {} } },
           ACTION_FIELD("tap_action", "What the link does"),
@@ -4784,8 +4818,9 @@ const RoostFull = {
     this.wants[d] = { header: opts.hide_header !== false, sidebar: opts.hide_sidebar !== false, ...cur, on: !!on };
     if (opts.hide_header !== undefined) this.wants[d].header = opts.hide_header !== false;
     if (opts.hide_sidebar !== undefined) this.wants[d].sidebar = opts.hide_sidebar !== false;
-    if (how === "auto") this.exitThisVisit(d, !on);
-    else this.remember(d, on);
+    // Leaving full screen, by any button, keeps it off on every page of this dashboard until it is switched on again.
+    if (how === "auto") { this.exitThisVisit(d, !on); if (on) this.remember(d, true); else this.remember(d, false); }
+    else { this.remember(d, on); this.exitThisVisit(d, !on); }
     if (opts.browser && on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
     if (opts.browser && !on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
     this.start();
@@ -5012,7 +5047,9 @@ class RoostFullscreen extends RoostBase {
     const d = RoostFull.dash();
     RoostFull.fab = { card: this, dash: d, position: c.exit_position, allowed: c.exit_button && this.allows(c.exit_users) };
     if (!this.allows(c.users)) return;
-    const on = !RoostFull.exitedThisVisit(d);
+    // someone left full screen on this dashboard: stay out until they switch it back on
+    const on = !RoostFull.exitedThisVisit(d) && RoostFull.remembered(d) !== "0";
+    if (!on) { RoostFull.wants[d] = { header: c.hide_header !== false, sidebar: c.hide_sidebar !== false, on: false }; RoostFull.start(); RoostFull.apply(); return; }
     RoostFull.set(on, { hide_header: c.hide_header, hide_sidebar: c.hide_sidebar }, "auto");
   }
 

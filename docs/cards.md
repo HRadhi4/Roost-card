@@ -150,6 +150,8 @@ ring_width: 6
 ### Roost Nav
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/nav.gif" width="320" alt="Roost nav card in action">
 
+A button can open another page (`/dashboard-home/rooms`) or jump down the same page (`#rooms`). A `#rooms` button scrolls to the Roost Title called "Rooms" (or the one whose **Jump name** is `rooms`); if there is none, it goes back to the top.
+
 ```yaml
 type: custom:roost-nav
 layout: auto             # auto (bar on phones, rail on tablets), bar or rail
@@ -521,6 +523,20 @@ sample: true
 
 ### Roost Page
 A whole phone page laid out like the original dashboard: 14 px at the sides, 16 px between cards, the night-sky background and room for the bottom bar. Put it in a **Panel** view and list the page's cards in it. Cards that sit side by side go in a `grid` (8 px apart).
+
+> **Easier to edit: use a Sections view instead.** Inside a Roost Page, Home Assistant gives one edit button to the whole page, so every card's settings open stacked in one window. In a normal **Sections** view each card has its own edit button. To keep the Roost look there, set the view to one column and give it the night-sky background:
+> ```yaml
+> type: sections
+> max_columns: 1
+> background: >-
+>   radial-gradient(1000px 620px at 15% -10%, #2A1F6B 0%, transparent 60%),
+>   radial-gradient(800px 600px at 100% 100%, #0E2A4A 0%, transparent 60%), #0B0D17
+> sections:
+>   - type: grid
+>     cards:
+>       - type: custom:roost-hero
+>         grid_options: { columns: full }
+> ```
 
 ```yaml
 type: custom:roost-page
