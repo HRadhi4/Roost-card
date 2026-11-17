@@ -7889,14 +7889,30 @@ class RoostCamera extends RoostBase {
 
 // ------------------------------------------------------------------ Roost Sensors
 // Many small readings in neat squares, each turning orange when outside the range you set.
+// How a reading feels, in a word and a colour: "Comfortable", "Warm", "Dry"... (null when there is no common scale)
+function comfortOf(dc, v, unit) {
+  if (v == null) return null;
+  if (dc === "temperature") {
+    const c = /F/.test(unit || "") ? (v - 32) / 1.8 : v;
+    return c < 18 ? ["Cold", COLORS.blue] : c < 20 ? ["Cool", COLORS.teal] : c <= 26 ? ["Comfortable", COLORS.green] : c < 29 ? ["Warm", COLORS.amber] : ["Hot", COLORS.coral];
+  }
+  if (dc === "humidity") return v < 30 ? ["Dry", COLORS.amber] : v <= 60 ? ["Comfortable", COLORS.green] : v <= 70 ? ["Humid", COLORS.teal] : ["Very humid", COLORS.blue];
+  if (dc === "carbon_dioxide") return v < 800 ? ["Fresh", COLORS.green] : v < 1200 ? ["Stuffy", COLORS.amber] : ["Open a window", COLORS.coral];
+  if (dc === "pm25") return v < 12 ? ["Clean", COLORS.green] : v < 35 ? ["Moderate", COLORS.amber] : ["Poor", COLORS.coral];
+  if (dc === "battery") return v < 20 ? ["Low", COLORS.coral] : v < 40 ? ["Getting low", COLORS.amber] : ["Good", COLORS.green];
+  return null;
+}
+
 class RoostSensors extends RoostBase {
-  static get defaults() { return { entities: [], columns: 3, radius: 18, theme: "auto" }; }
+  static get defaults() { return { entities: [], columns: 3, radius: 18, show_graph: true, show_range: true, hours: 24, theme: "auto" }; }
 
   validate(c) { if (!Array.isArray(c.entities) || !c.entities.length) throw new Error("Pick some readings"); }
 
   items() { return this._config.entities.map((e) => (typeof e === "string" ? { entity: e } : e)); }
 
   watched() { return this.items().map((i) => i.entity); }
+
+  extraSignature() { return `${this._histAt || 0}`; }
 
   static getConfigForm() {
     return {
@@ -7905,10 +7921,12 @@ class RoostSensors extends RoostBase {
           entity: { label: "Reading", required: true, selector: { entity: {} } },
           name: { label: "Name", selector: { text: {} } },
           icon: { label: "Icon", selector: { icon: {} } },
-          above: { label: "Orange above", selector: { number: { mode: "box" } } },
-          below: { label: "Orange below", selector: { number: { mode: "box" } } },
+          above: { label: "Warn above", selector: { number: { mode: "box" } } },
+          below: { label: "Warn below", selector: { number: { mode: "box" } } },
         } } } },
         { type: "grid", name: "", schema: [{ name: "columns", label: "Side by side", selector: { number: { min: 1, max: 6, mode: "box" } } }, { name: "radius", selector: slider(0, 32, 2) }] },
+        { type: "grid", name: "", schema: [{ name: "show_graph", label: "A line of the last hours", selector: { boolean: {} } }, { name: "show_range", label: "Today's lowest and highest", selector: { boolean: {} } }] },
+        { name: "hours", label: "Hours on the line", selector: slider(3, 72, 3) },
         THEME_FIELD,
       ],
       computeLabel,
@@ -7919,32 +7937,92 @@ class RoostSensors extends RoostBase {
 
   getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
 
+  // the last hours of every reading, fetched in one go and kept for ten minutes
+  async loadHistory() {
+    const c = this._config, h = this._hass;
+    if (!h?.callWS || this._histLoading || (!c.show_graph && !c.show_range)) return;
+    if (this._histAt && Date.now() - this._histAt < 600000) return;
+    this._histLoading = true;
+    try {
+      const start = new Date(Date.now() - Math.max(3, Number(c.hours) || 24) * 3600e3).toISOString();
+      const ids = this.items().map((i) => i.entity).filter((id) => num(this.sx(id)?.state) != null);
+      if (!ids.length) return;
+      const r = await h.callWS({ type: "history/history_during_period", start_time: start, entity_ids: ids, minimal_response: true, no_attributes: true, significant_changes_only: false });
+      const out = {};
+      for (const id of ids) out[id] = (r?.[id] || []).map((x) => [(x.lu ?? x.lc) * 1000 || Date.parse(x.last_updated || x.last_changed), num(x.s ?? x.state)]).filter(([t, v]) => isFinite(t) && v != null);
+      this._hist = out;
+      this._histAt = Date.now();
+      this._sig = null;
+      if (this._hass) this.hass = this._realHass || this._hass;
+    } catch (e) { this._histAt = Date.now(); } finally { this._histLoading = false; }
+  }
+
+  spark(id, v, col) {
+    const pts = (this._hist?.[id] || []).slice();
+    if (v != null) pts.push([Date.now(), v]);
+    if (pts.length < 2) return "";
+    const W = 100, H = 30, t0 = Date.now() - Math.max(3, Number(this._config.hours) || 24) * 3600e3, t1 = Date.now();
+    const vs = pts.map((x) => x[1]); let lo = Math.min(...vs), hi = Math.max(...vs);
+    if (hi - lo < 0.5) { const m = (hi + lo) / 2; lo = m - 0.25; hi = m + 0.25; }
+    const xy = pts.map(([t, y]) => [Math.max(0, ((t - t0) / (t1 - t0)) * W), H - 3 - ((y - lo) / (hi - lo)) * (H - 6)]);
+    // the reading was the same before its first change, so the line starts at the left edge
+    if (xy[0][0] > 0) xy.unshift([0, xy[0][1]]);
+    const line = curvePath(smoothLine(xy, W, H));
+    const gid = `g${Math.abs([...id].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) | 0, 7))}`;
+    return `<svg class="sp" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".32"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+      <path d="${line} L${xy[xy.length - 1][0].toFixed(1)},${H} L0,${H} Z" fill="url(#${gid})"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linecap="round"/></svg>`;
+  }
+
   render() {
     if (!this._hass || !this._config) return;
+    this.loadHistory();
     const c = this._config, p = this.p;
     const icons = { temperature: "mdi:thermometer", humidity: "mdi:water-percent", power: "mdi:flash", energy: "mdi:lightning-bolt", battery: "mdi:battery", carbon_dioxide: "mdi:molecule-co2", pm25: "mdi:blur", illuminance: "mdi:brightness-5", pressure: "mdi:gauge", voltage: "mdi:sine-wave", current: "mdi:current-ac" };
-    const tint = { temperature: COLORS.coral, humidity: COLORS.blue, power: COLORS.amber, energy: COLORS.green, battery: COLORS.green, carbon_dioxide: COLORS.slate, pm25: COLORS.purple, illuminance: COLORS.amber };
+    const tint = { temperature: COLORS.coral, humidity: COLORS.blue, power: COLORS.amber, energy: COLORS.green, battery: COLORS.green, carbon_dioxide: COLORS.slate, pm25: COLORS.purple, illuminance: COLORS.amber, voltage: COLORS.purple };
+    const cols = Math.max(1, Number(c.columns) || 3);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(96px,calc((100% - ${(Math.max(1, c.columns) - 1) * 8}px) / ${Math.max(1, c.columns)})),1fr));gap:8px}
-      .sq{${panelCss(p, c.radius)};padding:12px;display:flex;flex-direction:column;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
-      .sq:active{transform:scale(.96)}
-      .sq ha-icon{--mdc-icon-size:20px}
-      .v{font-size:22px;font-weight:700;line-height:1.1}
-      .v small{font-size:13px;font-weight:600;color:${p.muted}}
-      .n{font-size:12px;color:${p.muted};line-height:1.3}
+      .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(140px,calc((100% - ${(cols - 1) * 8}px) / ${cols})),1fr));gap:8px}
+      .sq{${panelCss(p, c.radius)};position:relative;overflow:hidden;padding:14px 14px 12px;display:flex;flex-direction:column;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .sq:active{transform:scale(.97)}
+      .sq::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--a0),var(--a1));opacity:.9}
+      .hd{display:flex;align-items:center;gap:10px}
+      .ic{width:34px;height:34px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--a0) 20%, transparent);color:var(--ac);--mdc-icon-size:19px}
+      .n{flex:1;min-width:0;font-size:13px;font-weight:600;color:${p.muted};line-height:1.25}
+      .row{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;flex-wrap:wrap}
+      .v{font-size:26px;font-weight:700;line-height:1;letter-spacing:-.5px}
+      .v small{font-size:13px;font-weight:600;color:${p.muted};margin-left:2px;letter-spacing:0}
+      .chip{font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:color-mix(in srgb, var(--a0) 22%, transparent);color:var(--ac);white-space:nowrap}
+      .tr{font-size:11px;font-weight:600;color:${p.muted};white-space:nowrap}
+      .sp{display:block;width:100%;height:34px;margin:0 -2px}
+      .rg{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;font-size:11px;color:${p.muted}}
+      .bar{position:relative;height:4px;border-radius:999px;background:${p.track}}
+      .bar i{position:absolute;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--a1);box-shadow:0 0 0 3px color-mix(in srgb, var(--a0) 30%, transparent)}
       .warn{border-color:#FF9F6B}
-      .warn .v{color:#FF9F6B}
-      .warn ha-icon{animation:roost-breathe 1.6s ease-in-out infinite}
+      .warn .ic{animation:roost-breathe 1.6s ease-in-out infinite}
     </style>
     <div class="grid">${this.items().map((it) => {
       const s = this.sx(it.entity), v = s ? num(s.state) : null, dc = s?.attributes.device_class;
-      const warn = v != null && ((it.above != null && it.above !== "" && v > it.above) || (it.below != null && it.below !== "" && v < it.below));
-      const g = warn ? COLORS.coral : tint[dc] || COLORS.purple;
       const unit = s?.attributes.unit_of_measurement || "";
-      return `<div class="sq ${warn ? "warn" : ""}" data-e="${esc(it.entity)}" role="button" tabindex="0">
-        <ha-icon icon="${esc(it.icon || s?.attributes.icon || icons[dc] || "mdi:information-outline")}" style="color:${g[this.dark ? 1 : 0]}"></ha-icon>
-        <span class="v num">${!s ? "?" : v != null ? `<span data-tw="${esc(it.entity)}">${esc(fmt(v, it.decimals ?? decOf(s.state, unit)))}</span><small>${esc(unitGap(unit))}</small>` : esc(UNAVAILABLE.includes(s.state) ? "Offline" : s.state)}</span>
-        <span class="n t">${esc(it.name || s?.attributes.friendly_name || it.entity)}</span></div>`;
+      const hi = it.above != null && it.above !== "" && v != null && v > it.above, lo = it.below != null && it.below !== "" && v != null && v < it.below;
+      const cf = hi ? ["High", COLORS.coral] : lo ? ["Low", COLORS.coral] : comfortOf(dc, v, unit);
+      const g = cf ? cf[1] : tint[dc] || COLORS.purple;
+      const dec = it.decimals ?? decOf(s?.state, unit);
+      const hist = (this._hist?.[it.entity] || []);
+      // trend over the last hour
+      const hourAgo = hist.filter(([t]) => t <= Date.now() - 3600e3).pop() || hist[0];
+      const d = v != null && hourAgo ? v - hourAgo[1] : null;
+      const step = Math.max(0.1, 10 ** -Math.max(0, dec));
+      const trend = d == null ? "" : Math.abs(d) < step ? "Steady" : `${d > 0 ? "↑" : "↓"} ${fmt(Math.abs(d), dec)}${unit.startsWith("°") ? "°" : ` ${unit}`} in 1 h`;
+      const vals = [...hist.map((x) => x[1]), ...(v != null ? [v] : [])];
+      const mn = vals.length ? Math.min(...vals) : null, mx = vals.length ? Math.max(...vals) : null;
+      const pos = mn != null && mx > mn ? ((v - mn) / (mx - mn)) * 100 : 50;
+      const col = g[this.dark ? 1 : 0];
+      return `<div class="sq ${hi || lo ? "warn" : ""}" data-e="${esc(it.entity)}" role="button" tabindex="0" style="--a0:${g[0]};--a1:${g[1]};--ac:${col}">
+        <div class="hd"><span class="ic"><ha-icon icon="${esc(it.icon || s?.attributes.icon || icons[dc] || "mdi:information-outline")}"></ha-icon></span><span class="n t">${esc(it.name || s?.attributes.friendly_name || it.entity)}</span>${cf ? `<span class="chip">${esc(cf[0])}</span>` : ""}</div>
+        <div class="row"><span class="v num">${!s ? "?" : v != null ? `<span data-tw="${esc(it.entity)}">${esc(fmt(v, dec))}</span><small>${esc(unitGap(unit).trim())}</small>` : esc(UNAVAILABLE.includes(s.state) ? "Offline" : s.state)}</span>${trend ? `<span class="tr t">${esc(trend)}</span>` : ""}</div>
+        ${c.show_graph && v != null ? this.spark(it.entity, v, col) : ""}
+        ${c.show_range && mn != null && mx > mn ? `<div class="rg"><span class="num">${esc(fmt(mn, dec))}</span><span class="bar"><i data-glide="${esc(it.entity)}" style="left:${pos.toFixed(1)}%"></i></span><span class="num">${esc(fmt(mx, dec))}</span></div>` : ""}
+      </div>`;
     }).join("")}</div>`;
     this.shadowRoot.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
   }
