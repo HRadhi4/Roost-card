@@ -893,6 +893,7 @@ doorbell: binary_sensor.doorbell_ring
 aspect: 3/4
 ---
 type: custom:roost-sensors
+style: line               # line (A), ring (B: a dial with the comfortable part in green), scale (C: one bar from cold to hot), rows (E: short rows for wall panels)
 columns: 3
 entities:
   - sensor.living_temperature
@@ -908,6 +909,22 @@ show_graph: true          # a smooth line of the last hours under each reading
 show_range: true          # the lowest and highest in that time, with a dot for now
 hours: 24                 # how far back the line goes
 # each reading also gets a word for how it feels (Comfortable, Warm, Dry, Stuffy...) and its trend over the last hour
+color_by: comfort          # comfort (green when comfortable), type (warm for temperature, blue for humidity) or fixed (color: below)
+show_icon: true
+show_name: true
+show_comfort: true         # the word: Comfortable, Warm, Dry, Stuffy...
+show_trend: true           # “↑ 1.4° in 1 h”
+show_scale_words: true     # words under the scale (style C)
+entities:
+  - entity: sensor.bedroom_temperature
+    name: Bedroom
+    comfort_min: 21          # your own comfortable range: below it says Cool, above it Warm
+    comfort_max: 25
+    min: 15                  # where the ring, scale and row bar start and end
+    max: 35
+    color: teal              # one colour just for this reading
+    above: 30                # turns orange and says High above this
+    decimals: 1
 ```
 
 

@@ -2,6 +2,17 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.6.6
+- **Sensors: four styles to choose from.**
+  - **A · Line:** a comfort word, a line of the last hours, today's lowest and highest.
+  - **B · Ring:** a dial with the comfortable part in green.
+  - **C · Scale:** one bar from cold to hot, or dry to humid, with a dot for now.
+  - **E · Rows:** short rows with a fill bar, for wall panels.
+- **Many settings for each reading:** its own comfortable range, where the scale starts and ends, its own colour, warnings and decimals. For the whole card:
+  - show or hide the icon, the name, the word, the trend, the line, the range and the scale words;
+  - colours by how it feels, by kind, or one colour.
+- On narrow screens the comfort word moves under the name instead of squeezing it.
+
 ## 1.6.5
 - **Sensors, redesigned.** Each reading now shows:
   - a word for how it feels, in its colour (temperature: Cold, Cool, Comfortable, Warm, Hot; humidity: Dry, Comfortable, Humid; air quality: Fresh, Stuffy and so on);
