@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.5.1
+- **Roost Car** has a new drawing: an original side view drawn to real sedan sizes.
+  - Door lines, pillars, mirror, flush handles, lights and the charge port.
+  - Metallic two-tone paint in the card's colour and alloy wheels.
+  - The battery cells fill inside the floor, and power runs down the cable while it charges.
+
 ## 1.5.0
 - **Twelve new cards**:
   - **Air** (purifier and air quality);

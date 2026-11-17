@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.5.0";
+const ROOST_VERSION = "1.5.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -5939,9 +5939,12 @@ class RoostEV extends ticking(RoostBase, 60000) {
     const col = lvl != null && lvl <= 20 ? "#F43F6B" : g[1];
     const cells = 10, full = lvl == null ? 0 : Math.round((lvl / 100) * cells), limCell = Math.round((lim / 100) * cells);
     const paint = [g[1], g[0]], glass = this.dark ? ["#3B4A9A", "#0B0E24"] : ["#A9B8EE", "#2E3A78"];
-    const rim = (cx) => `<g><circle cx="${cx}" cy="92" r="19" fill="#0B0D17"/><circle cx="${cx}" cy="92" r="13.5" fill="url(#evrim)"/>
-      ${[0, 72, 144, 216, 288].map((a) => { const r1 = (a * Math.PI) / 180; return `<path d="M${cx} 92 L${(cx + 12.5 * Math.cos(r1 - 0.16)).toFixed(1)} ${(92 + 12.5 * Math.sin(r1 - 0.16)).toFixed(1)} L${(cx + 12.5 * Math.cos(r1 + 0.16)).toFixed(1)} ${(92 + 12.5 * Math.sin(r1 + 0.16)).toFixed(1)} Z" fill="${this.dark ? "#1A1F3D" : "#3A4170"}" opacity=".85"/>`; }).join("")}
-      <circle cx="${cx}" cy="92" r="4" fill="#C9CEF2"/><circle cx="${cx}" cy="92" r="1.6" fill="#0B0D17"/><path d="M${cx - 9} ${92 - 11} A14 14 0 0 1 ${cx + 9} ${92 - 11}" fill="none" stroke="${g[1]}" stroke-width="2.4" stroke-linecap="round" opacity=".9"/></g>`;
+    // wheels: 70 cm tyres on a 4.7 m car (1 m = 66 px), drawn like a CAD side elevation
+    const rim = (cx) => `<g><circle cx="${cx}" cy="87" r="23" fill="#0B0D17"/><circle cx="${cx}" cy="87" r="22" fill="none" stroke="#2A3066" stroke-width="1"/>
+      <circle cx="${cx}" cy="87" r="15.5" fill="url(#evrim)"/>
+      ${[0, 72, 144, 216, 288].map((a) => { const r1 = ((a - 90) * Math.PI) / 180; return `<path d="M${(cx + 4 * Math.cos(r1 - 0.5)).toFixed(1)} ${(87 + 4 * Math.sin(r1 - 0.5)).toFixed(1)} L${(cx + 14.5 * Math.cos(r1 - 0.2)).toFixed(1)} ${(87 + 14.5 * Math.sin(r1 - 0.2)).toFixed(1)} A14.5 14.5 0 0 1 ${(cx + 14.5 * Math.cos(r1 + 0.2)).toFixed(1)} ${(87 + 14.5 * Math.sin(r1 + 0.2)).toFixed(1)} L${(cx + 4 * Math.cos(r1 + 0.5)).toFixed(1)} ${(87 + 4 * Math.sin(r1 + 0.5)).toFixed(1)} Z" fill="#1A1F3D" opacity=".78"/>`; }).join("")}
+      <path d="M${cx + 6} ${87 - 13} A14 14 0 0 1 ${cx + 13.5} ${87 - 3}" fill="none" stroke="${g[1]}" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="87" r="4.2" fill="#DDE1F0"/><circle cx="${cx}" cy="87" r="1.6" fill="#1A1F3D"/></g>`;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, charging)}
       .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
       .hero .pc{font-size:46px;font-weight:700;line-height:1;font-family:${FONT_NUM};color:${col};letter-spacing:-1px}
@@ -5963,34 +5966,43 @@ class RoostEV extends ticking(RoostBase, 60000) {
       <div class="hero"><div><div class="pc num" data-tw="ev">${lvl == null ? "" : `${Math.round(lvl)}<small>%</small>`}</div><div class="sub t">${lim < 100 ? `Charges to ${Math.round(lim)}%` : "Battery"}</div></div>
         ${this.val(c.range) ? `<div class="rg"><b class="num">${esc(this.val(c.range))}</b><span>range</span></div>` : ""}</div>
       <div class="car" role="img" aria-label="Battery ${lvl == null ? "unknown" : `${Math.round(lvl)}%`}${charging ? ", charging" : ""}">
-        <svg viewBox="0 0 340 132" aria-hidden="true">
+        <svg viewBox="-4 4 380 116" aria-hidden="true">
           <defs>
-            <linearGradient id="evbody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${paint[0]}"/><stop offset=".55" stop-color="${paint[1]}"/><stop offset="1" stop-color="${this.dark ? "#0B0D17" : "#3A4170"}"/></linearGradient>
+            <linearGradient id="evbody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${paint[0]}"/><stop offset=".42" stop-color="${paint[1]}"/><stop offset=".43" stop-color="${paint[1]}"/><stop offset="1" stop-color="${this.dark ? "#0E1530" : "#2A3060"}"/></linearGradient>
+            <linearGradient id="evspec" x1="0" x2="1"><stop offset="0" stop-color="rgba(255,255,255,0)"/><stop offset=".5" stop-color="rgba(255,255,255,.55)"/><stop offset="1" stop-color="rgba(255,255,255,0)"/></linearGradient>
             <linearGradient id="evglass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${glass[0]}"/><stop offset="1" stop-color="${glass[1]}"/></linearGradient>
             <linearGradient id="evcell" x1="0" x2="1"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${col}"/></linearGradient>
-            <radialGradient id="evrim" cx="40%" cy="35%"><stop offset="0" stop-color="#F4F5FC"/><stop offset=".6" stop-color="#9AA3D9"/><stop offset="1" stop-color="#5A6199"/></radialGradient>
+            <radialGradient id="evrim" cx="40%" cy="35%"><stop offset="0" stop-color="#F4F5FC"/><stop offset=".6" stop-color="#A9B0D6"/><stop offset="1" stop-color="#5A6199"/></radialGradient>
             <radialGradient id="evshadow"><stop offset="0" stop-color="rgba(0,0,0,${this.dark ? 0.6 : 0.25})"/><stop offset="1" stop-color="rgba(0,0,0,0)"/></radialGradient>
-            <linearGradient id="evbeam" x1="0" x2="1"><stop offset="0" stop-color="rgba(125,211,252,.45)"/><stop offset="1" stop-color="rgba(125,211,252,0)"/></linearGradient>
-            <clipPath id="evclip"><path d="M62 88 C62 76 70 70 86 68 L124 64 C140 46 162 36 192 35 C222 34 246 40 268 58 L296 64 C314 67 324 74 324 84 L324 90 C324 94 320 96 316 96 L70 96 C65 96 62 93 62 90 Z"/></clipPath>
+            <linearGradient id="evbeam" x1="0" x2="1"><stop offset="0" stop-color="rgba(125,211,252,.4)"/><stop offset="1" stop-color="rgba(125,211,252,0)"/></linearGradient>
+            <clipPath id="evclip"><path d="M24 101 L53 101 A28 28 0 0 1 109 101 L244 101 A28 28 0 0 1 300 101 L322 101 C328 100 331 94 331 86 L330 72 C330 64 326 58 318 54 L262 45 C252 40 238 22 212 15 C196 11 150 11 134 15 C112 21 90 34 72 44 L36 47 C26 48 20 52 19 60 L18 82 C18 94 20 101 24 101 Z"/></clipPath>
           </defs>
-          <ellipse cx="193" cy="112" rx="150" ry="9" fill="url(#evshadow)"/>
-          <path d="M322 74 L340 64 L340 92 Z" fill="url(#evbeam)"/>
-          ${plugged ? `<rect x="6" y="36" width="24" height="50" rx="8" fill="${this.dark ? "#141831" : "#FFFFFF"}" stroke="${p.border}" stroke-width="1.5"/><rect x="11" y="44" width="14" height="5" rx="2.5" class="led" fill="${charging ? "#34D399" : p.muted}"/>
-            <path d="M18 86 C18 108 44 110 58 100 C66 94 64 82 70 76" fill="none" stroke="${this.dark ? "#3A4170" : "#9AA3D9"}" stroke-width="4.5" stroke-linecap="round"/>
-            <path class="flow" d="M18 86 C18 108 44 110 58 100 C66 94 64 82 70 76" fill="none" stroke="${charging ? "#FFFFFF" : "transparent"}" stroke-width="2.4" stroke-linecap="round"/>` : ""}
-          <path d="M62 88 C62 76 70 70 86 68 L124 64 C140 46 162 36 192 35 C222 34 246 40 268 58 L296 64 C314 67 324 74 324 84 L324 90 C324 94 320 96 316 96 L70 96 C65 96 62 93 62 90 Z" fill="url(#evbody)"/>
-          <g clip-path="url(#evclip)">
-            <path d="M84 70 C140 62 260 60 316 70" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="1.6"/>
-            ${charging ? `<rect class="wave" x="130" y="58" width="40" height="40" fill="${col}" opacity=".0" style="filter:blur(6px)"/>` : ""}
+          <ellipse cx="200" cy="111" rx="160" ry="7" fill="url(#evshadow)"/>
+          <path d="M356 62 L376 52 L376 80 Z" fill="url(#evbeam)"/>
+          ${plugged ? `<rect x="3" y="30" width="20" height="46" rx="7" fill="${this.dark ? "#141831" : "#FFFFFF"}" stroke="${p.border}" stroke-width="1.5"/><rect x="7.5" y="37" width="11" height="4.5" rx="2.2" class="led" fill="${charging ? "#34D399" : p.muted}"/>
+            <path d="M13 76 C13 100 40 104 56 92 C62 84 64 64 72 57" fill="none" stroke="${this.dark ? "#3A4170" : "#9AA3D9"}" stroke-width="4" stroke-linecap="round"/>
+            <path class="flow" d="M13 76 C13 100 40 104 56 92 C62 84 64 64 72 57" fill="none" stroke="${charging ? "#FFFFFF" : "transparent"}" stroke-width="2.2" stroke-linecap="round"/>` : ""}
+          <g transform="translate(26 0)">
+            <path d="M24 101 L53 101 A28 28 0 0 1 109 101 L244 101 A28 28 0 0 1 300 101 L322 101 C328 100 331 94 331 86 L330 72 C330 64 326 58 318 54 L262 45 C252 40 238 22 212 15 C196 11 150 11 134 15 C112 21 90 34 72 44 L36 47 C26 48 20 52 19 60 L18 82 C18 94 20 101 24 101 Z" fill="url(#evbody)" stroke="${this.dark ? "#5A6BC0" : "#3A4170"}" stroke-width=".8"/>
+            <g clip-path="url(#evclip)" fill="none" stroke="${this.dark ? "rgba(11,13,23,.55)" : "rgba(42,48,96,.45)"}" stroke-width=".9">
+              <path d="M30 62 C120 58 230 58 324 62" stroke="url(#evspec)" stroke-width="2.2"/>
+              <path d="M106 48 C106 62 106 74 112 82 L114 96"/><path d="M168 46 L168 96"/><path d="M238 46 C238 60 240 72 242 82"/>
+              <path d="M112 96 L242 96"/><path d="M40 52 L52 51 L52 59 L40 60 Z"/>
+              <path d="M53 101 A28 28 0 0 1 109 101" stroke-width="2.5"/><path d="M244 101 A28 28 0 0 1 300 101" stroke-width="2.5"/>
+              ${charging ? `<rect class="wave" x="120" y="80" width="40" height="18" fill="${col}" opacity="0" style="filter:blur(6px)" stroke="none"/>` : ""}
+            </g>
+            <path d="M80 45 C96 36 114 26 136 19 C152 15 196 15 210 18 C228 23 242 34 251 43 L245 46 L84 46 Z" fill="url(#evglass)"/>
+            <rect x="165" y="16" width="6" height="30" fill="${paint[1]}" opacity=".95"/><path d="M100 45 L112 29" stroke="${paint[1]}" stroke-width="3"/>
+            <path d="M120 40 L134 23" stroke="rgba(255,255,255,.3)" stroke-width="3" stroke-linecap="round"/><path d="M192 42 L204 22" stroke="rgba(255,255,255,.22)" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M246 41 C250 37 256 37 258 41 L256 45 L247 45 Z" fill="${paint[1]}" stroke="${this.dark ? "rgba(11,13,23,.55)" : "rgba(42,48,96,.45)"}" stroke-width=".8"/>
+            <rect x="140" y="54" width="14" height="2.6" rx="1.3" fill="rgba(255,255,255,.55)"/><rect x="208" y="54" width="14" height="2.6" rx="1.3" fill="rgba(255,255,255,.55)"/>
+            <path d="M306 57 C314 57 322 58 328 61 L328 64 C320 62 312 61 306 61 Z" fill="#E0F2FE" style="filter:drop-shadow(0 0 4px #7DD3FC)"/>
+            <path d="M19 57 L36 52 L36 56 L19 61 Z" fill="#F43F6B" style="filter:drop-shadow(0 0 4px #F43F6B)"/>
+            ${plugged ? `<circle class="port" cx="46" cy="55.5" r="2.6" fill="${charging ? "#34D399" : p.muted}" style="filter:drop-shadow(0 0 5px ${charging ? "#34D399" : "transparent"})"/>` : ""}
+            <rect x="116" y="84" width="124" height="10" rx="5" fill="rgba(11,13,23,.4)" stroke="rgba(255,255,255,.28)" stroke-width=".8"/>
+            ${Array.from({ length: cells }, (_, k) => `<rect class="cell ${charging && k === full && k < limCell ? "next" : ""}" x="${118.5 + k * 12}" y="86" width="10" height="6" rx="1.8" fill="${k < full ? "url(#evcell)" : k < limCell ? "rgba(255,255,255,.18)" : "transparent"}" stroke="${k < limCell ? "none" : "rgba(255,255,255,.35)"}" stroke-dasharray="${k < limCell ? "" : "2 2"}"/>`).join("")}
+            ${rim(81)}${rim(272)}
           </g>
-          <path d="M132 64 C146 50 164 42 188 41 L188 64 Z" fill="url(#evglass)"/><path d="M196 41 C220 41 240 47 258 62 L196 64 Z" fill="url(#evglass)"/>
-          <path d="M148 58 L162 44" stroke="rgba(255,255,255,.35)" stroke-width="3" stroke-linecap="round"/><path d="M210 58 L222 44" stroke="rgba(255,255,255,.25)" stroke-width="2.4" stroke-linecap="round"/>
-          <rect x="304" y="70" width="18" height="4" rx="2" fill="#E0F2FE" style="filter:drop-shadow(0 0 5px #7DD3FC)"/>
-          <rect x="62" y="72" width="9" height="4" rx="2" fill="#F43F6B" style="filter:drop-shadow(0 0 4px #F43F6B)"/>
-          ${plugged ? `<circle class="port" cx="72" cy="76" r="3.4" fill="${charging ? "#34D399" : p.muted}" style="filter:drop-shadow(0 0 5px ${charging ? "#34D399" : "transparent"})"/>` : ""}
-          <rect x="132" y="76" width="126" height="12" rx="6" fill="rgba(11,13,23,.35)" stroke="rgba(255,255,255,.25)" stroke-width="1"/>
-          ${Array.from({ length: cells }, (_, k) => `<rect class="cell ${charging && k === full && k < limCell ? "next" : ""}" x="${135 + k * 12.1}" y="78.5" width="10" height="7" rx="2" fill="${k < full ? "url(#evcell)" : k < limCell ? "rgba(255,255,255,.18)" : "transparent"}" stroke="${k < limCell ? "none" : "rgba(255,255,255,.35)"}" stroke-dasharray="${k < limCell ? "" : "2 2"}"/>`).join("")}
-          ${rim(108)}${rim(280)}
         </svg>
       </div>
       <div class="stat">${stat("Charging at", charging && pw != null ? `${fmt(pw, 1)} kW` : "")}${stat("Full in", toFull != null ? minsText(toFull) : "")}</div>
