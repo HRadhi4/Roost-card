@@ -2,6 +2,19 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.3.9
+- **Works like a built-in card in Sections views**:
+  - a card that still needs a device shows a friendly "open the settings to finish" note instead of a red error;
+  - cards stretch to the height you give them when you resize them;
+  - right sizes on older Home Assistant versions too.
+- **Roost Fan**, new dial look (the default):
+  - turn the dial to Off, Low, Medium or High; the fan spins faster with each step and air rings pulse out;
+  - tap the fan to switch it on or off;
+  - Swing, Direction and Mode are small chips, and the modes open in a short list.
+  - The old look with a button for every speed is still there (Look → buttons).
+- **Roost Timer**: turn the ring to set the time, then press play. The quick-time buttons are now optional.
+- **Roost Media**: the volume bar is enough, so the extra − and + buttons are gone when the bar can be dragged.
+
 ## 1.3.8
 - **Tablet and wall panel look**, like the tablet mockup:
   - **Roost Nav**: a full-height side rail (Look → Side rail), a letter or a person's picture at the top, buttons that sit at the far end (for example Settings), and the page moves over so the rail never covers cards.

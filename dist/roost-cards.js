@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.3.8";
+const ROOST_VERSION = "1.3.9";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -219,15 +219,38 @@ class RoostBase extends HTMLElement {
       if (this.localName === "roost-remote" && config.entity && !config.athom_remote) config = { ...config, entity: undefined, athom_remote: "Sample TV" };
     }
     this._config = { ...this.constructor.defaults, ...config };
-    this.validate?.(this._config);
+    // A card that still needs a device shows a friendly "pick one" note, like Home Assistant's own cards, instead of a red error.
+    this._setup = "";
+    try { this.validate?.(this._config); } catch (e) { this._setup = e.message || String(e); }
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this._sig = null;
-    if (this._hass) this.render();
+    if (this._setup) this.renderSetup();
+    else if (this._hass) this.render();
+  }
+
+  renderSetup() {
+    if (!this.shadowRoot) return;
+    const name = (window.customCards || []).find((x) => x.type === this.localName)?.name || "Roost card";
+    const p = this._hass ? this.p : PALETTE.dark;
+    this.shadowRoot.innerHTML = `<style>:host{display:block;height:100%}
+      .setup{height:100%;min-height:96px;box-sizing:border-box;display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:22px;border:1px dashed ${p.border};background:${p.panel};color:${p.text};font-family:${FONT_TEXT}}
+      .ic{width:42px;height:42px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#6D4BFF,#8B6CFF);color:#fff}
+      b{display:block;font-size:15px;margin-bottom:3px}span{font-size:13px;color:${p.muted};line-height:1.4}</style>
+      <div class="setup"><div class="ic"><ha-icon icon="mdi:pencil-outline"></ha-icon></div><div><b>${esc(name)}</b><span>${esc(this._setup)}. Open the card's settings (the pencil) to finish.</span></div></div>`;
+  }
+
+  // Older Home Assistant versions (2024.8 to 2024.10) size cards in Sections with these.
+  getLayoutOptions() {
+    const g = this.getGridOptions?.() || {};
+    const q = (v) => (v == null ? undefined : v === "full" ? 4 : Math.max(1, Math.round(Number(v) / 3)));
+    return { grid_columns: q(g.columns ?? 12), grid_rows: g.rows ?? "auto", grid_min_columns: q(g.min_columns) };
   }
 
   set hass(hass) {
     if (this._config?.sample && hass) { this._realHass = hass; hass = Sample.wrap(hass, this); }
     this._hass = hass;
+    if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
+    this._setupDrawn = false;
     const sig = this.signature();
     if (sig === this._sig) return;
     this._sig = sig;
@@ -449,9 +472,10 @@ class RoostBase extends HTMLElement {
 
   baseCss() {
     const p = this.p;
-    return `:host{display:block;container-type:inline-size;--roost-text:${p.text};--roost-muted:${p.muted};font-family:${FONT_TEXT};line-height:normal}
+    return `:host{display:block;height:100%;container-type:inline-size;--roost-text:${p.text};--roost-muted:${p.muted};font-family:${FONT_TEXT};line-height:normal}
       .num,svg text{font-family:${FONT_NUM}}
       *{box-sizing:border-box}
+      :host > .card:last-child{min-height:100%}
       .t{white-space:normal;overflow-wrap:break-word;word-break:normal;overflow:visible;text-overflow:clip}
       ${KEYFRAMES}`;
   }
@@ -1060,6 +1084,7 @@ class RoostThermostat extends RoostBase {
 
   set hass(hass) {
     this._hass = hass;
+    if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
     if (this._drag) return;
     const sig = super.signature();
     if (sig === this._sig) return;
@@ -1759,6 +1784,7 @@ class RoostRooms extends RoostBase {
 
   set hass(hass) {
     this._hass = hass;
+    if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
     (this._cards || []).flat().forEach((el) => { el.hass = hass; });
     const counts = this._config?.show_count ? this._config.rooms.map((r) => this.onCount(r)).join(",") : "";
     const rm = this._config?.rooms?.[this._active] || {};
@@ -3277,10 +3303,10 @@ class RoostMedia extends RoostBase {
         <span class="tx"><div class="n t">${esc(this.name(c.entity))}</div><div class="l t">${playing ? '<span class="eq"><i></i><i></i><i></i></span>' : ""}${esc(line)}</div></span>
         <button class="pw" data-a="power" aria-label="Power"><ha-icon icon="mdi:power"></ha-icon></button></div>
       ${on && now ? `<div class="now t">${esc(now)}</div>` : ""}
-      ${on && c.show_volume && vs ? `<div class="row"><button class="b" data-a="down" aria-label="Volume down"><ha-icon icon="mdi:volume-minus"></ha-icon></button>
+      ${on && c.show_volume && vs ? `<div class="row">${vol == null ? '<button class="b" data-a="down" aria-label="Volume down"><ha-icon icon="mdi:volume-minus"></ha-icon></button>' : ""}
         ${vol != null ? `<div class="vol" role="slider" aria-valuenow="${Math.round(vol * 100)}"><span class="f" data-bar="vol" style="width:${(vol * 100).toFixed(0)}%"></span><span class="v num" ${muted ? "" : 'data-tw="vol"'}>${muted ? "Muted" : `${Math.round(vol * 100)}%`}</span></div>` : '<span style="flex:1"></span>'}
         <button class="b ${muted ? "on" : ""}" data-a="mute" aria-label="Mute"><ha-icon icon="${muted ? "mdi:volume-off" : "mdi:volume-mute"}"></ha-icon></button>
-        <button class="b" data-a="up" aria-label="Volume up"><ha-icon icon="mdi:volume-plus"></ha-icon></button></div>` : ""}
+        ${vol == null ? '<button class="b" data-a="up" aria-label="Volume up"><ha-icon icon="mdi:volume-plus"></ha-icon></button>' : ""}</div>` : ""}
       ${on && c.show_controls ? `<div class="ctl"><button class="b" data-a="prev" aria-label="Previous"><ha-icon icon="mdi:skip-previous"></ha-icon></button>
         <button class="b on" data-a="play" aria-label="Play or pause"><ha-icon icon="${playing ? "mdi:pause" : "mdi:play"}"></ha-icon></button>
         <button class="b" data-a="next" aria-label="Next"><ha-icon icon="mdi:skip-next"></ha-icon></button></div>` : ""}
@@ -4351,9 +4377,11 @@ class RoostEnergy extends ticking(RoostBase, 300000) {
 // ------------------------------------------------------------------ Roost Timer
 // A countdown ring for a Home Assistant timer (kettle, washing), with start, pause, cancel and quick times.
 class RoostTimer extends RoostBase {
-  static get defaults() { return { presets: [1, 3, 5, 10], color: "coral", radius: 22, theme: "auto" }; }
+  static get defaults() { return { presets: [], dial: true, dial_max: 60, color: "coral", radius: 22, theme: "auto" }; }
 
   validate(c) { if (!c.entity) throw new Error("Choose a timer (Settings → Helpers → Timer)"); }
+
+  signature() { return this._drag ? this._sig : super.signature(); }
 
   static getConfigForm() {
     return {
@@ -4361,7 +4389,8 @@ class RoostTimer extends RoostBase {
         { name: "sample", label: "Show sample data (try the card without the device)", selector: { boolean: {} } },
         { name: "entity", required: true, selector: { entity: { domain: "timer" } } },
         { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "icon", selector: { icon: {} } }] },
-        { name: "presets", label: "Quick times (minutes)", selector: { select: { multiple: true, custom_value: true, mode: "dropdown", options: ["1", "2", "3", "4", "5", "10", "15", "20", "30", "45", "60"] } } },
+        { type: "grid", name: "", schema: [{ name: "dial", label: "Turn the ring to set the time", selector: { boolean: {} } }, { name: "dial_max", label: "Longest time on the ring (minutes)", selector: slider(5, 180, 5) }] },
+        { name: "presets", label: "Quick time buttons too (minutes, optional)", selector: { select: { multiple: true, custom_value: true, mode: "dropdown", options: ["1", "2", "3", "4", "5", "10", "15", "20", "30", "45", "60"] } } },
         ...colourFields("color"),
         { type: "grid", name: "", schema: [{ name: "radius", selector: slider(0, 40, 2) }, THEME_FIELD] },
       ],
@@ -4383,13 +4412,16 @@ class RoostTimer extends RoostBase {
     const s = this.st(); if (!s) return 0;
     if (s.state === "active" && s.attributes.finishes_at) return Math.max(0, Math.round((new Date(s.attributes.finishes_at) - Date.now()) / 1000));
     if (s.state === "paused") return this.secs(s.attributes.remaining);
+    if (this._dial != null) return this._dial * 60;
     return this.secs(s.attributes.duration);
   }
 
   paint() {
     const v = this.shadowRoot.querySelector(".v"), arc = this.shadowRoot.querySelector(".arc"), s = this.st();
     if (!v || !s) return;
-    const left = this.left(), tot = this.secs(s.attributes.duration) || 1, f = s.state === "idle" ? 1 : left / tot;
+    const max = Math.max(1, Number(this._config.dial_max) || 60);
+    const left = this.left(), tot = this.secs(s.attributes.duration) || 1;
+    const f = s.state === "idle" ? (this._config.dial ? Math.min(1, left / 60 / max) : 1) : left / tot;
     const m = Math.floor(left / 60), sec = left % 60;
     v.textContent = `${m >= 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}` : m}:${String(sec).padStart(2, "0")}`;
     const L = 2 * Math.PI * 80 * 0.75, C = 2 * Math.PI * 80;
@@ -4405,7 +4437,8 @@ class RoostTimer extends RoostBase {
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px}
       .n{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
       .n ha-icon{--mdc-icon-size:20px;color:${g[this.dark ? 1 : 0]};${state === "active" ? "animation:roost-wiggle 1.2s ease-in-out infinite" : ""}}
-      .ring{position:relative;width:100%;max-width:200px}
+      .ring{position:relative;width:100%;max-width:200px;${state === "idle" && c.dial ? "touch-action:none;cursor:grab;" : ""}}
+      .knob{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#fff;border:3px solid ${g[1]};box-shadow:0 3px 8px rgba(0,0,0,.35);pointer-events:none}
       .ring svg{display:block;width:100%}
       .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
       .v{font-size:38px;font-weight:700}
@@ -4420,13 +4453,39 @@ class RoostTimer extends RoostBase {
     </style>
     <div class="card">
       <div class="n t"><ha-icon icon="${esc(c.icon || "mdi:timer-outline")}"></ha-icon>${esc(this.name(c.entity, "Timer"))}</div>
-      <div class="ring">${ringSvg({ f: 1, track: p.track, from: g[0], to: g[1], id: "tg", inner: 58, innerFill: p.dial })}<div class="in"><span class="v num"></span><span class="w t">${esc(word)}</span></div></div>
+      <div class="ring">${ringSvg({ f: 1, track: p.track, from: g[0], to: g[1], id: "tg", inner: 58, innerFill: p.dial })}<div class="in"><span class="v num"></span><span class="w t">${esc(state === "idle" && c.dial ? "Turn the ring" : word)}</span></div>${state === "idle" && c.dial ? '<span class="knob"></span>' : ""}</div>
       ${s ? `<div class="btns">${state === "active" ? '<button class="b main" data-a="pause" aria-label="Pause"><ha-icon icon="mdi:pause"></ha-icon></button>' : '<button class="b main" data-a="start" aria-label="Start"><ha-icon icon="mdi:play"></ha-icon></button>'}
         ${state !== "idle" ? '<button class="b" data-a="cancel" aria-label="Cancel"><ha-icon icon="mdi:stop"></ha-icon></button>' : ""}</div>
-      <div class="q">${(c.presets || []).map((m) => `<button data-m="${esc(m)}">${esc(m)} min</button>`).join("")}</div>` : ""}
+      ${(c.presets || []).length ? `<div class="q">${c.presets.map((m) => `<button data-m="${esc(m)}">${esc(m)} min</button>`).join("")}</div>` : ""}` : ""}
     </div>`;
+    if (state !== "idle") this._dial = null;
     this.paint();
-    this.shadowRoot.querySelectorAll("[data-a]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("timer", b.dataset.a, { entity_id: c.entity }); }));
+    const ring = this.shadowRoot.querySelector(".ring"), knob = this.shadowRoot.querySelector(".knob");
+    const max = Math.max(1, Number(c.dial_max) || 60);
+    const placeKnob = () => {
+      if (!knob) return;
+      const f = Math.min(1, this.left() / 60 / max), t = ((135 + 270 * f) * Math.PI) / 180, w = ring.clientWidth;
+      knob.style.left = `${(w / 2 + (80 / 210) * w * Math.cos(t)).toFixed(1)}px`; knob.style.top = `${(w / 2 + (80 / 210) * w * Math.sin(t)).toFixed(1)}px`;
+    };
+    (window.requestAnimationFrame || setTimeout)(placeKnob);
+    if (knob) {
+      const minsAt = (ev) => {
+        const b = ring.getBoundingClientRect(); let a = (Math.atan2(ev.clientY - (b.top + b.width / 2), ev.clientX - (b.left + b.width / 2)) * 180) / Math.PI;
+        a = (a - 135 + 360) % 360; if (a > 270) a = a > 315 ? 0 : 270;
+        return Math.max(1, Math.round((a / 270) * max));
+      };
+      const set = (ev) => { const m = minsAt(ev); if (m !== this._dial) { this._dial = m; if (max <= 60 || m % 5 === 0) this.vibrate(); this.paint(); placeKnob(); } };
+      ring.addEventListener("pointerdown", (ev) => { this._drag = true; ring.setPointerCapture?.(ev.pointerId); set(ev); });
+      ring.addEventListener("pointermove", (ev) => { if (this._drag) set(ev); });
+      const end = () => { this._drag = false; };
+      ring.addEventListener("pointerup", end); ring.addEventListener("pointercancel", end);
+    }
+    const hms = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}:00`;
+    this.shadowRoot.querySelectorAll("[data-a]").forEach((b) => b.addEventListener("click", () => {
+      this.vibrate();
+      if (b.dataset.a === "start" && state === "idle" && this._dial != null) this.call("timer", "start", { entity_id: c.entity, duration: hms(this._dial) });
+      else this.call("timer", b.dataset.a, { entity_id: c.entity });
+    }));
     this.shadowRoot.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => {
       this.vibrate();
       const m = Number(b.dataset.m);
@@ -4438,15 +4497,19 @@ class RoostTimer extends RoostBase {
 // ------------------------------------------------------------------ Roost Fan
 // A fan that spins as fast as it is set, with speed buttons, swing and its modes.
 class RoostFan extends RoostBase {
-  static get defaults() { return { color: "teal", radius: 22, theme: "auto" }; }
+  static get defaults() { return { color: "teal", radius: 22, style: "dial", theme: "auto" }; }
 
   validate(c) { if (!c.entity) throw new Error("Choose a fan"); }
+
+  // While a finger is on the dial, Home Assistant's updates must not redraw it.
+  signature() { return this._drag ? this._sig : super.signature(); }
 
   static getConfigForm() {
     return {
       schema: [
         { name: "sample", label: "Show sample data (try the card without the device)", selector: { boolean: {} } },
         { name: "entity", required: true, selector: { entity: { domain: "fan" } } },
+        { name: "style", label: "Look", selector: pick([["dial", "Dial: turn it to set the speed (fewer buttons)"], ["buttons", "A button for each speed and mode"]]) },
         { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "radius", selector: slider(0, 40, 2) }] },
         ...colourFields("color"),
         THEME_FIELD,
@@ -4461,6 +4524,149 @@ class RoostFan extends RoostBase {
 
   render() {
     if (!this._hass || !this._config) return;
+    if (this._config.style === "buttons") { this.renderButtons(); return; }
+    const c = this._config, p = this.p, g = this.colour(), s = this.st();
+    const on = s?.state === "on", a = s?.attributes || {};
+    const hasPct = a.percentage != null || a.percentage_step != null;
+    const step = Number(a.percentage_step) || 33.34;
+    const raw = hasPct ? Math.round(100 / step) : 1;
+    const smooth = raw > 6; // many speeds: the dial turns smoothly
+    const speeds = smooth ? 100 : Math.max(1, raw);
+    const pct = on ? (hasPct ? Number(a.percentage ?? 100) : 100) : 0;
+    const names = speeds === 3 ? ["Off", "Low", "Medium", "High"] : speeds === 2 ? ["Off", "Low", "High"] : speeds === 1 ? ["Off", "On"] : null;
+    const word = (v) => (v <= 0 ? "Off" : smooth ? `${Math.round(v)}%` : names ? names[Math.round(v / (100 / speeds))] || "On" : `Speed ${Math.round(v / (100 / speeds))}`);
+    const modes = a.preset_modes || [];
+    const oscil = a.oscillating != null, dir = a.direction != null;
+    const offline = !s || UNAVAILABLE.includes(s.state);
+    const R = 64, C = 84, SW = 270, L = 2 * Math.PI * R * (SW / 360);
+    const at = (f) => { const t = ((135 + SW * f) * Math.PI) / 180; return [C + R * Math.cos(t), C + R * Math.sin(t)]; };
+    const stops = smooth ? [0, 1] : Array.from({ length: speeds + 1 }, (_, i) => i / speeds);
+    const spin = (v) => (v > 0 ? Math.max(0.28, 2.4 - (v / 100) * 2.1).toFixed(2) : 0);
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px 18px;display:grid;grid-template-columns:168px minmax(0,1fr);align-items:center;column-gap:18px;row-gap:12px;position:relative}
+      .chips{grid-column:1/-1}
+      @container (max-width: 330px){:host .card{grid-template-columns:minmax(0,1fr)}:host .dial{justify-self:center}}
+      .dial{position:relative;width:168px;height:168px;flex:none;touch-action:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+      .dial svg{position:absolute;inset:0;overflow:visible}
+      .arc{transition:stroke-dasharray .12s ease-out}
+      .on .arc{animation:roost-fanglow 3s ease-in-out infinite}
+      @keyframes roost-fanglow{0%,100%{filter:drop-shadow(0 0 4px ${g[2]})}50%{filter:drop-shadow(0 0 14px ${g[2]})}}
+      .knob{transition:cx .12s ease-out,cy .12s ease-out}
+      .drag .arc,.drag .knob{transition:none}
+      .hub{position:absolute;left:34px;top:34px;width:100px;height:100px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        background:radial-gradient(circle at 40% 30%,${this.dark ? "#232856,#12152E" : "#FFFFFF,#E9ECF8"});box-shadow:inset 0 2px 12px rgba(255,255,255,.06),0 14px 30px -12px rgba(0,0,0,.5)}
+      .blades{--mdc-icon-size:62px;display:flex;color:${on ? g[1] : p.muted}}
+      .blades.go{animation:roost-spin var(--spin) linear infinite}
+      .air{position:absolute;inset:-6px;border-radius:50%;border:2px solid ${g[1]};opacity:0;pointer-events:none}
+      .on .air{animation:roost-air var(--air) ease-out infinite}
+      .on .air.b2{animation-delay:calc(var(--air) / 2)}
+      @keyframes roost-air{0%{transform:scale(.72);opacity:.55}100%{transform:scale(1.18);opacity:0}}
+      .lbl{position:absolute;font-size:10px;font-weight:600;color:${p.muted};transform:translate(-50%,-50%);pointer-events:none}
+      .lbl.on2{color:${g[1]}}
+      .side{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+      .n{font-size:16px;font-weight:600}
+      .big{font-size:26px;font-weight:700;letter-spacing:-.4px;line-height:1.1;color:${on ? p.text : p.muted}}
+      .l{font-size:12.5px;color:${p.muted}}
+      .chips{display:flex;flex-wrap:wrap;gap:8px}
+      .chips .chip{flex:1 1 auto;justify-content:center}
+      .chip{height:40px;padding:0 14px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:13px;font-weight:600;
+        display:inline-flex;align-items:center;gap:7px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+      .chip ha-icon{--mdc-icon-size:18px}
+      .chip.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 8px 18px -10px ${g[2]}}
+      .chip.on.sw ha-icon{animation:roost-swing 2.2s ease-in-out infinite}
+      @keyframes roost-swing{0%,100%{transform:rotate(-28deg)}50%{transform:rotate(28deg)}}
+      .chip:active{transform:scale(.95)}
+      .menu{position:absolute;right:14px;bottom:14px;z-index:3;min-width:150px;max-height:220px;overflow:auto;padding:6px;border-radius:16px;border:1px solid ${p.border};
+        background:${this.dark ? "#1A1F3D" : "#FFFFFF"};box-shadow:0 18px 40px -12px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:2px}
+      .menu[hidden]{display:none}
+      .mi{all:unset;padding:10px 12px;border-radius:10px;font-size:14px;cursor:pointer;color:${p.text};display:flex;align-items:center;justify-content:space-between;gap:10px}
+      .mi:hover,.mi.on{background:${g[0]}2E}
+    </style>
+    <div class="card">
+      <div class="dial ${on ? "on" : ""}" role="slider" tabindex="0" aria-label="Fan speed" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}" aria-valuetext="${esc(word(pct))}"
+        style="--spin:${spin(pct)}s;--air:${on ? Math.max(0.7, 2.6 - (pct / 100) * 1.8).toFixed(2) : 2}s">
+        <svg width="168" height="168" viewBox="0 0 168 168" aria-hidden="true">
+          <defs><linearGradient id="fg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/></linearGradient></defs>
+          <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${p.track}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)} 999" transform="rotate(135 ${C} ${C})"/>
+          <circle class="arc" cx="${C}" cy="${C}" r="${R}" fill="none" stroke="url(#fg)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 999" transform="rotate(135 ${C} ${C})"/>
+          ${stops.map((f) => { const [x, y] = at(f); return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="${this.dark ? "#0B0D17" : "#FFFFFF"}" opacity=".9"/>`; }).join("")}
+          <circle class="knob" r="11" fill="#fff" stroke="${g[1]}" stroke-width="3" cx="0" cy="0" style="filter:drop-shadow(0 3px 6px rgba(0,0,0,.35))"/>
+        </svg>
+        ${!smooth && speeds <= 4 ? stops.map((f, i) => { const [x, y] = at(f); const dx = (x - C) * 0.32, dy = (y - C) * 0.32; return `<span class="lbl" data-i="${i}" style="left:${(x + dx).toFixed(1)}px;top:${(y + dy).toFixed(1)}px">${esc((names || [])[i] || i)}</span>`; }).join("") : ""}
+        <span class="hub" role="button" aria-label="Turn the fan on or off"><span class="air"></span><span class="air b2"></span>
+          <ha-icon class="blades ${on ? "go" : ""}" icon="mdi:fan"></ha-icon></span>
+      </div>
+      <div class="side">
+        <div class="n t">${esc(this.name(c.entity, "Fan"))}</div>
+        <div><div class="big num" aria-live="polite">${offline ? "Offline" : esc(word(pct))}</div>
+          <div class="l t">${on && hasPct ? `${Math.round(pct)}%` : on ? "On" : "Turn the dial or tap the fan"}${a.preset_mode && on ? ` · ${esc(a.preset_mode)}` : ""}</div></div>
+      </div>
+        ${oscil || dir || modes.length ? `<div class="chips">
+          ${oscil ? `<button class="chip sw ${a.oscillating ? "on" : ""}" data-o="1" aria-pressed="${!!a.oscillating}"><ha-icon icon="mdi:arrow-oscillating"></ha-icon>Swing</button>` : ""}
+          ${dir ? `<button class="chip" data-d="1" aria-label="Direction"><ha-icon icon="${a.direction === "reverse" ? "mdi:rotate-left" : "mdi:rotate-right"}"></ha-icon>${a.direction === "reverse" ? "Reverse" : "Forward"}</button>` : ""}
+          ${modes.length ? `<button class="chip ${a.preset_mode ? "on" : ""}" data-menu="1" aria-haspopup="true"><ha-icon icon="mdi:tune-variant"></ha-icon>${esc(a.preset_mode || "Mode")}<ha-icon icon="mdi:chevron-down" style="--mdc-icon-size:16px;margin-right:-4px"></ha-icon></button>` : ""}
+        </div>` : ""}
+      ${modes.length ? `<div class="menu" hidden role="menu">${a.preset_mode ? `<button class="mi" data-m="">None</button>` : ""}${modes.map((m) => `<button class="mi ${a.preset_mode === m ? "on" : ""}" role="menuitem" data-m="${esc(m)}">${esc(m)}${a.preset_mode === m ? '<ha-icon icon="mdi:check" style="--mdc-icon-size:16px"></ha-icon>' : ""}</button>`).join("")}</div>` : ""}
+    </div>`;
+    const r = this.shadowRoot, dial = r.querySelector(".dial"), arc = r.querySelector(".arc"), knob = r.querySelector(".knob"), big = r.querySelector(".big");
+    const paint = (v) => {
+      const f = Math.max(0, Math.min(1, v / 100));
+      arc.setAttribute("stroke-dasharray", `${(L * f).toFixed(1)} 999`);
+      arc.style.opacity = f > 0 ? 1 : 0;
+      const [x, y] = at(f); knob.setAttribute("cx", x.toFixed(1)); knob.setAttribute("cy", y.toFixed(1));
+      r.querySelectorAll(".lbl").forEach((el) => el.classList.toggle("on2", Math.abs(+el.dataset.i / speeds - f) < 0.001));
+    };
+    (window.requestAnimationFrame || setTimeout)(() => paint(pct));
+    const snap = (v) => (smooth ? Math.round(v) : Math.round(v / (100 / speeds)) * (100 / speeds));
+    const valueAt = (ev) => {
+      const b = dial.getBoundingClientRect(); const dx = ev.clientX - (b.left + b.width / 2), dy = ev.clientY - (b.top + b.height / 2);
+      let ang = (Math.atan2(dy, dx) * 180) / Math.PI; ang = (ang - 135 + 360) % 360;
+      if (ang > SW) ang = ang > SW + (360 - SW) / 2 ? 0 : SW;
+      return (ang / SW) * 100;
+    };
+    const send = (v) => {
+      this.vibrate();
+      if (v <= 0) this.call("fan", "turn_off", { entity_id: c.entity });
+      else if (hasPct) this.call("fan", "set_percentage", { entity_id: c.entity, percentage: Math.round(Math.min(100, v)) });
+      else this.call("fan", "turn_on", { entity_id: c.entity });
+    };
+    let moved = false, startV = 0;
+    dial.addEventListener("pointerdown", (ev) => {
+      if (ev.target.closest(".hub")) return;
+      this._drag = true; moved = false; startV = pct; dial.classList.add("drag");
+      dial.setPointerCapture?.(ev.pointerId);
+      const v = snap(valueAt(ev)); paint(v); big.textContent = word(v); this._dv = v;
+    });
+    dial.addEventListener("pointermove", (ev) => {
+      if (!this._drag) return;
+      moved = true; const v = snap(valueAt(ev)); if (v !== this._dv) { this._dv = v; paint(v); big.textContent = word(v); if (!smooth) this.vibrate(); }
+    });
+    const end = () => {
+      if (!this._drag) return;
+      this._drag = false; dial.classList.remove("drag");
+      if (this._dv !== startV || !moved) send(this._dv);
+    };
+    dial.addEventListener("pointerup", end);
+    dial.addEventListener("pointercancel", () => { this._drag = false; dial.classList.remove("drag"); paint(pct); big.textContent = word(pct); });
+    dial.addEventListener("keydown", (ev) => {
+      const d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[ev.key];
+      if (!d) return; ev.preventDefault();
+      send(Math.max(0, Math.min(100, snap(pct + d * (smooth ? 10 : 100 / speeds)))));
+    });
+    r.querySelector(".hub").addEventListener("click", (ev) => { ev.stopPropagation(); this.vibrate(); this.call("fan", "toggle", { entity_id: c.entity }); });
+    r.querySelectorAll("[data-o]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("fan", "oscillate", { entity_id: c.entity, oscillating: !a.oscillating }); }));
+    r.querySelectorAll("[data-d]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("fan", "set_direction", { entity_id: c.entity, direction: a.direction === "reverse" ? "forward" : "reverse" }); }));
+    const menu = r.querySelector(".menu");
+    r.querySelectorAll("[data-menu]").forEach((b) => b.addEventListener("click", (ev) => { ev.stopPropagation(); menu.hidden = !menu.hidden; }));
+    r.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => {
+      this.vibrate(); menu.hidden = true;
+      if (b.dataset.m) this.call("fan", "set_preset_mode", { entity_id: c.entity, preset_mode: b.dataset.m });
+      else this.call("fan", "set_percentage", { entity_id: c.entity, percentage: Math.round(pct || 100 / speeds) });
+    }));
+    r.querySelector(".card").addEventListener("click", (ev) => { if (menu && !menu.hidden && !ev.target.closest(".menu,[data-menu]")) menu.hidden = true; });
+  }
+
+  renderButtons() {
     const c = this._config, p = this.p, g = this.colour(), s = this.st();
     const on = s?.state === "on", a = s?.attributes || {};
     const pct = on ? a.percentage ?? 100 : 0;
@@ -5113,6 +5319,7 @@ class RoostPage extends RoostBase {
 
   set hass(hass) {
     this._hass = hass;
+    if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
     (this._cards || []).forEach((el) => { el.hass = hass; });
     const sig = `${this.dark ? 1 : 0}|${this._built ? 1 : 0}`;
     if (sig === this._sig) return;
@@ -5293,6 +5500,7 @@ class RoostPanel extends RoostPage {
 
   set hass(hass) {
     this._hass = hass;
+    if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
     (this._cards || []).forEach((el) => { el.hass = hass; });
     const rows = this.watched().map((id) => this.st(id)?.state).join("|");
     const sig = `${this.dark ? 1 : 0}|${this._built ? 1 : 0}|${rows}|${this._isOpen ? 1 : 0}`;

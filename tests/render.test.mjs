@@ -269,7 +269,8 @@ if (!saved || saved.color !== "custom" || "radius" in saved || saved.entity !== 
 if (!names(form.schema).includes("color_start")) { fails++; console.error("FAIL editor shows own colours when chosen"); }
 // Errors for missing settings
 for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }], ["roost-rooms", { rooms: [] }]]) {
-  try { document.createElement(tag).setConfig(cfg); fails++; console.error(`FAIL ${tag} accepted an empty config`); } catch { /* expected */ }
+  const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
+  if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
 console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 12} checks passed`);
 process.exit(fails ? 1 : 0);

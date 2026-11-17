@@ -445,7 +445,9 @@ devices: [sensor.kettle_power, sensor.tv_power]
 ---
 type: custom:roost-timer
 entity: timer.kettle
-presets: [1, 3, 5, 10]
+dial: true          # turn the ring to set the time, then press play
+dial_max: 60        # the longest time on the ring, in minutes
+presets: [5, 10]    # optional quick-time buttons as well
 ```
 
 ### Roost Fan, Lock, Agenda and To-do
@@ -454,6 +456,7 @@ presets: [1, 3, 5, 10]
 ```yaml
 type: custom:roost-fan
 entity: fan.bedroom
+style: dial         # dial (turn it: Off, Low, Medium, High; swing and modes as small chips) or buttons
 ---
 type: custom:roost-lock
 entity: lock.front_door
