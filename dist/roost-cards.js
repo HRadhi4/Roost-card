@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.6.0";
+const ROOST_VERSION = "1.6.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {

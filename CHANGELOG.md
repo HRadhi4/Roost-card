@@ -2,6 +2,21 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.6.1
+Everything a hand-built wall tablet needed, so a whole tablet dashboard can be made from Roost cards alone:
+- **Rooms**:
+  - a room can open from a link, such as a side-rail button or a Room card's tap;
+  - a room can have no button in the bar, for an Automations page;
+  - a card in a room can take two columns;
+  - the room bar can fill the width;
+  - “No room sensor online” shows when the room's sensors are off.
+- **Any device card**: a “Not working right now” note with your reason.
+- **Thermostat**: the power button can run a script, for ACs sent by infrared.
+- **Light/Dark button**: can also switch a helper, so automations and other screens follow.
+- **Panel**: cards side by side.
+- **Hero**: “Location off” for someone whose phone location is off.
+- **Full screen**: also hides the sidebar space on newer Home Assistant versions.
+
 ## 1.6.0
 - **New: Roost Grocy**: the kitchen from Grocy, with food that goes off soon (use it, open it or throw it away), the shopping list to tick off, chores and tasks, and the meal plan.
 - **Room: any cards under it**: Roost cards or Home Assistant's own, in one box with the room or just below it, side by side, and folded away behind “3 more” if you like.

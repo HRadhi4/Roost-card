@@ -19,6 +19,12 @@ opacity: 55        # 0 = fully see-through, 100 = solid
 blur: 18           # blur behind the card, in pixels
 ```
 
+**Not working right now**, on every device card: when something is broken, write why, and a calm note covers that card so nobody keeps tapping it. Empty it again when it works.
+
+```yaml
+out_of_order: The curtain remote's battery is dead
+```
+
 ### Roost Tile
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile.gif" width="320" alt="Roost tile card in action">
 
@@ -81,6 +87,10 @@ modes: [cool, dry, fan_only, heat_cool]
 show_power: true
 show_plus_minus: true
 max_width: 250           # dial size in px
+power_action:            # optional: for an AC sent by infrared, the power button runs your script
+  action: perform-action
+  perform_action: script.turn_on
+  target: { entity_id: script.bedroom_ac_power }
 ```
 Drag the knob or tap anywhere on the ring. The number follows your finger, and the temperature is sent when you let go.
 
@@ -187,7 +197,16 @@ rooms:
         wide: true
   - name: Bedroom
     icon: mdi:bed-king
+    link: "#bedroom"        # opens from a link: a side-rail button, a Room card's tap, any "navigate"
     entities: [light.bedroom]
+    cards:
+      - { type: custom:roost-thermostat, entity: climate.bedroom_ac, span: 2 }   # span: takes two columns
+  - name: Automations
+    icon: mdi:robot
+    link: "#automations"
+    hidden: true            # no button in the bar: reached only from its link (for example the side rail)
+    cards:
+      - { type: custom:roost-automations, wide: true }
 show_names: active         # active (icons, name on the chosen room), all (icons and names), names (names only) or none (icons only)
 pill_align: fill           # fill (same width, filling the bar), spread, start or center
 pill_width: 0              # button width in px, 0 = automatic
@@ -453,6 +472,7 @@ tap_action: { action: navigate, navigation_path: "#devices" }
 ---
 type: custom:roost-theme
 show_label: true
+entity: input_boolean.dashboard_dark_mode   # optional: switched on in dark, off in light, for automations or other screens
 ```
 
 ### Roost Remote
@@ -981,6 +1001,7 @@ title: Rooms
 subtitle: Living room · 8 outlets   # optional line under the title
 picture: /local/strip.png           # or icon: mdi:power-socket-uk
 collapsible: true                   # folds open and closed
+columns: 4                          # cards side by side (fewer on a narrow phone); a card with wide: true takes the whole row
 entities: [alarm_control_panel.home, binary_sensor.front_door]   # rows with their state
 cards:
   - { type: custom:roost-room, name: Kitchen, temperature: sensor.kitchen_temperature, plain: true }
