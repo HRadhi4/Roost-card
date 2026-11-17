@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.6.2";
+const ROOST_VERSION = "1.6.3";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -808,7 +808,28 @@ class RoostEditor extends HTMLElement {
     this._form.data = this._data;
     this._form.schema = fitSchema(schema, this._data);
     this._form.computeLabel = label;
-    if (cls.hasCards) this.drawCards();
+    if (cls.hasCards || cls.roomCards) this.drawCards();
+  }
+
+  // Rooms card: which room's cards are being edited.
+  roomIdx() { const n = (this._config.rooms || []).length; return Math.max(0, Math.min(n - 1, this._roomIdx || 0)); }
+
+  drawRoomChips() {
+    const rooms = this._config.rooms || [], on = this.roomIdx();
+    const key = `${rooms.map((r) => `${r.name}:${(Array.isArray(r.cards) ? r.cards : []).length}`).join("|")}#${on}`;
+    if (key === this._chipsKey) return;
+    this._chipsKey = key;
+    this._roomChips.innerHTML = "";
+    if (!rooms.length) { this._roomChips.textContent = "Add a room above first."; return; }
+    rooms.forEach((r, i) => {
+      const b = document.createElement("button");
+      const n = Array.isArray(r.cards) ? r.cards.length : 0;
+      b.type = "button"; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(i === on));
+      b.textContent = `${r.name || `Room ${i + 1}`}${n ? ` · ${n}` : ""}`;
+      b.style.cssText = `font:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:999px;cursor:pointer;border:1px solid ${i === on ? "transparent" : "var(--divider-color,#8884)"};background:${i === on ? "var(--primary-color,#6D4BFF)" : "transparent"};color:${i === on ? "var(--text-primary-color,#fff)" : "var(--primary-text-color)"}`;
+      b.addEventListener("click", () => { this._roomIdx = i; this._stackCards = null; this.draw(); });
+      this._roomChips.appendChild(b);
+    });
   }
 
   // Cards inside a Roost Page or Panel are edited here too, one tab per card, with Home Assistant's own card editor.
@@ -826,10 +847,24 @@ class RoostEditor extends HTMLElement {
           ev.stopPropagation();
           const cards = ev.detail?.config?.cards;
           if (!Array.isArray(cards)) return;
-          this._config = { ...this._config, cards };
+          if (this.cardClass.roomCards) {
+            // the cards of the chosen room
+            const rooms = (this._config.rooms || []).map((r, i) => (i === this.roomIdx() ? { ...r, cards } : r));
+            this._config = { ...this._config, rooms };
+            this._stackCards = cards;
+          } else this._config = { ...this._config, cards };
           this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
         });
-        this.append(head, el);
+        if (this.cardClass.roomCards) {
+          head.textContent = "Cards in each room";
+          const hint = document.createElement("div");
+          hint.textContent = "Pick a room, then add, move or remove its cards. They show under that room's devices.";
+          hint.style.cssText = "font-size:13px;opacity:.75;margin-bottom:8px";
+          this._roomChips = document.createElement("div");
+          this._roomChips.setAttribute("role", "tablist");
+          this._roomChips.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px";
+          this.append(head, hint, this._roomChips, el);
+        } else this.append(head, el);
         this._stack = el;
       } catch (e) {
         const note = document.createElement("p");
@@ -840,10 +875,16 @@ class RoostEditor extends HTMLElement {
       }
       this._stackLoading = false;
     }
+    if (this._roomChips) this.drawRoomChips();
     if (this._stack?.setConfig) {
       this._stack.hass = this._hass;
-      const cards = this._config.cards || [];
+      const cards = (this.cardClass.roomCards ? (this._config.rooms || [])[this.roomIdx()]?.cards : this._config.cards) || [];
       if (this._stackCards !== cards) { this._stackCards = cards; try { this._stack.setConfig({ type: "vertical-stack", cards }); } catch (e) { /* shown as code */ } }
+      // the stack's own "Title" box means nothing here, so it is hidden
+      Promise.resolve(this._stack.updateComplete).then(() => {
+        const sr = this._stack.shadowRoot;
+        if (sr && !sr.getElementById("roost-hide")) { const st = document.createElement("style"); st.id = "roost-hide"; st.textContent = ":host > ha-form, .card-config > ha-form, ha-form:first-child{display:none}"; sr.appendChild(st); }
+      });
     }
   }
 }
@@ -1993,6 +2034,7 @@ class RoostRow extends RoostBase {
 // ------------------------------------------------------------------ Roost Rooms
 // A row of room pills; the chosen room's cards show below. Switching is instant (all rooms are built once).
 class RoostRooms extends RoostBase {
+  static get roomCards() { return true; }
   static get defaults() {
     return { rooms: [], columns: 2, gap: 8, color: "active", show_names: "active", active_style: "filled", background: "solid",
       pill_shape: "pill", pill_height: 40, pill_icon_size: 20, pill_align: "spread", show_count: false,
@@ -2073,7 +2115,6 @@ class RoostRooms extends RoostBase {
           entities: { label: "Devices in this room (each becomes a tile)", selector: { entity: { multiple: true } } },
           temperature: { label: "Temperature sensor (shown next to the room buttons)", selector: { entity: { domain: "sensor" } } },
           humidity: { label: "Humidity sensor", selector: { entity: { domain: "sensor" } } },
-          cards: { label: "Extra cards (advanced, YAML list)", selector: { object: {} } },
           link: { label: "Opens from a link (for example #entrance, for the side rail)", selector: { text: {} } },
           hidden: { label: "No button in the bar (reached only from its link, for example an Automations page)", selector: { boolean: {} } },
         } } } },

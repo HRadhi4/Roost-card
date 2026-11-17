@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.6.3
+- **Rooms: add or remove any card in a room from the visual editor.** Under “Cards in each room”, pick a room and use Home Assistant's own card picker to add, move or remove cards. No YAML is needed. Each room button shows how many cards it has.
+- Cards in a Page, Panel or Room no longer show a “Title” box that did nothing.
+
 ## 1.6.2
 - **Side rail**: a full screen button that switches it on and off, with the icon following, and only for the people you choose. No more floating button over the page.
 - **Clock line of times**:

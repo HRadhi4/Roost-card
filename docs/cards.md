@@ -183,6 +183,8 @@ icon_size: 22
 ### Roost Rooms
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="320" alt="Roost rooms card in action">
 
+**No code needed:** in the card's editor, under **Cards in each room**, tap a room, then use **+** to add any card (Roost or Home Assistant's own), the arrows to move it, and the bin to remove it. The number on each room button says how many cards it has.
+
 ```yaml
 type: custom:roost-rooms
 rooms:
