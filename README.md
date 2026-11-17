@@ -47,8 +47,15 @@ Step by step, and without HACS: **[Install guide](docs/tutorials/01-install.md)*
 
 ## Tutorials
 
-Short, written, with pictures:
+### Video: build a full dashboard
 
+[![Video tutorial: build a full phone dashboard with Roost Cards](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/video/roost-full-dashboard.jpg)](https://github.com/HRadhi4/Roost-card/blob/main/docs/video/roost-full-dashboard.mp4)
+
+From an empty page to a full phone home screen, all in the visual editor, and a quick look at all 37 cards at the end. (4 minutes, no sound.)
+
+### Written, with pictures
+
+0. [Video: build a full dashboard](docs/tutorials/00-video.md) · 4 min
 1. [Install Roost Cards](docs/tutorials/01-install.md) · 2 min
 2. [Add your first card](docs/tutorials/02-first-card.md) · 1 min
 3. [Build a phone home screen](docs/tutorials/03-phone-home-screen.md) · 10 min
