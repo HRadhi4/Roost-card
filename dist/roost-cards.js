@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.4.0";
+const ROOST_VERSION = "1.5.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -154,6 +154,52 @@ const Sample = {
       "sensor.sample_robot_mop_pad": st("sensor.sample_robot_mop_pad", "12", { friendly_name: "Robot vacuum Mop pad", unit_of_measurement: "%" }),
       "select.sample_robot_water": st("select.sample_robot_water", "Medium", { friendly_name: "Robot vacuum Water flow", options: ["Off", "Low", "Medium", "High"] }),
       "select.sample_robot_mode": st("select.sample_robot_mode", "Vacuum and mop", { friendly_name: "Robot vacuum Cleaning mode", options: ["Vacuum", "Mop", "Vacuum and mop", "Mop after vacuum"] }),
+      "fan.sample_purifier": st("fan.sample_purifier", "on", { friendly_name: "Air purifier", percentage: 50, percentage_step: 25, preset_modes: ["Auto", "Sleep", "Turbo"], preset_mode: "Auto" }),
+      "sensor.sample_pm25": st("sensor.sample_pm25", "14", { friendly_name: "PM2.5", unit_of_measurement: "µg/m³", device_class: "pm25" }),
+      "sensor.sample_purifier_filter": st("sensor.sample_purifier_filter", "64", { friendly_name: "Filter life", unit_of_measurement: "%" }),
+      "sensor.sample_room_temp": st("sensor.sample_room_temp", "23.5", { friendly_name: "Temperature", unit_of_measurement: "°C", device_class: "temperature" }),
+      "sensor.sample_room_hum": st("sensor.sample_room_hum", "48", { friendly_name: "Humidity", unit_of_measurement: "%", device_class: "humidity" }),
+      "water_heater.sample_heater": st("water_heater.sample_heater", "electric", { friendly_name: "Water heater", current_temperature: 46, temperature: 60, min_temp: 30, max_temp: 75, operation_list: ["off", "eco", "electric", "performance"], operation_mode: "electric" }),
+      "timer.sample_heater": st("timer.sample_heater", "idle", { friendly_name: "Water heater timer", duration: "0:30:00" }),
+      "sensor.sample_washer_state": st("sensor.sample_washer_state", "rinse", { friendly_name: "Washing machine" }),
+      "sensor.sample_washer_left": st("sensor.sample_washer_left", "23", { friendly_name: "Time left", unit_of_measurement: "min" }),
+      "sensor.sample_washer_progress": st("sensor.sample_washer_progress", "64", { friendly_name: "Progress", unit_of_measurement: "%" }),
+      "cover.sample_garage": st("cover.sample_garage", "closed", { friendly_name: "Garage", device_class: "garage", current_position: 0 }),
+      "sensor.sample_solar": st("sensor.sample_solar", "3240", { friendly_name: "Solar", unit_of_measurement: "W", device_class: "power" }),
+      "sensor.sample_battery_power": st("sensor.sample_battery_power", "-850", { friendly_name: "Battery", unit_of_measurement: "W", device_class: "power" }),
+      "sensor.sample_battery_level": st("sensor.sample_battery_level", "64", { friendly_name: "Battery level", unit_of_measurement: "%", device_class: "battery" }),
+      "sensor.sample_grid": st("sensor.sample_grid", "-1130", { friendly_name: "Grid", unit_of_measurement: "W", device_class: "power" }),
+      "sensor.sample_house": st("sensor.sample_house", "1260", { friendly_name: "House", unit_of_measurement: "W", device_class: "power" }),
+      "switch.sample_zone_1": st("switch.sample_zone_1", "on", { friendly_name: "Front lawn" }),
+      "switch.sample_zone_2": st("switch.sample_zone_2", "off", { friendly_name: "Back lawn" }),
+      "switch.sample_zone_3": st("switch.sample_zone_3", "off", { friendly_name: "Flower beds" }),
+      "switch.sample_zone_4": st("switch.sample_zone_4", "off", { friendly_name: "Trees" }),
+      "sensor.sample_rain": st("sensor.sample_rain", "0", { friendly_name: "Rain today", unit_of_measurement: "mm" }),
+      "sensor.sample_ev_battery": st("sensor.sample_ev_battery", "58", { friendly_name: "Car battery", unit_of_measurement: "%", device_class: "battery" }),
+      "sensor.sample_ev_range": st("sensor.sample_ev_range", "214", { friendly_name: "Range", unit_of_measurement: "km" }),
+      "sensor.sample_ev_power": st("sensor.sample_ev_power", "7.2", { friendly_name: "Charging power", unit_of_measurement: "kW", device_class: "power" }),
+      "switch.sample_ev_charging": st("switch.sample_ev_charging", "on", { friendly_name: "Charging" }),
+      "binary_sensor.sample_ev_plugged": st("binary_sensor.sample_ev_plugged", "on", { friendly_name: "Plugged in", device_class: "plug" }),
+      "number.sample_ev_limit": st("number.sample_ev_limit", "80", { friendly_name: "Charge limit", unit_of_measurement: "%" }),
+      "sensor.sample_plant_moisture": st("sensor.sample_plant_moisture", "16", { friendly_name: "Monstera moisture", unit_of_measurement: "%", device_class: "moisture" }),
+      "sensor.sample_plant_light": st("sensor.sample_plant_light", "5200", { friendly_name: "Light", unit_of_measurement: "lx", device_class: "illuminance" }),
+      "sensor.sample_plant_temp": st("sensor.sample_plant_temp", "24", { friendly_name: "Temperature", unit_of_measurement: "°C", device_class: "temperature" }),
+      "sensor.sample_ink_black": st("sensor.sample_ink_black", "64", { friendly_name: "Black", unit_of_measurement: "%" }),
+      "sensor.sample_ink_cyan": st("sensor.sample_ink_cyan", "22", { friendly_name: "Cyan", unit_of_measurement: "%" }),
+      "sensor.sample_ink_magenta": st("sensor.sample_ink_magenta", "48", { friendly_name: "Magenta", unit_of_measurement: "%" }),
+      "sensor.sample_ink_yellow": st("sensor.sample_ink_yellow", "9", { friendly_name: "Yellow", unit_of_measurement: "%" }),
+      "sensor.sample_printer": st("sensor.sample_printer", "idle", { friendly_name: "Printer" }),
+      "sensor.sample_3d_progress": st("sensor.sample_3d_progress", "42", { friendly_name: "Print progress", unit_of_measurement: "%" }),
+      "sensor.sample_3d_left": st("sensor.sample_3d_left", "72", { friendly_name: "Time left", unit_of_measurement: "min" }),
+      "sensor.sample_3d_nozzle": st("sensor.sample_3d_nozzle", "215", { friendly_name: "Nozzle", unit_of_measurement: "°C" }),
+      "sensor.sample_3d_bed": st("sensor.sample_3d_bed", "60", { friendly_name: "Bed", unit_of_measurement: "°C" }),
+      "sensor.sample_3d_state": st("sensor.sample_3d_state", "printing", { friendly_name: "3D printer" }),
+      "zone.sample_home": st("zone.sample_home", "2", { friendly_name: "Home", latitude: 26.2, longitude: 50.58, radius: 120, icon: "mdi:home" }),
+      "zone.sample_work": st("zone.sample_work", "1", { friendly_name: "Work", latitude: 26.235, longitude: 50.54, radius: 300, icon: "mdi:briefcase" }),
+      "zone.sample_school": st("zone.sample_school", "0", { friendly_name: "School", latitude: 26.18, longitude: 50.61, radius: 200, icon: "mdi:school" }),
+      "person.sample_saeed": st("person.sample_saeed", "home", { friendly_name: "Saeed", latitude: 26.2, longitude: 50.58 }),
+      "person.sample_layla": st("person.sample_layla", "Work", { friendly_name: "Layla", latitude: 26.235, longitude: 50.541 }),
+      "person.sample_daniel": st("person.sample_daniel", "not_home", { friendly_name: "Daniel", latitude: 26.188, longitude: 50.565 }),
       "button.sample_robot_empty": st("button.sample_robot_empty", "unknown", { friendly_name: "Robot vacuum Empty dustbin", icon: "mdi:delete-empty-outline" }),
       "button.sample_robot_wash": st("button.sample_robot_wash", "unknown", { friendly_name: "Robot vacuum Wash the mop", icon: "mdi:water-sync" }),
     };
@@ -218,6 +264,20 @@ const Sample = {
       return undefined;
     }
     if (domain === "select") return this.set(id, data.option);
+    if (domain === "water_heater") {
+      if (service === "set_temperature") return this.set(id, null, { temperature: data.temperature });
+      if (service === "set_operation_mode") return this.set(id, data.operation_mode, { operation_mode: data.operation_mode });
+      if (service === "turn_off") return this.set(id, "off", { operation_mode: "off" });
+      if (service === "turn_on") return this.set(id, "electric", { operation_mode: "electric" });
+    }
+    if (domain === "cover") {
+      const to = service === "open_cover" ? "open" : service === "close_cover" ? "closed" : null;
+      if (!to) return this.set(id, s.attributes.current_position > 50 ? "open" : "closed");
+      this.set(id, to === "open" ? "opening" : "closing");
+      this.timers[id] = setTimeout(() => this.set(id, to, { current_position: to === "open" ? 100 : 0 }), 6000);
+      return undefined;
+    }
+    if (domain === "switch" || domain === "input_boolean") return this.set(id, service === "turn_on" ? "on" : service === "turn_off" ? "off" : s.state === "on" ? "off" : "on");
     if (domain === "camera" || domain === "button") return undefined;
     return undefined;
   },
@@ -247,6 +307,18 @@ class RoostBase extends HTMLElement {
     if (config.sample) {
       const fill = { "roost-fan": { entity: "fan.sample_fan" }, "roost-lock": { entity: "lock.sample_front_door", door: "binary_sensor.sample_front_door" }, "roost-camera": { entity: "camera.sample_door", doorbell: "binary_sensor.sample_doorbell" },
         "roost-timer": { entity: "timer.sample_kettle" },
+        "roost-air": { entity: "fan.sample_purifier", air: "sensor.sample_pm25", filter: "sensor.sample_purifier_filter", temperature: "sensor.sample_room_temp", humidity: "sensor.sample_room_hum" },
+        "roost-water-heater": { entity: "water_heater.sample_heater", timer: "timer.sample_heater" },
+        "roost-doorbell": { camera: "camera.sample_door", ring: "binary_sensor.sample_doorbell", lock: "lock.sample_front_door" },
+        "roost-laundry": { entity: "sensor.sample_washer_state", remaining: "sensor.sample_washer_left", progress: "sensor.sample_washer_progress", stage: "sensor.sample_washer_state" },
+        "roost-garage": { entity: "cover.sample_garage" },
+        "roost-flow": { solar: "sensor.sample_solar", battery: "sensor.sample_battery_power", battery_level: "sensor.sample_battery_level", grid: "sensor.sample_grid", home: "sensor.sample_house" },
+        "roost-irrigation": { zones: [{ entity: "switch.sample_zone_1", icon: "mdi:grass" }, { entity: "switch.sample_zone_2", icon: "mdi:grass" }, { entity: "switch.sample_zone_3", icon: "mdi:flower-tulip" }, { entity: "switch.sample_zone_4", icon: "mdi:pine-tree" }], rain: "sensor.sample_rain" },
+        "roost-ev": { battery: "sensor.sample_ev_battery", range: "sensor.sample_ev_range", power: "sensor.sample_ev_power", charging: "switch.sample_ev_charging", plugged: "binary_sensor.sample_ev_plugged", limit: "number.sample_ev_limit", capacity: 64 },
+        "roost-plant": { name: "Monstera", moisture: "sensor.sample_plant_moisture", light: "sensor.sample_plant_light", temperature: "sensor.sample_plant_temp" },
+        "roost-printer": config.kind === "3d" ? { entity: "sensor.sample_3d_state", progress: "sensor.sample_3d_progress", remaining: "sensor.sample_3d_left", nozzle: "sensor.sample_3d_nozzle", bed: "sensor.sample_3d_bed" }
+          : { entity: "sensor.sample_printer", inks: [{ entity: "sensor.sample_ink_black", color: "#1F2333" }, { entity: "sensor.sample_ink_cyan", color: "#22D3EE" }, { entity: "sensor.sample_ink_magenta", color: "#EC4899" }, { entity: "sensor.sample_ink_yellow", color: "#FACC15" }] },
+        "roost-family": { entities: ["person.sample_saeed", "person.sample_layla", "person.sample_daniel"], zones: ["zone.sample_work", "zone.sample_school"], zone_home: "zone.sample_home" },
         "roost-vacuum": { entity: "vacuum.sample_robot", battery: "sensor.sample_robot_battery", area_sensor: "sensor.sample_robot_area", time_sensor: "sensor.sample_robot_time",
           consumables: ["sensor.sample_robot_filter", "sensor.sample_robot_main_brush", "sensor.sample_robot_side_brush", "sensor.sample_robot_mop_pad"],
           selects: ["select.sample_robot_water", "select.sample_robot_mode"], buttons: ["button.sample_robot_empty", "button.sample_robot_wash"],
@@ -287,6 +359,7 @@ class RoostBase extends HTMLElement {
     this._hass = hass;
     if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
     this._setupDrawn = false;
+    if (this._menuOpen && this._sig) return;
     const sig = this.signature();
     if (sig === this._sig) return;
     this._sig = sig;
@@ -295,6 +368,45 @@ class RoostBase extends HTMLElement {
   }
 
   get hass() { return this._hass; }
+
+  // ---- small shared helpers for the newer cards
+  // a reading as words: "1460 W", "22.5°", "64%", "" when there is none
+  val(id, fallbackUnit = "") {
+    const s = id ? this._hass?.states[id] : null;
+    if (!s || UNAVAILABLE.includes(s.state)) return "";
+    const n = num(s.state), u = s.attributes.unit_of_measurement ?? fallbackUnit;
+    if (n == null) return String(s.state).replace(/_/g, " ");
+    const t = fmt(n, decOf(s.state, u));
+    return /^(%|°|°C|°F)$/.test(u) ? `${t}${u === "°C" || u === "°F" ? "°" : u}` : u ? `${t} ${u}` : t;
+  }
+
+  n(id) { const s = id ? this._hass?.states[id] : null; return s && !UNAVAILABLE.includes(s.state) ? num(s.state) : null; }
+
+  on(id) { const s = id ? this._hass?.states[id] : null; return !!s && ["on", "open", "opening", "home", "active", "heat", "cool", "charging", "running", "cleaning", "playing"].includes(String(s.state).toLowerCase()); }
+
+  menuCss() {
+    const p = this.p, g = this.colour();
+    return `.menu{position:absolute;right:14px;bottom:14px;z-index:5;min-width:180px;max-width:calc(100% - 28px);max-height:260px;overflow:auto;padding:6px;border-radius:16px;border:1px solid ${p.border};
+        background:${this.dark ? "#1A1F3D" : "#FFFFFF"};box-shadow:0 18px 40px -12px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:2px}
+      .menu[hidden]{display:none}
+      .menu .h{font-size:11px;color:${p.muted};padding:6px 12px 2px;letter-spacing:.5px}
+      .mi{all:unset;padding:10px 12px;border-radius:10px;font-size:14px;cursor:pointer;color:${p.text};display:flex;align-items:center;gap:10px}
+      .mi ha-icon{--mdc-icon-size:18px;color:${p.muted}}
+      .mi:hover,.mi.on{background:${g[0]}2E}
+      .mi .ck{margin-left:auto;color:${g[1]}}`;
+  }
+
+  // A short list over the card (modes, options). While it is open, updates wait so it doesn't vanish under the finger.
+  openMenu(title, items) {
+    const menu = this.shadowRoot?.querySelector(".menu");
+    if (!menu) return;
+    menu.innerHTML = `${title ? `<div class="h t">${esc(title)}</div>` : ""}${items.map((it, i) => `<button class="mi ${it.on ? "on" : ""}" role="menuitem" data-i="${i}">${it.icon ? `<ha-icon icon="${it.icon}"></ha-icon>` : ""}<span class="t">${esc(it.label)}</span>${it.on ? '<ha-icon class="ck" icon="mdi:check"></ha-icon>' : ""}</button>`).join("")}`;
+    menu.hidden = false; this._menuOpen = true;
+    const close = () => { window.removeEventListener("pointerdown", away, true); menu.hidden = true; this._menuOpen = false; this._sig = null; if (this._hass) this.hass = this._realHass || this._hass; };
+    const away = (e) => { if (!e.composedPath().includes(menu)) close(); };
+    setTimeout(() => window.addEventListener("pointerdown", away, true), 0);
+    menu.querySelectorAll(".mi").forEach((b) => b.addEventListener("click", (ev) => { ev.stopPropagation(); this.vibrate(); const it = items[+b.dataset.i]; close(); it.run(); }));
+  }
 
   /**
    * Meaningful movement after a redraw, so changes are seen instead of jumping:
@@ -423,8 +535,11 @@ class RoostBase extends HTMLElement {
 
   st(id = this._config.entity) { return id ? this._hass?.states[id] : undefined; }
 
+  // a state by id, or nothing when no id is given (st() without an id means the card's own entity)
+  sx(id) { return id ? this._hass?.states[id] : undefined; }
+
   name(id, fallback) {
-    const s = this.st(id);
+    const s = this.sx(id);
     return this._config.name || s?.attributes.friendly_name || fallback || id || "";
   }
 
@@ -458,7 +573,7 @@ class RoostBase extends HTMLElement {
       case "toggle":
         if (String(entityId).startsWith("cover.") && this._config?.reverse) {
           // reversed curtain: decide from what it really is, then send the command the motor understands
-          const v = coverView(this.st(entityId), true);
+          const v = coverView(this.sx(entityId), true);
           return this.call("cover", v.state === "closed" || v.state === "closing" ? "close_cover" : "open_cover", { entity_id: entityId });
         }
         return this.call("homeassistant", "toggle", { entity_id: entityId });
@@ -493,7 +608,7 @@ class RoostBase extends HTMLElement {
   /** An icon: the one set in the card, else the entity's own icon. */
   icon(container, icon, entityId) {
     container.innerHTML = "";
-    const s = this.st(entityId);
+    const s = this.sx(entityId);
     if (icon || !s) {
       const el = document.createElement("ha-icon");
       el.icon = icon || "mdi:help-circle-outline";
@@ -723,7 +838,7 @@ class RoostTile extends RoostBase {
       return `${s.state}${s.attributes.unit_of_measurement ? ` ${s.attributes.unit_of_measurement}` : ""}`;
     }
     let t = on ? "On" : "Off";
-    const pw = this._config.power_entity && parseFloat(this.st(this._config.power_entity)?.state);
+    const pw = this._config.power_entity && parseFloat(this.sx(this._config.power_entity)?.state);
     if (on && Number.isFinite(pw)) t += ` · ${Math.round(pw)} W`;
     return t;
   }
@@ -821,9 +936,9 @@ class RoostChips extends RoostBase {
     let singles = [];
     for (const id of this.ids()) {
       const d = id.split(".")[0];
-      if (d === "light") { if (!Array.isArray(this.st(id)?.attributes.entity_id)) lights.push(id); } // light groups are not lights
+      if (d === "light") { if (!Array.isArray(this.sx(id)?.attributes.entity_id)) lights.push(id); } // light groups are not lights
       else if (d === "person" || d === "device_tracker") people.push(id);
-      else if (d === "binary_sensor" && ["door", "window", "garage_door", "opening"].includes(this.st(id)?.attributes.device_class)) doors.push(id);
+      else if (d === "binary_sensor" && ["door", "window", "garage_door", "opening"].includes(this.sx(id)?.attributes.device_class)) doors.push(id);
       else if (d === "climate") climates.push(id);
       else singles.push(id);
     }
@@ -833,7 +948,7 @@ class RoostChips extends RoostBase {
   }
 
   chipFor(id) {
-    const s = this.st(id);
+    const s = this.sx(id);
     const d = id.split(".")[0];
     const un = !s || UNAVAILABLE.includes(s.state);
     const cls = s?.attributes.device_class;
@@ -863,27 +978,27 @@ class RoostChips extends RoostBase {
     const p = this.p, c = this._config;
     const { lights, people, singles, doors, climates } = this.groups();
     const h = { small: 34, medium: 40, large: 48 }[c.size] || 40;
-    const lightsOn = lights.filter((id) => this.st(id)?.state === "on").length;
+    const lightsOn = lights.filter((id) => this.sx(id)?.state === "on").length;
     const chips = [];
     singles.forEach((id) => {
-      if (id.startsWith("media_player.") && OFF_STATES.concat(UNAVAILABLE).includes(this.st(id)?.state)) return; // a TV chip only while it is on
+      if (id.startsWith("media_player.") && OFF_STATES.concat(UNAVAILABLE).includes(this.sx(id)?.state)) return; // a TV chip only while it is on
       chips.push({ key: id, ...this.chipFor(id), entity: id });
     });
     if (doors.length) {
-      const open = doors.filter((id) => this.st(id)?.state === "on").length;
+      const open = doors.filter((id) => this.sx(id)?.state === "on").length;
       chips.unshift({ key: "__doors", icon: open ? "mdi:door-open" : "mdi:door-closed", colour: open ? "#FF9F6B" : "#34D399", text: open ? String(open) : "", group: "doors", label: "Doors" });
     }
     if (lights.length) chips.push({ key: "__lights", icon: lightsOn ? "mdi:lightbulb-on" : "mdi:lightbulb-outline", colour: lightsOn ? "#F5B94A" : p.muted, text: lightsOn ? String(lightsOn) : "", group: "lights" });
     if (climates.length) {
-      const on = climates.filter((id) => this.st(id) && !OFF_STATES.concat(UNAVAILABLE).includes(this.st(id).state)).length;
+      const on = climates.filter((id) => this.sx(id) && !OFF_STATES.concat(UNAVAILABLE).includes(this.sx(id).state)).length;
       chips.push({ key: "__climates", icon: "mdi:snowflake", colour: on ? "#38BDF8" : p.muted, text: on ? String(on) : "", group: "climates", label: "Air conditioners" });
     }
     if (people.length) chips.push({ key: "__people", people: true, group: "people" });
     const open = this._open;
-    const initials = (id) => (this.st(id)?.attributes.friendly_name || id.split(".")[1]).split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+    const initials = (id) => (this.sx(id)?.attributes.friendly_name || id.split(".")[1]).split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
     const AVG = ["linear-gradient(135deg,#38BDF8,#6D4BFF)", "linear-gradient(135deg,#FF5577,#FF9F6B)", "linear-gradient(135deg,#10B981,#6EE7B7)", "linear-gradient(135deg,#F59E0B,#FDE68A)", "linear-gradient(135deg,#8B6CFF,#D6C4FF)"];
     const avatar = (id, i) => {
-      const s = this.st(id), home = s?.state === "home", pic = s?.attributes.entity_picture;
+      const s = this.sx(id), home = s?.state === "home", pic = s?.attributes.entity_picture;
       return `<span class="av" style="z-index:${10 - i};margin-left:${i ? -10 : 0}px;color:${home ? "#fff" : "#A3A9CF"};${pic && !home ? "filter:grayscale(1);opacity:.6;" : ""}background:${home ? AVG[i % AVG.length] : "#3A4070"}">${pic ? `<img src="${esc(pic)}" alt="">` : esc(initials(id).slice(0, 1))}</span>`;
     };
     const list = { lights, people, doors, climates }[open] || [];
@@ -924,7 +1039,7 @@ class RoostChips extends RoostBase {
           ${ch.icon ? `<ha-icon icon="${ch.icon}" style="color:${ch.colour}"></ha-icon>` : `<span class="ent" data-icon="${esc(ch.entity)}" style="color:${ch.colour};display:flex"></span>`}
           ${ch.text ? `<span class="${ch.word ? "word" : "cnt"}"${ch.word ? "" : ` style="color:${ch.colour}"`}>${esc(ch.text)}</span>` : ""}</button>`).join("")}</div>
     ${list.length ? `<div class="list">${list.map((id) => {
-      const s = this.st(id), isOn = s?.state === "on" || s?.state === "home";
+      const s = this.sx(id), isOn = s?.state === "on" || s?.state === "home";
       return `<div class="it" ${open === "climates" || open === "doors" ? `data-m="${esc(id)}" style="cursor:pointer"` : ""}><span class="n t">${esc(s?.attributes.friendly_name || id)}<br><span class="s">${esc(stateWord(id, s))}</span></span>
         ${open === "lights" ? `<button class="tog ${isOn ? "on" : ""}" data-t="${esc(id)}" aria-label="Switch ${esc(s?.attributes.friendly_name || id)}"></button>` : ""}</div>`;
     }).join("")}</div>` : ""}`;
@@ -1004,7 +1119,7 @@ class RoostThermostat extends RoostBase {
       const q = i / 44, gg = ((135 + 270 * q) * Math.PI) / 180;
       ticks += `<line class="tk" x1="${(125 + 114 * Math.cos(gg)).toFixed(1)}" y1="${(125 + 114 * Math.sin(gg)).toFixed(1)}" x2="${(125 + 122 * Math.cos(gg)).toFixed(1)}" y2="${(125 + 122 * Math.sin(gg)).toFixed(1)}" stroke="${q <= f + 0.001 ? (on ? (q < 0.5 ? g[0] : g[1]) : p.tick) : p.track}" stroke-width="2" stroke-linecap="round"/>`;
     }
-    const rs = c.sensor ? this.st(c.sensor) : null;
+    const rs = c.sensor ? this.sx(c.sensor) : null;
     const roomV = rs && !isNaN(parseFloat(rs.state)) ? parseFloat(rs.state) : a.current_temperature;
     const room = roomV != null && !isNaN(roomV) ? Number(roomV).toFixed(1) : null; // never show "—"
     const noTemp = !un && set == null;
@@ -1233,21 +1348,21 @@ class RoostHero extends RoostBase {
     const out = [];
     const DOORISH = ["door", "window", "garage_door", "opening", "lock", undefined, ""];
     const MOVING = ["motion", "occupancy", "presence", "moving"];
-    const dc = (id) => this.st(id)?.attributes?.device_class;
+    const dc = (id) => this.sx(id)?.attributes?.device_class;
     const doors = ids.filter((id) => /^(lock|cover)\./.test(id) || (id.startsWith("binary_sensor.") && DOORISH.includes(dc(id))));
-    const moving = ids.filter((id) => id.startsWith("binary_sensor.") && MOVING.includes(dc(id)) && this.st(id)?.state === "on");
+    const moving = ids.filter((id) => id.startsWith("binary_sensor.") && MOVING.includes(dc(id)) && this.sx(id)?.state === "on");
     if (doors.length) {
-      const open = doors.filter((id) => { const s = this.st(id)?.state; return s === "on" || s === "open" || s === "unlocked" || s === "opening"; });
+      const open = doors.filter((id) => { const s = this.sx(id)?.state; return s === "on" || s === "open" || s === "unlocked" || s === "opening"; });
       out.push(open.length ? `${open.map((id) => this.name(id)).join(" and ")} ${open.length > 1 ? "are" : "is"} open` : "Doors are closed");
     }
     if (moving.length) out.push(`someone is moving: ${moving.map((id) => this.name(id)).join(", ")}`);
     ids.filter((id) => id.startsWith("alarm_control_panel.")).forEach((id) => {
-      const s = this.st(id)?.state || "";
+      const s = this.sx(id)?.state || "";
       out.push(s === "disarmed" ? "the alarm is off" : s.startsWith("armed") ? `the alarm is on (${s.replace("armed_", "").replace("_", " ")})` : s === "triggered" ? "THE ALARM IS RINGING" : "");
     });
     const people = ids.filter((id) => id.startsWith("person."));
     if (people.length) {
-      const home = people.filter((id) => this.st(id)?.state === "home");
+      const home = people.filter((id) => this.sx(id)?.state === "home");
       out.push(home.length ? `${home.map((id) => this.name(id).split(" ")[0]).join(" and ")} ${home.length > 1 ? "are" : "is"} home` : "no one is home");
     }
     const parts = out.filter(Boolean);
@@ -1314,7 +1429,7 @@ class RoostHero extends RoostBase {
   nextUp() {
     const now = Date.now();
     const list = (this._config.upcoming || []).map((u) => {
-      const s = this.st(u.entity);
+      const s = this.sx(u.entity);
       if (!s) return null;
       const raw = s.entity_id.startsWith("calendar.") ? s.attributes.start_time : s.entity_id.startsWith("input_datetime.") ? (s.attributes.timestamp ? s.attributes.timestamp * 1000 : s.state) : s.state;
       let t = new Date(raw).getTime();
@@ -1328,14 +1443,14 @@ class RoostHero extends RoostBase {
   render() {
     if (!this._hass || !this._config) return;
     const c = this._config, now = new Date(), hr = now.getHours();
-    const sun = this.st(c.sun);
+    const sun = this.sx(c.sun);
     const day = sun ? sun.state === "above_horizon" : hr >= 6 && hr < 18;
     const part = c.greeting ? c.greeting : hr < 5 ? "Good night" : hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
     const who = c.show_name ? c.title || (this._hass.user?.name || "").split(" ")[0] : "";
     const os = Math.max(20, Number(c.orb_size) || 56);
     const osz = os !== 56 ? os : day ? 56 : 52; // the moon is a little smaller, as on the original
     const info = (c.info || []).map((it) => {
-      const st = this.st(it.entity);
+      const st = this.sx(it.entity);
       if (!st || UNAVAILABLE.includes(st.state)) return "";
       const v = isNaN(parseFloat(st.state)) ? st.state : `${Math.round(parseFloat(st.state) * 10) / 10}${st.attributes.unit_of_measurement || ""}`;
       return `<span class="inf t" data-e="${esc(it.entity)}">${it.icon ? `<ha-icon icon="${esc(it.icon)}"></ha-icon>` : ""}${it.name ? `${esc(it.name)} ` : ""}<b>${esc(v)}</b></span>`;
@@ -1343,7 +1458,7 @@ class RoostHero extends RoostBase {
     const say = this.status();
     const PG = [["#38BDF8", "#6D4BFF"], ["#FF5577", "#FF9F6B"], ["#10B981", "#6EE7B7"], ["#F59E0B", "#FDE68A"]];
     const chips = (c.people || []).map((id, k) => {
-      const st = this.st(id);
+      const st = this.sx(id);
       if (!st) return "";
       const nm = this.name(id).split(" ")[0], pic = st.attributes.entity_picture;
       const where = ["home", "unknown", "unavailable"].includes(st.state) ? "" : st.state === "not_home" ? "Away" : st.state;
@@ -1352,7 +1467,7 @@ class RoostHero extends RoostBase {
     const house = c.house ? `<svg class="house" aria-hidden="true" width="230" height="130" viewBox="0 0 230 130"><path d="M10 130V70L70 28l60 42v60z" fill="${day ? "rgba(255,255,255,.18)" : "#120F33"}"/><path d="M120 130V58l45-32 45 32v72z" fill="${day ? "rgba(255,255,255,.12)" : "#0E0B2A"}"/>
       <rect x="38" y="78" width="18" height="18" rx="3" fill="#FCD34D" class="win"/><rect x="82" y="78" width="18" height="18" rx="3" fill="#FCD34D" opacity=".35"/>
       <rect x="148" y="70" width="16" height="16" rx="3" fill="#A78BFA" class="win" style="animation-delay:.8s;animation-duration:4.4s"/><rect x="174" y="96" width="16" height="34" rx="3" fill="${day ? "rgba(255,255,255,.2)" : "#2A2560"}"/><rect x="58" y="104" width="22" height="26" rx="3" fill="${day ? "rgba(255,255,255,.2)" : "#2A2560"}"/></svg>` : "";
-    const w = this.st(c.weather);
+    const w = this.sx(c.weather);
     const temp = w?.attributes.temperature;
     const unit = (w?.attributes.temperature_unit || "°C").replace(/^°?/, "°");
     const cond = w && !UNAVAILABLE.includes(w.state) ? w.state.replace("clear-night", "clear").replace("partlycloudy", "partly cloudy").replace(/-/g, " ") : "";
@@ -1439,7 +1554,7 @@ class RoostNav extends RoostBase {
   logoHtml() {
     const l = String(this._config.logo || "").trim();
     if (!l) return "";
-    const st = l.includes(".") ? this.st(l) : null;
+    const st = l.includes(".") ? this.sx(l) : null;
     if (st) {
       const pic = st.attributes.entity_picture;
       return `<span class="logo">${pic ? `<img src="${esc(pic)}" alt="">` : esc(this.name(l).charAt(0).toUpperCase())}</span>`;
@@ -1909,8 +2024,9 @@ class RoostRooms extends RoostBase {
     const token = (this._buildToken = {});
     const helpers = window.loadCardHelpers ? await window.loadCardHelpers() : null;
     if (token !== this._buildToken) return;
-    const make = (cfg) => {
+    const make = (cfg0) => {
       let el;
+      const cfg = withTheme(cfg0, this._config.theme);
       try {
         el = helpers ? helpers.createCardElement(cfg) : document.createElement(String(cfg.type || "").replace(/^custom:/, ""));
         if (!helpers) el.setConfig?.(cfg);
@@ -1948,7 +2064,7 @@ class RoostRooms extends RoostBase {
     const ph = Math.max(28, Number(c.pill_height) || 40);
     const rad = c.pill_shape === "square" ? 10 : c.pill_shape === "rounded" ? Math.round(ph * 0.34) : 999;
     const counts = c.show_count ? c.rooms.map((r) => this.onCount(r)) : [];
-    const rd = (id) => { const s = this.st(id); const v = s ? num(s.state) : null; return v == null ? null : fmt(v, 1); };
+    const rd = (id) => { const s = this.sx(id); const v = s ? num(s.state) : null; return v == null ? null : fmt(v, 1); };
     const t0 = room.temperature ? rd(room.temperature) : null, h0 = room.humidity ? rd(room.humidity) : null;
     const clim = t0 != null || h0 != null ? `<div class="clim t">${h0 != null ? `<span><ha-icon icon="mdi:water-outline" style="color:#38BDF8"></ha-icon>${esc(Math.round(h0))}%</span>` : ""}${t0 != null ? `<span><ha-icon icon="mdi:thermometer" style="color:#FF9F6B"></ha-icon>${esc(t0)}°C</span>` : ""}</div>` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
@@ -2167,7 +2283,7 @@ class RoostCurtain extends RoostBase {
   update() {
     const c = this._config, s = this.st(), root = this.shadowRoot;
     const pos = this.position(s);
-    const day = (this.st(c.sun || "sun.sun") || {}).state !== "below_horizon";
+    const day = (this.sx(c.sun || "sun.sun") || {}).state !== "below_horizon";
     const sky = root.querySelector(".sky");
     if (sky) {
       sky.style.background = day ? "linear-gradient(180deg,#60A5FA,#BFDBFE)" : "linear-gradient(180deg,#131848,#2C2472)";
@@ -2220,7 +2336,7 @@ class RoostCurtain extends RoostBase {
 
   // Live weather behind the window: clouds drift, rain and snow fall, storms flash, the sun's rays turn.
   weather(box, day, sky) {
-    const c = this._config, w = this.st(c.weather), cond = w ? w.state : "sunny";
+    const c = this._config, w = this.sx(c.weather), cond = w ? w.state : "sunny";
     const grey = /rain|pour|light|cloudy|fog|snow|hail/.test(cond) && cond !== "partlycloudy";
     if (sky && grey) sky.style.background = day ? "linear-gradient(180deg,#7C8BA6,#C7D0DE)" : "linear-gradient(180deg,#1A1F3D,#33395E)";
     const orb = this.shadowRoot.querySelector(".orb");
@@ -2271,7 +2387,10 @@ function ago(iso) {
   return `${Math.round(m / 1440)} d ago`;
 }
 
-const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+// Roost cards inside another Roost card follow its light/dark setting unless they have their own.
+const withTheme = (cfg, theme) => (cfg && typeof cfg.type === "string" && cfg.type.startsWith("custom:roost-") && !cfg.theme && theme && theme !== "auto" ? { ...cfg, theme } : cfg);
+// a number, or null. A time such as "2026-11-17T08:00" is not the number 2026.
+const num = (v) => { if (typeof v === "number") return Number.isFinite(v) ? v : null; const t = String(v ?? "").trim(); if (!/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(t)) return null; const n = parseFloat(t); return Number.isFinite(n) ? n : null; };
 const fmt = (v, dec) => (v == null ? "" : Number(v).toFixed(dec == null ? (Math.abs(v) >= 100 ? 0 : 1) : dec));
 // as many decimals as the sensor itself gives (52 stays 52, 26.4 stays 26.4), at most two
 // whole numbers for watts, lux and ppm (a "0.0 W" reading reads as "0 W"); otherwise as many decimals as the sensor gives, at most 2
@@ -2340,7 +2459,7 @@ class RoostGauge extends RoostBase {
     const g = hot ? ["#FF9F6B", "#F43F6B"] : this.colour();
     const unit = c.unit != null && c.unit !== "" ? c.unit : s?.attributes.unit_of_measurement || "";
     const u2 = unitGap(unit);
-    const sub = c.second ? this.st(c.second) : null, sv = sub ? num(sub.state) : null;
+    const sub = c.second ? this.sx(c.second) : null, sv = sub ? num(sub.state) : null;
     const line = !s ? "Device not found" : !ok ? "Offline" : hot ? (c.warn_below != null && v <= c.warn_below ? "Too low" : "Too high") : sub ? `${c.second_name || sub.attributes.friendly_name || "Also"} ${sv != null ? fmt(sv, decOf(sub.state, sub.attributes.unit_of_measurement)) : sub.state}${sv != null ? unitGap(sub.attributes.unit_of_measurement || "") : ""}` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${c.frame ? panelCss(p, c.radius) : `color:${p.text}`};padding:${c.frame ? "16px 14px" : 0};display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -2379,13 +2498,13 @@ class RoostAutomations extends ticking(RoostBase, 60000) {
   ids() {
     const c = this._config, h = this._hass;
     let ids = c.all ? Object.keys(h?.states || {}).filter((id) => id.startsWith("automation.")).sort((a, b) => this.name(a).localeCompare(this.name(b))) : c.entities.map((e) => (typeof e === "string" ? e : e.entity));
-    if (c.only_on) ids = ids.filter((id) => this.st(id)?.state === "on");
+    if (c.only_on) ids = ids.filter((id) => this.sx(id)?.state === "on");
     return ids;
   }
 
   name(id) {
     const e = (this._config.entities || []).find((x) => typeof x === "object" && x.entity === id);
-    return e?.name || this.st(id)?.attributes.friendly_name || id;
+    return e?.name || this.sx(id)?.attributes.friendly_name || id;
   }
 
   watched() { return this._hass ? this.ids() : []; }
@@ -2438,7 +2557,7 @@ class RoostAutomations extends ticking(RoostBase, 60000) {
     </style>
     ${c.title ? `<div class="ttl t">${esc(c.title)}</div>` : ""}
     <div class="list">${ids.length ? ids.map((id) => {
-      const s = this.st(id), on = s?.state === "on", un = !s || UNAVAILABLE.includes(s.state);
+      const s = this.sx(id), on = s?.state === "on", un = !s || UNAVAILABLE.includes(s.state);
       const line = un ? (s ? "Offline" : "Not found") : c.show_last_run ? (s.attributes.last_triggered ? `Last ran ${ago(s.attributes.last_triggered)}` : "Never ran") : on ? "On" : "Off";
       const ent = (c.entities || []).find((x) => typeof x === "object" && x.entity === id);
       return `<div class="row ${on ? "on" : ""}" data-id="${esc(id)}" data-flash="${esc(s?.attributes.last_triggered || "")}" data-flashkey="${esc(id)}" role="button" tabindex="0" aria-label="${esc(this.name(id))}">
@@ -2527,7 +2646,7 @@ class RoostClockClassic extends ticking(RoostBase, 15000) {
 
   // today's time for a sensor (a full date, or "18:05")
   when(id) {
-    const s = this.st(id);
+    const s = this.sx(id);
     if (!s || UNAVAILABLE.includes(s.state)) return null;
     let d = new Date(s.state);
     if (isNaN(d)) {
@@ -2744,7 +2863,7 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
     }
     for (const [k, m] of Object.entries(c.adjust || {})) if (out[k] && Number(m)) out[k] = new Date(out[k].getTime() + Number(m) * 60000);
     for (const k of Object.keys(PRAYER_NAMES)) {
-      const s = this.st(c[`${k}_entity`]);
+      const s = this.sx(c[`${k}_entity`]);
       if (!s || UNAVAILABLE.includes(s.state)) continue;
       let d = new Date(s.state);
       if (isNaN(d)) { const m = String(s.state).match(/^(\d{1,2}):(\d{2})/); if (!m) continue; d = new Date(date); d.setHours(+m[1], +m[2], 0, 0); }
@@ -3018,7 +3137,16 @@ class RoostClockFace extends RoostClockClassic {
       if (c.seconds && !c.smooth) { clearInterval(this._tick); this._tick = setInterval(() => { this._sig = null; if (this._hass) this.hass = this._hass; }, 1000); }
     } else if (c.face === "flip") {
       const ds = (hh.length < 2 && !c.hour24 ? ` ${hh}` : hh) + mm + (c.seconds ? ss : "");
-      const cells = [...ds].map((ch, i) => `<span class="fc ${ch === " " ? "blank" : ""}" data-pop="${ch}" data-popkey="f${i}"><b>${num(ch.trim())}</b></span>${i === 1 || (i === 3 && c.seconds) ? '<span class="fs">:</span>' : ""}`).join("");
+      // a real split-flap: the old top half falls, then the new bottom half drops into place
+      const prev = this._flipPrev || {}, nowFlip = {};
+      let still = false; try { still = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { /* old browser */ }
+      const cells = [...ds].map((ch, i) => {
+        const nw = num(ch.trim()), old = prev[i] ?? nw; nowFlip[i] = nw;
+        const turn = old !== nw && !still;
+        return `<span class="fc ${ch === " " ? "blank" : ""}"><span class="hf up"><b>${nw}</b></span><span class="hf dn"><b>${turn ? old : nw}</b></span>
+          ${turn ? `<span class="hf up flap f1"><b>${old}</b></span><span class="hf dn flap f2"><b>${nw}</b></span>` : ""}</span>${i === 1 || (i === 3 && c.seconds) ? '<span class="fs">:</span>' : ""}`;
+      }).join("");
+      this._flipPrev = nowFlip;
       face = `<div class="fl">${cells}${c.hour24 ? "" : `<span class="fap">${ap}</span>`}</div>`;
     } else if (c.face === "ring") {
       const R = 88, C = 2 * Math.PI * R, k = c.seconds ? t.s / 60 : t.m / 60;
@@ -3069,10 +3197,22 @@ class RoostClockFace extends RoostClockClassic {
       .rt small{font-size:13px;color:${p.muted};font-weight:600}
       .rt .ap2{font-size:12px;color:${accent};font-weight:700;margin-left:3px}
       .fl{display:flex;align-items:center;gap:${Math.round(6 * S)}px}
-      .fc{position:relative;display:flex;align-items:center;justify-content:center;width:min(${Math.round(58 * S)}px,15cqw);height:min(${Math.round(80 * S)}px,21cqw);border-radius:12px;
+      .fc{position:relative;display:flex;align-items:center;justify-content:center;width:min(${Math.round(58 * S)}px,${c.seconds ? 12 : 15}cqw);height:min(${Math.round(80 * S)}px,${c.seconds ? 17 : 21}cqw);border-radius:12px;
         background:linear-gradient(180deg,${this.dark ? "#262C52" : "#FFFFFF"} 0 50%,${this.dark ? "#1D2244" : "#F1F3FB"} 50% 100%);box-shadow:0 8px 18px -10px rgba(0,0,0,.6),inset 0 0 0 1px ${p.border}}
-      .fc::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(0,0,0,.35)}
-      .fc b{font-family:${FONT_NUM};font-weight:700;font-size:min(${Math.round(54 * S)}px,14cqw)}
+      .fc::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(0,0,0,.35);z-index:3}
+      .fc{perspective:300px}
+      .hf{position:absolute;left:0;right:0;height:50%;overflow:hidden;display:flex;justify-content:center;backface-visibility:hidden}
+      .hf.up{top:0;border-radius:12px 12px 0 0;background:${this.dark ? "#262C52" : "#FFFFFF"};align-items:flex-start}
+      .hf.dn{bottom:0;border-radius:0 0 12px 12px;background:${this.dark ? "#1D2244" : "#F1F3FB"};align-items:flex-end}
+      .hf b{display:flex;align-items:center;justify-content:center;height:200%;line-height:1}
+      .hf.up b{margin-top:0}
+      .hf.dn b{margin-bottom:0}
+      .flap{z-index:2}
+      .f1{transform-origin:bottom center;animation:roost-flip1 .3s ease-in forwards}
+      .f2{transform-origin:top center;transform:rotateX(90deg);animation:roost-flip2 .3s ease-out .3s forwards}
+      @keyframes roost-flip1{from{transform:rotateX(0)}to{transform:rotateX(-90deg);filter:brightness(.6)}}
+      @keyframes roost-flip2{from{transform:rotateX(90deg);filter:brightness(1.3)}to{transform:rotateX(0)}}
+      .fc b{font-family:${FONT_NUM};font-weight:700;font-size:min(${Math.round(54 * S)}px,${c.seconds ? 11 : 14}cqw)}
       .fc.blank{visibility:hidden;width:0;margin-left:-${Math.round(6 * S)}px}
       .fs{font-family:${FONT_NUM};font-weight:700;font-size:min(${Math.round(40 * S)}px,10cqw);color:${p.muted};animation:roost-breathe 2s ease-in-out infinite}
       .fap{font-size:14px;font-weight:700;color:${accent};align-self:flex-end}
@@ -3100,7 +3240,7 @@ class RoostTitle extends RoostBase {
   reading() {
     const c = this._config;
     if (!c.temperature && !c.humidity) return "";
-    const t = c.temperature ? num(this.st(c.temperature)?.state) : null, h = c.humidity ? num(this.st(c.humidity)?.state) : null;
+    const t = c.temperature ? num(this.sx(c.temperature)?.state) : null, h = c.humidity ? num(this.sx(c.humidity)?.state) : null;
     if (t == null && h == null) return "Room sensor offline";
     return [t != null ? `${fmt(t, 1)}°C` : "", h != null ? `${Math.round(h)}% humidity` : ""].filter(Boolean).join(" · ");
   }
@@ -3294,7 +3434,7 @@ class RoostMedia extends RoostBase {
     const un = !s || UNAVAILABLE.includes(s.state);
     const on = !un && !["off", "standby"].includes(s.state);
     const playing = s?.state === "playing";
-    const vs = this.st(c.volume_entity || c.entity) || s;
+    const vs = this.sx(c.volume_entity || c.entity) || s;
     const vol = vs?.attributes.volume_level, muted = !!vs?.attributes.is_volume_muted;
     const a = s?.attributes || {};
     const now = [a.media_title, a.media_artist || a.media_series_title].filter(Boolean).join(" · ") || a.app_name || (a.source ? `Input: ${a.source}` : "");
@@ -3396,7 +3536,7 @@ class RoostRoom extends RoostBase {
   summaryAll() {
     const c = this._config, parts = [], doors = [];
     for (const e of c.entities || []) {
-      const id = typeof e === "string" ? e : e?.entity; const s = this.st(id); if (!s) continue;
+      const id = typeof e === "string" ? e : e?.entity; const s = this.sx(id); if (!s) continue;
       const d = id.split(".")[0], cls = s.attributes.device_class;
       const word = (typeof e === "object" && e.name) || { climate: "AC", cover: /blind/i.test(s.attributes.friendly_name || "") ? "Blind" : "Curtain", media_player: "TV", fan: "Fan" }[d] || s.attributes.friendly_name || id;
       if (UNAVAILABLE.includes(s.state)) { parts.push(`${word} offline`); continue; }
@@ -3409,9 +3549,9 @@ class RoostRoom extends RoostBase {
       else parts.push(`${word} ${s.state === "on" ? "on" : "off"}`);
     }
     if (doors.length) parts.unshift(doors.some(Boolean) ? (doors.length > 1 ? "A door is open" : "Door open") : doors.length > 1 ? "Doors closed" : "Door closed");
-    const t = num(this.st(c.temperature)?.state), h = num(this.st(c.humidity)?.state);
+    const t = num(this.sx(c.temperature)?.state), h = num(this.sx(c.humidity)?.state);
     if (c.temperature && t != null && c.warn != null && t >= c.warn) parts.unshift("Too hot");
-    if (!parts.length && h != null) parts.push(`${fmt(h, decOf(this.st(c.humidity).state))}% humidity`);
+    if (!parts.length && h != null) parts.push(`${fmt(h, decOf(this.sx(c.humidity).state))}% humidity`);
     const out = parts.join(" · ");
     return out ? out.charAt(0).toUpperCase() + out.slice(1) : "All quiet";
   }
@@ -3445,7 +3585,7 @@ class RoostRoom extends RoostBase {
   summary() {
     const out = [], lights = [];
     for (const id of this.ids()) {
-      const s = this.st(id); if (!s) continue;
+      const s = this.sx(id); if (!s) continue;
       const d = id.split(".")[0], nm = s.attributes.friendly_name || id;
       if (UNAVAILABLE.includes(s.state)) { out.push(`${nm} offline`); continue; }
       if (d === "light" || (d === "switch" && /light|lamp/i.test(nm))) { if (s.state === "on") lights.push(nm); continue; }
@@ -3489,7 +3629,7 @@ class RoostRoom extends RoostBase {
   render() {
     if (!this._hass || !this._config) return;
     const c = this._config, p = this.p, g = this.colour();
-    const ts = this.st(c.temperature), t = ts ? num(ts.state) : null, hs = this.st(c.humidity), h = hs ? num(hs.state) : null;
+    const ts = this.sx(c.temperature), t = ts ? num(ts.state) : null, hs = this.sx(c.humidity), h = hs ? num(hs.state) : null;
     const hot = t != null && c.warn != null && t >= c.warn;
     const f = t == null ? 0 : Math.max(0.06, Math.min(1, (t - c.min) / ((c.max - c.min) || 1)));
     const bar = hot ? "linear-gradient(90deg,#FF9F6B,#F43F6B)" : `linear-gradient(90deg,${g[0]},${g[1]})`;
@@ -3566,7 +3706,7 @@ class RoostAlarm extends RoostBase {
     const busy = ["arming", "pending", "triggered"].includes(s?.state);
     const needCode = !!s?.attributes.code_format && s?.attributes.code_arm_required !== false;
     const label = { arm_away: ["Away", "mdi:shield-lock"], arm_home: ["Home", "mdi:shield-home"], arm_night: ["Night", "mdi:shield-moon"], arm_vacation: ["Holiday", "mdi:shield-airplane"] };
-    const doors = (c.doors || []).map((id) => this.st(id)).filter(Boolean);
+    const doors = (c.doors || []).map((id) => this.sx(id)).filter(Boolean);
     const open = doors.filter((d) => d.state === "on");
     if (c.style === "pills" && !this._pending) {
       const PILLS = [["disarm", "Disarm", "linear-gradient(135deg,#10B981,#34D399)", "disarmed"], ["arm_home", "Arm home", "linear-gradient(135deg,#2F6BFF,#38BDF8)", "armed_home"], ["arm_away", "Arm away", "linear-gradient(135deg,#F43F6B,#FF8F6B)", "armed_away"], ["arm_night", "Arm night", "linear-gradient(135deg,#6D4BFF,#B794FF)", "armed_night"]]
@@ -3685,8 +3825,9 @@ class RoostLight extends RoostBase {
       .bar{position:relative;height:52px;border-radius:18px;background:${p.inset};overflow:hidden;cursor:pointer;touch-action:none}
       .bar .f{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,${on && a.rgb_color && !warmTone(a.rgb_color) ? `color-mix(in srgb, ${tint} 70%, #fff)` : g[0]},${tint});border-radius:18px}
       .bar ha-icon{position:absolute;left:14px;top:14px;--mdc-icon-size:24px;color:${on ? (a.rgb_color && !warmTone(a.rgb_color) ? "#fff" : g[3]) : p.muted}}
-      .chips{display:flex;flex-wrap:wrap;gap:8px}
-      .chips button{height:36px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+      .chips{display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+      .chips::-webkit-scrollbar{display:none}
+      .chips button{flex:none;height:36px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
       .chips button i{display:block;width:14px;height:14px;border-radius:50%}
       .dotc{width:36px;padding:0!important;justify-content:center}
     </style>
@@ -3883,7 +4024,7 @@ class RoostPeople extends ticking(RoostBase, 60000) {
   render() {
     if (!this._hass || !this._config) return;
     const c = this._config, p = this.p, list = c.layout === "list";
-    const ppl = c.entities.map((id) => this.st(id)).filter(Boolean);
+    const ppl = c.entities.map((id) => this.sx(id)).filter(Boolean);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .wrap{${panelCss(p)};padding:16px;display:${list ? "flex;flex-direction:column;gap:12px" : `grid;grid-template-columns:repeat(auto-fit,minmax(${c.size + 24}px,1fr));gap:12px`}}
       .pp{display:flex;${list ? "flex-direction:row;align-items:center;gap:12px" : "flex-direction:column;align-items:center;gap:6px;text-align:center"};cursor:pointer}
@@ -4234,14 +4375,14 @@ class RoostPresence extends RoostBase {
 
   getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
 
-  val(ids, suffix) { const id = findBySuffix(ids, suffix); return id ? num(this.st(id)?.state) : null; }
+  val(ids, suffix) { const id = findBySuffix(ids, suffix); return id ? num(this.sx(id)?.state) : null; }
 
   render() {
     if (!this._hass || !this._config) return;
     const c = this._config, p = this.p, g = this.colour(), ids = this.ids();
     const R = c.range * 1000, s60 = Math.sin(Math.PI / 3), c60 = Math.cos(Math.PI / 3);
     const targets = [1, 2, 3].map((n) => ({ n, x: this.val(ids, `target_${n}_x`), y: this.val(ids, `target_${n}_y`) })).filter((t) => t.x != null && t.y != null && !(t.x === 0 && t.y === 0)).map((t) => ({ ...t, y: Math.abs(t.y) }));
-    const occ = ids.map((id) => this.st(id)).find((s) => s && s.entity_id.startsWith("binary_sensor.") && ["occupancy", "presence"].includes(s.attributes.device_class));
+    const occ = ids.map((id) => this.sx(id)).find((s) => s && s.entity_id.startsWith("binary_sensor.") && ["occupancy", "presence"].includes(s.attributes.device_class));
     const zones = c.show_zones ? [1, 2, 3].map((n) => {
       const z = { x1: this.val(ids, `zone_${n}_x1`), y1: this.val(ids, `zone_${n}_y1`), x2: this.val(ids, `zone_${n}_x2`), y2: this.val(ids, `zone_${n}_y2`) };
       if ([z.x1, z.x2, z.y1, z.y2].some((v) => v == null) || (!z.x1 && !z.x2 && !z.y1 && !z.y2)) return "";
@@ -4326,7 +4467,7 @@ class RoostWeather extends RoostBase {
     const c = this._config, p = this.p, s = this.st();
     this.subscribe();
     const a = s?.attributes || {}, cond = s?.state || "", unit = (a.temperature_unit || "°C").replace(/^°?C$/, "°").replace(/^°?F$/, "°");
-    const day = cond !== "clear-night" && (this.st("sun.sun")?.state ?? "above_horizon") !== "below_horizon";
+    const day = cond !== "clear-night" && (this.sx("sun.sun")?.state ?? "above_horizon") !== "below_horizon";
     const grey = /rain|pour|light|cloudy|fog|snow|hail/.test(cond) && cond !== "partlycloudy";
     const sky = !day ? "linear-gradient(135deg,#1B1E52,#38287E)" : grey ? "linear-gradient(135deg,#64748B,#94A3B8)" : "linear-gradient(135deg,#2563EB,#60A5FA 60%,#FDBA74)";
     const fc = (this._fc || a.forecast || []).slice(0, c.count);
@@ -4436,7 +4577,7 @@ class RoostEnergy extends ticking(RoostBase, 300000) {
     if (!this._hass || !this._config) return;
     const c = this._config, p = this.p, g = this.colour();
     this.loadDays();
-    const devs = (c.devices || []).map((e) => (typeof e === "string" ? { id: e } : { id: e?.entity, nm: e?.name })).map((d) => ({ ...d, s: this.st(d.id) })).filter((d) => d.s).map((d) => ({ ...d, w: num(d.s.state) ?? 0 }));
+    const devs = (c.devices || []).map((e) => (typeof e === "string" ? { id: e } : { id: e?.entity, nm: e?.name })).map((d) => ({ ...d, s: this.sx(d.id) })).filter((d) => d.s).map((d) => ({ ...d, w: num(d.s.state) ?? 0 }));
     const total = devs.reduce((a, d) => a + d.w, 0);
     const top = [...devs].sort((a, b) => b.w - a.w).slice(0, c.count);
     const max = Math.max(1, ...top.map((d) => d.w));
@@ -4549,7 +4690,7 @@ class RoostTimer extends RoostBase {
     </style>
     <div class="card">
       <div class="n t"><ha-icon icon="${esc(c.icon || "mdi:timer-outline")}"></ha-icon>${esc(this.name(c.entity, "Timer"))}</div>
-      <div class="ring">${ringSvg({ f: 1, track: p.track, from: g[0], to: g[1], id: "tg", inner: 58, innerFill: p.dial })}<div class="in"><span class="v num"></span><span class="w t">${esc(state === "idle" && c.dial ? "Turn the ring" : word)}</span></div>${state === "idle" && c.dial ? '<span class="knob"></span>' : ""}</div>
+      <div class="ring">${ringSvg({ f: 1, track: p.track, from: g[0], to: g[1], id: "tg", inner: 58, innerFill: p.dial })}<div class="in"><span class="v num"></span><span class="w t">${esc(word)}</span></div>${state === "idle" && c.dial ? '<span class="knob"></span>' : ""}</div>
       ${s ? `<div class="btns">${state === "active" ? '<button class="b main" data-a="pause" aria-label="Pause"><ha-icon icon="mdi:pause"></ha-icon></button>' : '<button class="b main" data-a="start" aria-label="Start"><ha-icon icon="mdi:play"></ha-icon></button>'}
         ${state !== "idle" ? '<button class="b" data-a="cancel" aria-label="Cancel"><ha-icon icon="mdi:stop"></ha-icon></button>' : ""}</div>
       ${(c.presets || []).length ? `<div class="q">${c.presets.map((m) => `<button data-m="${esc(m)}">${esc(m)} min</button>`).join("")}</div>` : ""}` : ""}
@@ -4639,7 +4780,7 @@ class RoostFan extends RoostBase {
     const oscil = a.oscillating != null, dir = a.direction != null;
     const offline = !s || UNAVAILABLE.includes(s.state);
     const big = c.style === "big", D = big ? 240 : 168, R = big ? 96 : 64, C = D / 2, HUB = big ? 150 : 100, SW = 270, L = 2 * Math.PI * R * (SW / 360);
-    const rd = (id, u) => { const x = id ? this.st(id) : null; const v = x ? num(x.state) : null; return v == null ? "" : `${fmt(v, Math.min(2, decOf(x.state)))}${u}`; };
+    const rd = (id, u) => { const x = id ? this.sx(id) : null; const v = x ? num(x.state) : null; return v == null ? "" : `${fmt(v, Math.min(2, decOf(x.state)))}${u}`; };
     const room = [rd(c.temperature, "°"), rd(c.humidity, "%")].filter(Boolean).join(" · ");
     const at = (f) => { const t = ((135 + SW * f) * Math.PI) / 180; return [C + R * Math.cos(t), C + R * Math.sin(t)]; };
     const stops = smooth ? [0, 1] : Array.from({ length: speeds + 1 }, (_, i) => i / speeds);
@@ -4957,7 +5098,7 @@ class RoostVacuum extends RoostBase {
   render() {
     if (!this._hass || !this._config) return;
     if (this._menuOpen) return; // a list is open: redraw when it closes
-    const c = this._config, p = this.p, g = this.colour(), s = this.st(), a = s?.attributes || {}, q = this.parts(), S = (x) => (x ? this.st(x) : null);
+    const c = this._config, p = this.p, g = this.colour(), s = this.st(), a = s?.attributes || {}, q = this.parts(), S = (x) => (x ? this.sx(x) : null);
     const state = s?.state || "missing";
     const offline = !s || UNAVAILABLE.includes(state);
     const st2 = String(a.status || "").toLowerCase();
@@ -5165,6 +5306,999 @@ class RoostVacuum extends RoostBase {
   }
 }
 
+// ================================================================== Twelve more cards (1.5.0)
+// Shared look for these cards: the same header as the other Roost cards (42 px icon box, name, one state line).
+const headCss = (p, g, on) => `.card{${panelCss(p, 22)};padding:16px;display:flex;flex-direction:column;gap:14px;position:relative}
+  .top{display:flex;align-items:center;gap:12px}
+  .ic{width:42px;height:42px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;
+    background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? g[3] : p.muted};box-shadow:${on ? `0 10px 22px -10px ${g[2]}` : "none"}}
+  .ic ha-icon{--mdc-icon-size:22px}
+  .tx{flex:1;min-width:0}
+  .n{font-size:15px;font-weight:600;line-height:1.2}
+  .l{font-size:12px;color:${p.muted};margin-top:3px}
+  .chips{display:flex;gap:8px}
+  .chip{flex:1 1 0;min-width:0;min-height:40px;padding:4px 10px;line-height:1.15;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:13px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .chip ha-icon{--mdc-icon-size:17px}
+  .chip.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 8px 18px -10px ${g[2]}}
+  .chip:active,.ic:active,.big:active{transform:scale(.95)}
+  @container (max-width: 300px){:host .chip .cw{display:none}}
+  .stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px}
+  .stat:empty{display:none}
+  .st{min-width:0;padding:10px 12px;border-radius:14px;background:${p.inset}}
+  .st b{display:block;font-size:16px;font-weight:700;font-family:${FONT_NUM};white-space:nowrap}
+  .st span{font-size:11.5px;color:${p.muted};overflow-wrap:normal;word-break:keep-all}
+  .big{height:48px;border-radius:16px;border:0;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};font:inherit;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;box-shadow:0 12px 24px -12px ${g[2]};padding:0 16px}
+  .big.off{background:${p.off};color:${p.text};border:1px solid ${p.border};box-shadow:none}
+  .big ha-icon{--mdc-icon-size:20px}`;
+const head = (icon, name, line, extra = "") => `<div class="top"><span class="ic" data-ic="1" role="button" tabindex="0"><ha-icon icon="${esc(icon)}"></ha-icon></span>
+  <div class="tx"><div class="n t">${esc(name)}</div><div class="l t" aria-live="polite">${esc(line)}</div></div>${extra}</div>`;
+const stat = (label, value) => (value ? `<div class="st"><b class="num t">${esc(value)}</b><span class="t">${esc(label)}</span></div>` : "");
+const minsText = (m) => { if (m == null) return ""; const t = Math.max(0, Math.round(m)); return t >= 60 ? `${Math.floor(t / 60)} h ${t % 60} min` : `${t} min`; };
+// minutes from a sensor: minutes, hours, seconds, "1:23:00", or a finish time
+function minutesOf(st) {
+  if (!st || UNAVAILABLE.includes(st.state)) return null;
+  const u = st.attributes.unit_of_measurement, v = num(st.state);
+  if (st.attributes.device_class === "timestamp" || /T\d\d:/.test(st.state)) { const t = new Date(st.state).getTime(); return Number.isFinite(t) ? (t - Date.now()) / 60000 : null; }
+  if (/^\d+:\d\d(:\d\d)?$/.test(st.state)) { const [h, m, x] = st.state.split(":").map(Number); return h * 60 + m + (x || 0) / 60; }
+  if (v == null) return null;
+  return u === "h" ? v * 60 : u === "s" ? v / 60 : u === "d" ? v * 1440 : v;
+}
+
+// ------------------------------------------------------------------ Roost Air
+// An air purifier (or just a room's air): a ring coloured by how clean the air is, air drawn into the purifier, mode and filter.
+const AQ_STEPS = { pm25: [[12, "Clean", "#34D399"], [35, "Fair", "#F5B94A"], [55, "Poor", "#FF9F6B"], [150, "Unhealthy", "#F43F6B"], [1e9, "Very bad", "#B794FF"]],
+  aqi: [[50, "Clean", "#34D399"], [100, "Fair", "#F5B94A"], [150, "Poor", "#FF9F6B"], [200, "Unhealthy", "#F43F6B"], [1e9, "Very bad", "#B794FF"]],
+  co2: [[800, "Fresh", "#34D399"], [1000, "Fair", "#F5B94A"], [1500, "Stuffy", "#FF9F6B"], [1e9, "Open a window", "#F43F6B"]] };
+class RoostAir extends RoostBase {
+  static get defaults() { return { color: "teal", scale: "auto", theme: "auto" }; }
+
+  validate(c) { if (!c.entity && !c.air) throw new Error("Choose an air purifier or an air reading"); }
+
+  watched() { const c = this._config; return [c.entity, c.air, c.filter, c.humidity, c.temperature].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "entity", label: "Air purifier (optional)", selector: { entity: { domain: ["fan", "humidifier", "switch"] } } },
+      { name: "air", label: "Air reading (PM2.5, air quality index or CO₂)", selector: { entity: { domain: "sensor" } } },
+      { name: "scale", label: "The reading is", selector: pick([["auto", "Found by itself"], ["pm25", "PM2.5 (µg/m³)"], ["aqi", "Air quality index"], ["co2", "CO₂ (ppm)"]]) },
+      { type: "grid", name: "", schema: [{ name: "filter", label: "Filter life", selector: { entity: { domain: "sensor" } } }, { name: "name", selector: { text: {} } }] },
+      { type: "grid", name: "", schema: [{ name: "temperature", selector: { entity: { domain: "sensor" } } }, { name: "humidity", selector: { entity: { domain: "sensor" } } }] },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig(hass) { const ids = Object.keys(hass.states); return { entity: ids.find((i) => i.startsWith("fan.") && /purif|air/.test(i)) || "", air: ids.find((i) => i.startsWith("sensor.") && /pm2|aqi|air_quality/.test(i)) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), s = this.st(), a = s?.attributes || {}, on = s?.state === "on";
+    const airS = this.sx(c.air), v = this.n(c.air), unit = airS?.attributes.unit_of_measurement || "";
+    const scale = c.scale !== "auto" ? c.scale : /ppm/.test(unit) || /co2/.test(c.air || "") ? "co2" : /µg|ug/.test(unit) || /pm/.test(c.air || "") ? "pm25" : "aqi";
+    const step = v == null ? null : AQ_STEPS[scale].find(([max]) => v <= max);
+    const col = step ? step[2] : p.muted, top = AQ_STEPS[scale][AQ_STEPS[scale].length - 2][0] * 1.3;
+    const f = v == null ? 0 : Math.min(1, v / top);
+    const pct = on ? Number(a.percentage ?? 60) : 0, modes = a.preset_modes || [];
+    const name = c.name || (c.entity ? this.name(c.entity, "Air purifier") : this.name(c.air, "Air"));
+    const line = [!s ? "" : UNAVAILABLE.includes(s.state) ? "Offline" : on ? `On${a.preset_mode ? ` · ${a.preset_mode}` : a.percentage != null ? ` · ${Math.round(pct)}%` : ""}` : "Off", step ? `Air ${step[1].toLowerCase()}` : ""].filter(Boolean).join(" · ");
+    const dur = on ? Math.max(1.2, 4 - pct / 40).toFixed(2) : 0, ph = (-((Date.now() / 1000) % 4)).toFixed(2);
+    const R = 66, C = 2 * Math.PI * R;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, on)}${this.menuCss()}
+      .mid{display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:center}
+      @container (max-width: 320px){:host .mid{grid-template-columns:minmax(0,1fr);justify-items:center}}
+      .ring{position:relative;width:150px;height:150px}
+      .ring svg{position:absolute;inset:0}
+      .ring .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+      .ring .v{font-size:34px;font-weight:700;line-height:1;color:${col}}
+      .ring .u{font-size:11px;color:${p.muted}}
+      .ring .w{font-size:12px;font-weight:600;color:${col}}
+      .pt{position:absolute;width:4px;height:4px;border-radius:50%;background:${col};opacity:0;left:50%;top:50%}
+      ${on ? `.pt{animation:roost-airin ${dur}s linear ${ph}s infinite}@keyframes roost-airin{0%{opacity:0;transform:rotate(var(--a)) translateX(74px)}20%{opacity:.8}100%{opacity:0;transform:rotate(calc(var(--a) + 70deg)) translateX(8px)}}` : ""}
+      .side{display:flex;flex-direction:column;gap:10px;min-width:0;width:100%}
+    </style>
+    <div class="card">
+      ${head(c.entity ? "mdi:air-purifier" : "mdi:weather-windy", name, line, "")}
+      <div class="mid">
+        <div class="ring" role="img" aria-label="${esc(step ? `Air ${step[1]}` : "No reading")}">
+          <svg viewBox="0 0 150 150"><circle cx="75" cy="75" r="${R}" fill="none" stroke="${p.track}" stroke-width="10"/>
+            <circle cx="75" cy="75" r="${R}" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(C * Math.max(0.02, f)).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 75 75)" style="filter:drop-shadow(0 0 8px ${col}66)"/></svg>
+          ${Array.from({ length: 10 }, (_, i) => `<span class="pt" style="--a:${i * 36}deg;animation-delay:calc(${ph}s + ${(i * 0.37).toFixed(2)}s)"></span>`).join("")}
+          <div class="in"><span class="v num" data-tw="aq">${v == null ? "–" : esc(fmt(v, 0))}</span><span class="u">${esc(scale === "co2" ? "ppm CO₂" : scale === "pm25" ? "µg/m³ PM2.5" : "air quality")}</span>${step ? `<span class="w">${esc(step[1])}</span>` : ""}</div>
+        </div>
+        <div class="side">
+          <div class="stat">${stat("Filter", this.val(c.filter))}${stat("Temperature", this.val(c.temperature))}${stat("Humidity", this.val(c.humidity))}</div>
+          ${s ? `<div class="chips"><button class="chip ${on ? "on" : ""}" data-pw="1" aria-pressed="${on}"><ha-icon icon="mdi:power"></ha-icon><span class="cw">${on ? "On" : "Off"}</span></button>
+            ${modes.length ? `<button class="chip" data-mode="1" aria-haspopup="true"><ha-icon icon="mdi:tune-variant"></ha-icon><span class="cw t">${esc(a.preset_mode || "Mode")}</span></button>` : ""}
+            ${a.percentage != null ? `<button class="chip" data-sp="1" aria-haspopup="true"><ha-icon icon="mdi:fan"></ha-icon><span class="cw">${on ? `${Math.round(pct)}%` : "Speed"}</span></button>` : ""}</div>` : ""}
+        </div>
+      </div>
+      <div class="menu" hidden role="menu"></div>
+    </div>`;
+    const r = this.shadowRoot, dom = (c.entity || "").split(".")[0];
+    r.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.air || c.entity));
+    r.querySelector("[data-pw]")?.addEventListener("click", () => { this.vibrate(); this.call(dom === "switch" ? "switch" : dom, "toggle", { entity_id: c.entity }); });
+    r.querySelector("[data-mode]")?.addEventListener("click", (e) => { e.stopPropagation(); this.openMenu("Mode", modes.map((m) => ({ label: m, on: m === a.preset_mode, run: () => this.call("fan", "set_preset_mode", { entity_id: c.entity, preset_mode: m }) }))); });
+    r.querySelector("[data-sp]")?.addEventListener("click", (e) => { e.stopPropagation(); this.openMenu("Speed", [25, 50, 75, 100].map((x) => ({ label: `${x}%`, on: on && Math.abs(pct - x) < 13, run: () => this.call("fan", "set_percentage", { entity_id: c.entity, percentage: x }) }))); });
+  }
+}
+
+// ------------------------------------------------------------------ Roost Water Heater
+// A tank that shows how hot the water is, rising bubbles while it heats, the set temperature and a "heat for 30 min" button.
+class RoostWaterHeater extends RoostBase {
+  static get defaults() { return { color: "coral", boost: [30, 60], theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose a water heater (or its switch)"); }
+
+  watched() { const c = this._config; return [c.entity, c.temperature, c.timer].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "entity", required: true, selector: { entity: { domain: ["water_heater", "switch", "climate", "input_boolean"] } } },
+      { type: "grid", name: "", schema: [{ name: "temperature", label: "Water temperature (if the heater has none)", selector: { entity: { domain: "sensor" } } }, { name: "name", selector: { text: {} } }] },
+      { name: "timer", label: "Timer helper for the “heat for” buttons (an automation turns the heater off when it ends)", selector: { entity: { domain: "timer" } } },
+      { name: "boost", label: "“Heat for” buttons (minutes)", selector: { select: { multiple: true, custom_value: true, mode: "dropdown", options: ["15", "30", "45", "60", "90", "120"] } } },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((i) => i.startsWith("water_heater.")) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), s = this.st(), a = s?.attributes || {}, dom = c.entity.split(".")[0];
+    const on = s ? (dom === "water_heater" ? s.state !== "off" : s.state === "on" || s.state === "heat") : false;
+    const cur = this.n(c.temperature) ?? num(a.current_temperature), set = num(a.temperature);
+    const lo = num(a.min_temp) ?? 30, hi = num(a.max_temp) ?? 75;
+    const f = cur == null ? 0.5 : Math.max(0.08, Math.min(1, (cur - 15) / (hi - 15)));
+    const heating = on && (set == null || cur == null || cur < set - 0.5);
+    const tm = this.sx(c.timer), tLeft = tm?.state === "active" && tm.attributes.finishes_at ? (new Date(tm.attributes.finishes_at) - Date.now()) / 60000 : null;
+    const since = on && s?.last_changed ? (Date.now() - new Date(s.last_changed)) / 60000 : null;
+    const line = !s ? "Device not found" : UNAVAILABLE.includes(s.state) ? "Offline" : on ? [heating ? "Heating" : "Hot and ready", tLeft != null ? `off in ${minsText(tLeft)}` : since != null && since >= 1 ? `on for ${minsText(since)}` : ""].filter(Boolean).join(" · ") : "Off";
+    const hot = cur == null ? g[1] : cur >= 50 ? "#F43F6B" : cur >= 38 ? "#FF8F6B" : "#38BDF8";
+    const modes = dom === "water_heater" ? a.operation_list || [] : [];
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, on)}${this.menuCss()}
+      .mid{display:grid;grid-template-columns:96px minmax(0,1fr);gap:18px;align-items:center}
+      .tank{position:relative;width:96px;height:150px;border-radius:40px 40px 22px 22px;border:2px solid ${p.border};background:${p.inset};overflow:hidden}
+      .water{position:absolute;left:0;right:0;bottom:0;height:${(f * 100).toFixed(0)}%;background:linear-gradient(180deg,${hot},${hot}66);transition:height .12s}
+      .water::before{content:"";position:absolute;left:-10%;right:-10%;top:-6px;height:12px;border-radius:50%;background:${hot};opacity:.6}
+      .bub{position:absolute;bottom:4px;width:6px;height:6px;border-radius:50%;border:1.5px solid rgba(255,255,255,.7);opacity:0}
+      ${heating ? ".bub{animation:roost-bub 2.4s ease-in infinite}@keyframes roost-bub{0%{opacity:0;transform:translateY(0)}15%{opacity:.9}100%{opacity:0;transform:translateY(-110px)}}" : ""}
+      .tank .t2{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.35)}
+      .tank .t2 b{font-size:26px;font-family:${FONT_NUM}}
+      .tank .t2 span{font-size:11px;opacity:.9}
+      .flame{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);color:${heating ? "#FF8F6B" : p.muted}}
+      ${heating ? ".flame{animation:roost-breathe 1.2s ease-in-out infinite}" : ""}
+      .side{display:flex;flex-direction:column;gap:10px;min-width:0}
+      .setr{display:flex;align-items:center;gap:10px}
+      .pm{width:44px;height:44px;border-radius:50%;border:1px solid ${p.border};background:${p.off};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+      .setr .sv{flex:1;text-align:center}
+      .setr .sv b{display:block;font-size:22px;font-family:${FONT_NUM}}
+      .setr .sv span{font-size:11px;color:${p.muted}}
+    </style>
+    <div class="card">
+      ${head("mdi:water-boiler", c.name || this.name(c.entity, "Water heater"), line)}
+      <div class="mid">
+        <div class="tank" role="img" aria-label="Water ${cur == null ? "" : `${fmt(cur, 0)}°`}"><div class="water">${[18, 46, 70].map((x, i) => `<span class="bub" style="left:${x}%;animation-delay:${i * 0.8}s"></span>`).join("")}</div>
+          <div class="t2">${cur != null ? `<b data-tw="wt">${esc(fmt(cur, decOf(String(cur))))}°</b><span>water</span>` : ""}</div>
+          <ha-icon class="flame" icon="mdi:fire" style="--mdc-icon-size:18px"></ha-icon></div>
+        <div class="side">
+          ${set != null ? `<div class="setr"><button class="pm" data-d="-1" aria-label="Cooler"><ha-icon icon="mdi:minus"></ha-icon></button><div class="sv"><b class="num">${esc(fmt(set, 0))}°</b><span>Set to</span></div><button class="pm" data-d="1" aria-label="Hotter"><ha-icon icon="mdi:plus"></ha-icon></button></div>` : ""}
+          <button class="big ${on ? "off" : ""}" data-pw="1"><ha-icon icon="mdi:power"></ha-icon>${on ? "Turn off" : "Turn on"}</button>
+          <div class="chips">${(c.boost || []).slice(0, 3).map((m) => `<button class="chip" data-b="${esc(m)}" aria-label="Heat for ${esc(m)} minutes"><span style="white-space:nowrap">${esc(m)} min</span></button>`).join("")}
+            ${modes.length > 1 ? `<button class="chip" data-mode="1"><ha-icon icon="mdi:tune-variant"></ha-icon><span class="cw t">${esc(String(a.operation_mode || s.state).replace(/_/g, " "))}</span></button>` : ""}</div>
+        </div>
+      </div>
+      <div class="menu" hidden role="menu"></div>
+    </div>`;
+    const r = this.shadowRoot;
+    const turn = (want) => {
+      if (dom === "water_heater") return this.call("water_heater", want ? "turn_on" : "turn_off", { entity_id: c.entity });
+      if (dom === "climate") return this.call("climate", want ? "turn_on" : "turn_off", { entity_id: c.entity });
+      return this.call(dom === "input_boolean" ? "input_boolean" : "switch", want ? "turn_on" : "turn_off", { entity_id: c.entity });
+    };
+    r.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.entity));
+    r.querySelector("[data-pw]").addEventListener("click", () => { this.vibrate(); turn(!on); if (on && c.timer && tm?.state === "active") this.call("timer", "cancel", { entity_id: c.timer }); });
+    r.querySelectorAll("[data-d]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call(dom === "climate" ? "climate" : "water_heater", "set_temperature", { entity_id: c.entity, temperature: Math.max(lo, Math.min(hi, set + Number(b.dataset.d))) }); }));
+    r.querySelectorAll("[data-b]").forEach((b) => b.addEventListener("click", () => {
+      this.vibrate(); turn(true);
+      const m = Number(b.dataset.b);
+      if (c.timer) this.call("timer", "start", { entity_id: c.timer, duration: `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}:00` });
+    }));
+    r.querySelector("[data-mode]")?.addEventListener("click", (e) => { e.stopPropagation(); this.openMenu("Mode", modes.map((m) => ({ label: String(m).replace(/_/g, " "), on: m === (a.operation_mode || s.state), run: () => this.call("water_heater", "set_operation_mode", { entity_id: c.entity, operation_mode: m }) }))); });
+  }
+}
+
+// ------------------------------------------------------------------ Roost Doorbell
+// The door camera, a banner when someone rings, the last rings, and the door lock in one place.
+class RoostDoorbell extends ticking(RoostBase, 30000) {
+  static get defaults() { return { color: "coral", theme: "auto" }; }
+
+  validate(c) { if (!c.camera && !c.ring) throw new Error("Choose the doorbell camera or its ring sensor"); }
+
+  watched() { const c = this._config; return [c.camera, c.ring, c.lock, c.motion].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "camera", selector: { entity: { domain: ["camera", "image"] } } },
+      { type: "grid", name: "", schema: [{ name: "ring", label: "Ring (button pressed)", selector: { entity: { domain: ["binary_sensor", "event", "sensor"] } } }, { name: "motion", label: "Someone at the door (optional)", selector: { entity: { domain: "binary_sensor" } } }] },
+      { type: "grid", name: "", schema: [{ name: "lock", label: "Door lock (optional)", selector: { entity: { domain: ["lock", "switch", "button"] } } }, { name: "name", selector: { text: {} } }] },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig(hass) { const ids = Object.keys(hass.states); return { camera: ids.find((i) => i.startsWith("camera.") && /door/.test(i)) || ids.find((i) => i.startsWith("camera.")) || "", ring: ids.find((i) => /doorbell|ring/.test(i)) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  connectedCallback() { super.connectedCallback(); clearInterval(this._pic); this._pic = setInterval(() => { const im = this.shadowRoot?.querySelector(".pic"); const src = this.sx(this._config?.camera)?.attributes.entity_picture; if (im && src && !src.startsWith("data:")) im.src = `${src}${src.includes("?") ? "&" : "?"}t=${Date.now()}`; }, 10000); }
+
+  disconnectedCallback() { super.disconnectedCallback(); clearInterval(this._pic); }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    const cam = this.sx(c.camera), ring = this.sx(c.ring), lock = this.sx(c.lock), mo = this.sx(c.motion);
+    const rangAt = ring ? (ring.entity_id.startsWith("event.") || ring.entity_id.startsWith("sensor.") ? ring.state : ring.last_changed) : null;
+    const rangMin = rangAt && !UNAVAILABLE.includes(rangAt) ? (Date.now() - new Date(rangAt)) / 60000 : null;
+    const ringing = ring && (ring.state === "on" || (rangMin != null && rangMin < 1.5 && !ring.entity_id.startsWith("binary_sensor.")));
+    // remember the last few rings on this screen
+    const key = `roost-rings:${c.ring}`;
+    let rings = []; try { rings = JSON.parse(localStorage.getItem(key) || "[]"); } catch (e) { rings = []; }
+    if (ringing && rangAt && !rings.includes(rangAt)) { rings = [rangAt, ...rings].slice(0, 5); try { localStorage.setItem(key, JSON.stringify(rings)); } catch (e) { /* private mode */ } }
+    const locked = lock ? lock.state === "locked" : null;
+    const src = cam?.attributes.entity_picture;
+    const line = ringing ? "Someone is at the door" : mo?.state === "on" ? "Someone is outside" : rangMin != null && rangMin < 1440 * 7 ? `Last ring ${ago(rangAt)}` : "No one rang";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, ringing)}
+      .cam{position:relative;border-radius:18px;overflow:hidden;background:${p.inset};aspect-ratio:16/10;cursor:pointer}
+      .cam img{width:100%;height:100%;object-fit:cover;display:block}
+      .cam .none{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:${p.muted}}
+      .live{position:absolute;left:10px;top:10px;display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(10,8,40,.55);color:#fff;font-size:11.5px;font-weight:600}
+      .live i{width:7px;height:7px;border-radius:50%;background:#F43F6B;animation:roost-breathe 1.6s ease-in-out infinite}
+      .ban{position:absolute;left:10px;right:10px;bottom:10px;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};font-weight:700;font-size:14px;box-shadow:0 10px 24px -10px ${g[2]}}
+      .ban ha-icon{animation:roost-wiggle .6s ease-in-out infinite}
+      .ic ha-icon{${ringing ? "animation:roost-wiggle .6s ease-in-out infinite" : ""}}
+      .rows{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+      .rows::-webkit-scrollbar{display:none}
+      .rg{flex:none;padding:6px 12px;border-radius:999px;background:${p.inset};font-size:12px;color:${p.muted};display:flex;align-items:center;gap:6px}
+      .rg ha-icon{--mdc-icon-size:14px}
+    </style>
+    <div class="card">
+      ${head(ringing ? "mdi:bell-ring" : "mdi:doorbell-video", c.name || this.name(c.camera || c.ring, "Front door"), line)}
+      ${c.camera ? `<div class="cam" data-cam="1" role="button" aria-label="Open the camera">${src ? `<img class="pic" src="${esc(src)}" alt="Door camera">` : '<div class="none t">Camera offline</div>'}
+        ${src ? '<span class="live"><i></i>Live</span>' : ""}${ringing ? '<div class="ban"><ha-icon icon="mdi:bell-ring"></ha-icon><span class="t">Someone rang the bell</span></div>' : ""}</div>` : ""}
+      ${rings.length ? `<div class="rows">${rings.map((t) => `<span class="rg"><ha-icon icon="mdi:bell-outline"></ha-icon>${esc(new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}</span>`).join("")}</div>` : ""}
+      ${lock ? `<button class="big ${locked ? "" : "off"}" data-lock="1"><ha-icon icon="${locked === false ? "mdi:lock-open-variant" : "mdi:lock"}"></ha-icon>${lock.entity_id.startsWith("lock.") ? (locked ? (Date.now() - (this._sure || 0) < 3000 ? "Tap again to unlock" : "Unlock the door") : "Lock the door") : "Open the door"}</button>` : ""}
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.ring || c.camera));
+    r.querySelector("[data-cam]")?.addEventListener("click", () => this.moreInfo(c.camera));
+    r.querySelector("[data-lock]")?.addEventListener("click", () => {
+      if (lock.entity_id.startsWith("lock.") && locked && Date.now() - (this._sure || 0) >= 3000) { this._sure = Date.now(); this._sig = null; this.render(); clearTimeout(this._sureT); this._sureT = setTimeout(() => { this._sig = null; this.render(); }, 3000); return; }
+      this._sure = 0;
+      this.vibrate();
+      const d = lock.entity_id.split(".")[0];
+      if (d === "lock") this.call("lock", locked ? "unlock" : "lock", { entity_id: c.lock });
+      else if (d === "button") this.call("button", "press", { entity_id: c.lock });
+      else this.call("switch", "turn_on", { entity_id: c.lock });
+    });
+  }
+}
+
+// ------------------------------------------------------------------ Roost Laundry
+// A washer or dryer: the drum turns (water sloshes while washing, clothes tumble while drying), the steps of the cycle, time left, and "ready to unload".
+const WASH_STEPS = [["wash", /wash|main|pre/], ["rinse", /rins/], ["spin", /spin|drain/], ["done", /done|end|finish|complete|ready/]];
+const DRY_STEPS = [["dry", /dry|heat|tumble/], ["cool", /cool/], ["done", /done|end|finish|complete|ready/]];
+class RoostLaundry extends ticking(RoostBase, 30000) {
+  static get defaults() { return { kind: "washer", color: "blue", theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose the washer or dryer (its state or power)"); }
+
+  watched() { const c = this._config; return [c.entity, c.remaining, c.progress, c.stage, c.door].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "kind", label: "It is a", selector: pick([["washer", "Washing machine"], ["dryer", "Dryer"], ["dishwasher", "Dishwasher"]]) },
+      { name: "entity", label: "Running or not (its state, a power reading, or a switch)", required: true, selector: { entity: {} } },
+      { type: "grid", name: "", schema: [{ name: "remaining", label: "Time left / finishes at", selector: { entity: { domain: "sensor" } } }, { name: "progress", label: "Progress (%)", selector: { entity: { domain: "sensor" } } }] },
+      { type: "grid", name: "", schema: [{ name: "stage", label: "Step of the cycle", selector: { entity: { domain: ["sensor", "select"] } } }, { name: "door", label: "Door (optional)", selector: { entity: { domain: "binary_sensor" } } }] },
+      { type: "grid", name: "", schema: [{ name: "power_on", label: "Running above (W, for power readings)", selector: { number: { mode: "box" } } }, { name: "name", selector: { text: {} } }] },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((i) => /wash|laundry|dryer/.test(i)) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), s = this.st();
+    const st = String(s?.state || "").toLowerCase(), stageS = this.sx(c.stage), stage = String(stageS?.state || st).toLowerCase();
+    const w = this.n(c.entity);
+    const running = !s ? false : /^(on|run|running|wash|washing|rinse|spin|dry|drying|active|in_?progress|working|cooling)/.test(st) || (w != null && s.attributes.unit_of_measurement === "W" && w > (Number(c.power_on) || 5));
+    const steps = c.kind === "dryer" ? DRY_STEPS : WASH_STEPS;
+    let at = steps.findIndex(([, re]) => re.test(stage));
+    const left = minutesOf(this.sx(c.remaining)), prog = this.n(c.progress);
+    const done = !running && (/done|end|finish|complete|ready/.test(stage) || (this._wasRunning && !running));
+    if (running) this._wasRunning = true; else if (this.sx(c.door)?.state === "on") this._wasRunning = false;
+    if (done) at = steps.length - 1;
+    const icon = { washer: "mdi:washing-machine", dryer: "mdi:tumble-dryer", dishwasher: "mdi:dishwasher" }[c.kind] || "mdi:washing-machine";
+    const line = !s ? "Device not found" : UNAVAILABLE.includes(s.state) ? "Offline" : running ? [at >= 0 ? steps[at][0].replace(/^./, (x) => x.toUpperCase()) : "Running", left != null && left > 0 ? `${minsText(left)} left` : ""].filter(Boolean).join(" · ") : done ? "Ready to unload" : "Off";
+    const pct = prog != null ? prog : left != null && running ? null : done ? 100 : 0;
+    const spin = /spin|drain/.test(stage) ? 0.5 : c.kind === "dryer" ? 2.2 : 3;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, running || done)}
+      .mid{display:grid;grid-template-columns:120px minmax(0,1fr);gap:16px;align-items:center}
+      .mach{position:relative;width:120px;height:130px;border-radius:18px;background:${p.inset};border:1px solid ${p.border}}
+      .mach .panel{position:absolute;left:10px;right:10px;top:8px;height:12px;display:flex;gap:6px;align-items:center}
+      .mach .panel i{width:8px;height:8px;border-radius:50%;background:${running ? g[1] : p.track}}
+      .mach .panel i:first-child{width:30px;border-radius:4px;background:${p.track}}
+      .door{position:absolute;left:50%;top:30px;width:88px;height:88px;margin-left:-44px;border-radius:50%;border:6px solid ${this.dark ? "#2A3066" : "#C9CEE8"};background:${this.dark ? "#141831" : "#F4F5FC"};overflow:hidden}
+      .drum{position:absolute;inset:0;border-radius:50%}
+      ${running ? `.drum{animation:roost-spin ${spin}s linear infinite}` : ""}
+      .cl{position:absolute;width:26px;height:16px;border-radius:8px}
+      .wv{position:absolute;left:-20%;right:-20%;bottom:-10%;height:46%;background:${c.kind === "dryer" ? "transparent" : "rgba(56,189,248,.35)"};border-radius:40%}
+      ${running && c.kind !== "dryer" ? ".wv{animation:roost-slosh 1.6s ease-in-out infinite}@keyframes roost-slosh{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}" : ""}
+      ${c.kind === "dryer" && running ? ".heat{position:absolute;inset:0;background:radial-gradient(circle,rgba(255,159,107,.25),transparent 70%);animation:roost-breathe 2s ease-in-out infinite}" : ""}
+      .side{display:flex;flex-direction:column;gap:12px;min-width:0}
+      .steps{display:flex;gap:6px}
+      .sp{flex:1 1 0;min-width:0;text-align:center;font-size:11px;color:${p.muted}}
+      .sp i{display:block;height:6px;border-radius:3px;background:${p.track};margin-bottom:5px}
+      .sp.past i{background:${g[1]}}
+      .sp.now i{background:linear-gradient(90deg,${g[0]},${g[1]});box-shadow:0 0 10px ${g[2]}}
+      .sp.now{color:${p.text};font-weight:600}
+      .bar{height:8px;border-radius:4px;background:${p.track};overflow:hidden}
+      .bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,${g[0]},${g[1]})}
+      .rd{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:linear-gradient(135deg,#10B981,#6EE7B7);color:#03241B;font-weight:700;font-size:14px}
+      .rd ha-icon{animation:roost-bounce 1.6s ease-in-out infinite}
+    </style>
+    <div class="card">
+      ${head(icon, c.name || this.name(c.entity, c.kind === "dryer" ? "Dryer" : c.kind === "dishwasher" ? "Dishwasher" : "Washing machine"), line)}
+      <div class="mid">
+        <div class="mach" role="img" aria-label="${esc(line)}"><div class="panel"><i></i><i></i><i></i></div>
+          <div class="door"><div class="wv"></div><div class="heat"></div><div class="drum">
+            <span class="cl" style="left:18px;top:20px;background:#F43F6B99"></span><span class="cl" style="left:42px;top:44px;background:#38BDF899;transform:rotate(30deg)"></span><span class="cl" style="left:22px;top:50px;background:#F5B94A99;transform:rotate(-20deg)"></span></div></div></div>
+        <div class="side">
+          <div class="steps">${steps.map(([n], i) => `<div class="sp ${i < at ? "past" : i === at ? "now" : ""}"><i></i><span class="t">${esc(n.replace(/^./, (x) => x.toUpperCase()))}</span></div>`).join("")}</div>
+          ${pct != null && running ? `<div class="bar" role="progressbar" aria-valuenow="${Math.round(pct)}"><i data-bar="lp" style="width:${Math.min(100, Math.max(0, pct)).toFixed(0)}%"></i></div>` : ""}
+          <div class="stat">${stat("Time left", running && left != null ? minsText(left) : "")}${stat("Done", running && pct != null ? `${Math.round(pct)}%` : "")}${stat("Finishes", running && left != null ? new Date(Date.now() + left * 60000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "")}</div>
+          ${done ? '<div class="rd"><ha-icon icon="mdi:check-circle"></ha-icon><span class="t">Ready to unload</span></div>' : ""}
+        </div>
+      </div>
+    </div>`;
+    this.shadowRoot.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.entity));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Garage
+// A garage door that rolls up and down in panels (or a gate that slides), how long it has been open, and a warning when it stays open.
+class RoostGarage extends ticking(RoostBase, 30000) {
+  static get defaults() { return { style: "garage", warn_after: 10, color: "amber", theme: "auto" }; }
+
+  validate(c) { if (!c.entity) throw new Error("Choose the garage door or gate"); }
+
+  watched() { const c = this._config; return [c.entity, c.sensor].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "entity", required: true, selector: { entity: { domain: ["cover", "switch", "button", "lock"] } } },
+      { type: "grid", name: "", schema: [{ name: "style", label: "Look", selector: pick([["garage", "Garage door that rolls up"], ["gate", "Gate that slides"], ["swing", "Gate with two wings"]]) }, { name: "name", selector: { text: {} } }] },
+      { type: "grid", name: "", schema: [{ name: "sensor", label: "Open/closed sensor (for switch or button doors)", selector: { entity: { domain: "binary_sensor" } } }, { name: "warn_after", label: "Warn when open longer than (min)", selector: slider(1, 60) }] },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((i) => i.startsWith("cover.") && /garage|gate/.test(i)) || "" }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), s = this.st(), sen = this.sx(c.sensor);
+    const st = sen ? (sen.state === "on" ? "open" : "closed") : String(s?.state || "");
+    const moving = st === "opening" || st === "closing";
+    const pos = num(s?.attributes.current_position);
+    const open = st === "open" || st === "opening";
+    const f = moving ? (st === "opening" ? 0.85 : 0.15) : pos != null ? pos / 100 : open ? 1 : 0;
+    const since = (sen || s)?.last_changed ? (Date.now() - new Date((sen || s).last_changed)) / 60000 : null;
+    const late = open && !moving && since != null && since > (Number(c.warn_after) || 10);
+    const line = !s ? "Device not found" : UNAVAILABLE.includes(s.state) ? "Offline" : moving ? (st === "opening" ? "Opening" : "Closing") : open ? `Open${since != null ? ` for ${minsText(since)}` : ""}` : "Closed";
+    const sty = c.style;
+    const dur = moving ? 6 : 0;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, open)}
+      .scene{position:relative;height:150px;border-radius:18px;overflow:hidden;background:${p.inset};border:1px solid ${late ? "#F43F6B" : p.border}}
+      .frame{position:absolute;left:12%;right:12%;top:18%;bottom:0;border:6px solid ${this.dark ? "#2A3066" : "#C9CEE8"};border-bottom:0;border-radius:10px 10px 0 0;background:${this.dark ? "#0F1228" : "#E4E7F4"};overflow:hidden}
+      .car{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);color:${p.muted};opacity:.6}
+      .rol{position:absolute;left:0;right:0;top:0;height:${((1 - f) * 100).toFixed(0)}%;background:repeating-linear-gradient(180deg,${g[0]} 0 13px,${g[1]} 13px 16px)}
+      ${moving ? `.rol{animation:roost-${st === "opening" ? "up" : "down"} ${dur}s ease-in-out infinite}@keyframes roost-up{from{height:100%}to{height:8%}}@keyframes roost-down{from{height:8%}to{height:100%}}` : ""}
+      .gate{position:absolute;top:22%;bottom:0;width:${sty === "swing" ? "50%" : "100%"};background:repeating-linear-gradient(90deg,${g[0]} 0 4px,transparent 4px 18px),linear-gradient(${g[1]},${g[1]}) top/100% 4px no-repeat,linear-gradient(${g[1]},${g[1]}) bottom 10px left 0/100% 4px no-repeat}
+      .g1{left:${sty === "swing" ? 0 : (f * 88).toFixed(0)}%;transform-origin:left center;transform:${sty === "swing" ? `perspective(300px) rotateY(${(-f * 70).toFixed(0)}deg)` : "none"}}
+      .g2{right:0;transform-origin:right center;transform:perspective(300px) rotateY(${(f * 70).toFixed(0)}deg)}
+      .wa{position:absolute;left:10px;right:10px;bottom:10px;display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:#F43F6B;color:#fff;font-weight:700;font-size:13px}
+      .ctl{display:flex;gap:10px}
+      .ctl .big{flex:1}
+    </style>
+    <div class="card">
+      ${head(sty === "garage" ? (open ? "mdi:garage-open-variant" : "mdi:garage-variant") : open ? "mdi:gate-open" : "mdi:gate", c.name || this.name(c.entity, sty === "garage" ? "Garage" : "Gate"), line)}
+      <div class="scene" role="img" aria-label="${esc(line)}">
+        ${sty === "garage" ? `<div class="frame"><ha-icon class="car" icon="mdi:car-side" style="--mdc-icon-size:54px"></ha-icon><div class="rol"></div></div>`
+    : `<div class="frame" style="border-radius:0;left:4%;right:4%;top:34%;border-width:0 6px"><ha-icon class="car" icon="mdi:car-side" style="--mdc-icon-size:54px"></ha-icon></div><div class="gate g1"></div>${sty === "swing" ? '<div class="gate g2"></div>' : ""}`}
+        ${late ? `<div class="wa"><ha-icon icon="mdi:alert"></ha-icon><span class="t">Open for ${esc(minsText(since))}</span></div>` : ""}
+      </div>
+      ${s ? `<div class="ctl">${s.entity_id.startsWith("cover.") && moving ? '<button class="big off" data-a="stop"><ha-icon icon="mdi:stop"></ha-icon>Stop</button>' : ""}
+        <button class="big ${open ? "off" : ""}" data-a="go"><ha-icon icon="${open ? "mdi:arrow-down" : "mdi:arrow-up"}"></ha-icon>${open ? "Close" : Date.now() - (this._sure || 0) < 3000 ? "Tap again to open" : "Open"}</button></div>` : ""}
+    </div>`;
+    const r = this.shadowRoot, d = c.entity.split(".")[0];
+    r.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.entity));
+    r.querySelectorAll("[data-a]").forEach((b) => b.addEventListener("click", () => {
+      this.vibrate();
+      if (b.dataset.a === "stop") return this.call("cover", "stop_cover", { entity_id: c.entity });
+      if (!open && Date.now() - (this._sure || 0) >= 3000) { this._sure = Date.now(); this._sig = null; this.render(); clearTimeout(this._sureT); this._sureT = setTimeout(() => { this._sig = null; this.render(); }, 3000); return undefined; }
+      this._sure = 0;
+      if (d === "cover") return this.call("cover", open ? "close_cover" : "open_cover", { entity_id: c.entity });
+      if (d === "button") return this.call("button", "press", { entity_id: c.entity });
+      if (d === "lock") return this.call("lock", open ? "lock" : "open", { entity_id: c.entity });
+      return this.call("switch", "toggle", { entity_id: c.entity });
+    }));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Energy Flow
+// Sun, house, battery and grid with dots flowing along the lines: faster when more power moves, the way it is going.
+class RoostFlow extends RoostBase {
+  static get defaults() { return { battery_invert: false, grid_invert: false, color: "amber", theme: "auto" }; }
+
+  validate(c) { if (!c.solar && !c.grid && !c.home) throw new Error("Choose at least the solar, grid or house power"); }
+
+  watched() { const c = this._config; return [c.solar, c.battery, c.battery_level, c.grid, c.home].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { type: "grid", name: "", schema: [{ name: "solar", label: "Solar power", selector: { entity: { domain: "sensor" } } }, { name: "home", label: "House uses", selector: { entity: { domain: "sensor" } } }] },
+      { type: "grid", name: "", schema: [{ name: "grid", label: "Grid power (+ buying, − selling)", selector: { entity: { domain: "sensor" } } }, { name: "grid_invert", label: "Grid sign is the other way", selector: { boolean: {} } }] },
+      { type: "grid", name: "", schema: [{ name: "battery", label: "Battery power (+ giving, − charging)", selector: { entity: { domain: "sensor" } } }, { name: "battery_invert", label: "Battery sign is the other way", selector: { boolean: {} } }] },
+      { type: "grid", name: "", schema: [{ name: "battery_level", label: "Battery level (%)", selector: { entity: { domain: "sensor" } } }, { name: "name", selector: { text: {} } }] },
+      THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { sample: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  w(id) { const s = this.sx(id); const v = this.n(id); if (v == null) return null; const u = s.attributes.unit_of_measurement; return u === "kW" ? v * 1000 : u === "MW" ? v * 1e6 : v; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p;
+    const sol = Math.max(0, this.w(c.solar) ?? 0), bat0 = this.w(c.battery), grid0 = this.w(c.grid);
+    const bat = bat0 == null ? null : (c.battery_invert ? -bat0 : bat0), grid = grid0 == null ? null : (c.grid_invert ? -grid0 : grid0);
+    const home = this.w(c.home) ?? Math.max(0, sol + (bat ?? 0) + (grid ?? 0));
+    const lvl = this.n(c.battery_level);
+    const fw = (v) => { if (v == null) return ""; const a = Math.abs(v); return a >= 1000 ? `${fmt(a / 1000, a >= 10000 ? 1 : 2)} kW` : `${Math.round(a)} W`; };
+    const N = { sun: [50, 14], home: [50, 86], bat: [14, 50], grid: [86, 50] };
+    const lines = [];
+    const add = (from, to, v, col) => { if (!v || Math.abs(v) < 5) return; const d = Math.max(0.6, 3.2 - Math.log10(Math.abs(v)) * 0.75).toFixed(2); lines.push({ from, to, col, d }); };
+    add("sun", "home", Math.min(sol, home), "#F5B94A");
+    if (bat != null) { if (bat > 0) add("bat", "home", bat, "#34D399"); else add("sun", "bat", -bat, "#34D399"); }
+    if (grid != null) { if (grid > 0) add("grid", "home", grid, "#38BDF8"); else add("sun", "grid", -grid, "#B794FF"); }
+    const node = (k, icon, label, v, col, extra = "") => `<div class="nd ${k}" style="left:${N[k][0]}%;top:${N[k][1]}%"><span class="ci" style="border-color:${col};color:${col}"><ha-icon icon="${icon}"></ha-icon>${extra}</span><b class="num t">${esc(v)}</b><span class="t">${esc(label)}</span></div>`;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, COLORS.amber, sol > 0)}
+      .flow{position:relative;height:270px}
+      .flow svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+      .nd{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;width:96px}
+      .ci{position:relative;width:52px;height:52px;border-radius:50%;border:2.5px solid;background:${p.inset};display:flex;align-items:center;justify-content:center}
+      .ci ha-icon{--mdc-icon-size:24px}
+      .ci .lv{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 26px 26px;background:#34D39940}
+      .nd b{font-size:14px;font-weight:700}
+      .nd span{font-size:11px;color:${p.muted}}
+      .dot{offset-rotate:0deg}
+    </style>
+    <div class="card">
+      ${head("mdi:transmission-tower", c.name || "Energy now", sol > 0 ? `Sun gives ${fw(sol)}${grid != null && grid < 0 ? ` · selling ${fw(grid)}` : ""}` : grid != null && grid > 0 ? `Buying ${fw(grid)} from the grid` : "No sun right now")}
+      <div class="flow">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          ${[["sun", "home"], ["sun", "bat"], ["sun", "grid"], ["bat", "home"], ["grid", "home"]].map(([a, b]) => `<path d="M${N[a][0]} ${N[a][1]} Q50 50 ${N[b][0]} ${N[b][1]}" fill="none" stroke="${p.track}" stroke-width="2" vector-effect="non-scaling-stroke"/>`).join("")}
+        </svg>
+        ${lines.map((l, i) => [0, 1, 2].map((k) => `<span class="dot" style="position:absolute;left:0;top:0;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:${l.col};box-shadow:0 0 8px ${l.col}" data-from="${l.from}" data-to="${l.to}" data-d="${l.d}" data-k="${k}"></span>`).join("")).join("")}
+        ${c.solar ? node("sun", "mdi:solar-power-variant", "Solar", fw(sol), "#F5B94A") : ""}
+        ${node("home", "mdi:home-lightning-bolt-outline", "House", fw(home), p.text)}
+        ${c.battery || c.battery_level ? node("bat", "mdi:home-battery-outline", bat == null ? "Battery" : bat > 5 ? "Battery gives" : bat < -5 ? "Charging" : "Battery", lvl != null ? `${Math.round(lvl)}%` : fw(bat), "#34D399", lvl != null ? `<span class="lv" style="height:${Math.max(4, lvl)}%"></span>` : "") : ""}
+        ${c.grid ? node("grid", "mdi:transmission-tower", grid == null ? "Grid" : grid > 5 ? "Buying" : grid < -5 ? "Selling" : "Grid", fw(grid), grid != null && grid < 0 ? "#B794FF" : "#38BDF8") : ""}
+      </div>
+    </div>`;
+    // the dots travel along each line; the path is measured in pixels so it bends like the drawn line
+    const box = this.shadowRoot.querySelector(".flow");
+    const lay = () => {
+      const W = box.clientWidth, H = box.clientHeight;
+      if (!W) return;
+      box.querySelectorAll(".dot").forEach((d) => {
+        const [x1, y1] = N[d.dataset.from], [x2, y2] = N[d.dataset.to], k = +d.dataset.k, dur = +d.dataset.d;
+        d.style.offsetPath = `path('M${(x1 * W) / 100} ${(y1 * H) / 100} Q${W / 2} ${H / 2} ${(x2 * W) / 100} ${(y2 * H) / 100}')`;
+        try { d.animate([{ offsetDistance: "0%", opacity: 0 }, { opacity: 1, offset: 0.15 }, { opacity: 1, offset: 0.85 }, { offsetDistance: "100%", opacity: 0 }], { duration: dur * 1000, iterations: Infinity, delay: -((Date.now() + (k * dur * 1000) / 3) % (dur * 1000)) }); } catch (e) { /* no motion */ }
+      });
+    };
+    (window.requestAnimationFrame || setTimeout)(lay);
+    this.shadowRoot.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.home || c.solar || c.grid));
+    this.shadowRoot.querySelectorAll(".nd").forEach((el) => el.addEventListener("click", () => this.moreInfo({ sun: c.solar, home: c.home, bat: c.battery_level || c.battery, grid: c.grid }[el.classList[1]])));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Irrigation
+// Garden zones: tap one to water it for a few minutes, see which is watering and for how long, and skip when rain is coming.
+class RoostIrrigation extends ticking(RoostBase, 20000) {
+  static get defaults() { return { zones: [], minutes: 10, color: "teal", theme: "auto" }; }
+
+  validate(c) { if (!(c.zones || []).length) throw new Error("Add the garden zones (valves or switches)"); }
+
+  watched() { const c = this._config; return [...(c.zones || []).map((z) => z.entity), c.rain].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "zones", label: "Zones", selector: { object: { multiple: true, label_field: "name", fields: {
+        entity: { label: "Valve or switch", required: true, selector: { entity: { domain: ["valve", "switch"] } } },
+        name: { label: "Name", selector: { text: {} } }, icon: { label: "Icon", selector: { icon: {} } },
+        remaining: { label: "Time left (optional sensor)", selector: { entity: { domain: "sensor" } } },
+      } } } },
+      { type: "grid", name: "", schema: [{ name: "minutes", label: "Water for (minutes)", selector: slider(1, 60) }, { name: "timer", label: "Timer helper (an automation stops the water)", selector: { entity: { domain: "timer" } } }] },
+      { type: "grid", name: "", schema: [{ name: "rain", label: "Rain today or soon (mm sensor, or rain sensor)", selector: { entity: { domain: ["sensor", "binary_sensor"] } } }, { name: "name", selector: { text: {} } }] },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { sample: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    const zones = (c.zones || []).map((z) => { const s = this.sx(z.entity); const on = s && (s.state === "on" || s.state === "open" || s.state === "opening"); return { ...z, s, on, since: on && s.last_changed ? (Date.now() - new Date(s.last_changed)) / 60000 : null, left: minutesOf(this.sx(z.remaining)) }; });
+    const rs = this.sx(c.rain), rainMm = this.n(c.rain);
+    const rainy = rs ? (rs.entity_id.startsWith("binary_sensor.") ? rs.state === "on" : rainMm != null && rainMm >= 2) : false;
+    const busy = zones.filter((z) => z.on);
+    const line = busy.length ? `Watering ${busy.map((z) => z.name || this.name(z.entity)).join(", ")}` : rainy ? "Rain is coming, watering can wait" : "All zones off";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, busy.length > 0)}
+      .zs{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+      .z{position:relative;overflow:hidden;min-height:96px;padding:12px;border-radius:18px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;text-align:left;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+      .z.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 12px 24px -12px ${g[2]}}
+      .z ha-icon{--mdc-icon-size:22px}
+      .z b{font-size:14px;font-weight:600;line-height:1.2}
+      .z span{font-size:11.5px;opacity:.85}
+      .drop{position:absolute;top:-10px;width:3px;height:10px;border-radius:2px;background:rgba(255,255,255,.7)}
+      .z.on .drop{animation:roost-rain .9s linear infinite}
+      @keyframes roost-rain{0%{transform:translateY(0);opacity:0}30%{opacity:.8}100%{transform:translateY(34px);opacity:0}}
+      .rain{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:${p.inset};font-size:13px}
+      .rain ha-icon{color:#38BDF8}
+    </style>
+    <div class="card">
+      ${head("mdi:sprinkler-variant", c.name || "Garden", line)}
+      ${rs ? `<div class="rain"><ha-icon icon="${rainy ? "mdi:weather-pouring" : "mdi:weather-partly-cloudy"}"></ha-icon><span class="t">${rainy ? `Rain expected${rainMm != null ? ` (${fmt(rainMm, 1)} mm)` : ""}: no need to water today` : "No rain expected"}</span></div>` : ""}
+      <div class="zs">${zones.map((z, i) => `<button class="z ${z.on ? "on" : ""}" data-z="${i}" aria-pressed="${!!z.on}">
+        ${z.on ? [54, 66, 78, 90].map((x, k) => `<i class="drop" style="left:${x}%;animation-delay:${(k * 0.23).toFixed(2)}s"></i>`).join("") : ""}
+        <ha-icon icon="${esc(z.icon || "mdi:sprinkler")}"></ha-icon><div><b class="t">${esc(z.name || this.name(z.entity))}</b><br><span class="t">${!z.s ? "Not found" : z.on ? (z.left != null ? `${minsText(z.left)} left` : z.since != null && z.since >= 1 ? `Watering for ${minsText(z.since)}` : "Watering") : `Tap: water ${c.minutes} min`}</span></div></button>`).join("")}</div>
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.rain || zones[0]?.entity));
+    r.querySelectorAll("[data-z]").forEach((b) => b.addEventListener("click", () => {
+      const z = zones[+b.dataset.z]; if (!z.s) return;
+      this.vibrate();
+      const d = z.entity.split(".")[0];
+      if (z.on) { this.call(d, d === "valve" ? "close_valve" : "turn_off", { entity_id: z.entity }); return; }
+      this.call(d, d === "valve" ? "open_valve" : "turn_on", { entity_id: z.entity });
+      const m = Number(c.minutes) || 10;
+      if (c.timer) this.call("timer", "start", { entity_id: c.timer, duration: `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}:00` });
+    }));
+  }
+}
+
+// ------------------------------------------------------------------ Roost EV
+// An electric car from the side with its battery filling, power flowing in while it charges, range, the limit and when it will be full.
+class RoostEV extends ticking(RoostBase, 60000) {
+  static get defaults() { return { capacity: 60, color: "green", theme: "auto" }; }
+
+  validate(c) { if (!c.battery) throw new Error("Choose the car's battery level"); }
+
+  watched() { const c = this._config; return [c.battery, c.range, c.power, c.charging, c.plugged, c.limit].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { type: "grid", name: "", schema: [{ name: "battery", label: "Battery level (%)", required: true, selector: { entity: { domain: "sensor" } } }, { name: "range", label: "Range", selector: { entity: { domain: "sensor" } } }] },
+      { type: "grid", name: "", schema: [{ name: "power", label: "Charging power", selector: { entity: { domain: "sensor" } } }, { name: "charging", label: "Charging on/off", selector: { entity: { domain: ["switch", "binary_sensor", "sensor"] } } }] },
+      { type: "grid", name: "", schema: [{ name: "plugged", label: "Plugged in", selector: { entity: { domain: "binary_sensor" } } }, { name: "limit", label: "Charge limit", selector: { entity: { domain: ["number", "sensor"] } } }] },
+      { type: "grid", name: "", schema: [{ name: "capacity", label: "Battery size (kWh, for the time to full)", selector: { number: { mode: "box" } } }, { name: "name", selector: { text: {} } }] },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { sample: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    const lvl = this.n(c.battery), lim = this.n(c.limit) ?? 100;
+    const pw = (() => { const v = this.n(c.power); if (v == null) return null; const u = this.sx(c.power).attributes.unit_of_measurement; return u === "W" ? v / 1000 : v; })();
+    const chS = this.sx(c.charging);
+    const charging = chS ? /^(on|charging)$/i.test(chS.state) : pw != null && pw > 0.1;
+    const plugged = c.plugged ? this.on(c.plugged) : charging;
+    const toFull = charging && pw && lvl != null && lvl < lim ? ((lim - lvl) / 100 * (Number(c.capacity) || 60)) / pw * 60 : null;
+    const line = lvl == null ? "No reading" : charging ? `Charging${toFull != null ? ` · full ${new Date(Date.now() + toFull * 60000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : ""}` : plugged ? (lvl >= lim - 1 ? "Charged" : "Plugged in") : "Not plugged in";
+    const col = lvl != null && lvl <= 20 ? "#F43F6B" : g[1];
+    const cells = 10, full = lvl == null ? 0 : Math.round((lvl / 100) * cells), limCell = Math.round((lim / 100) * cells);
+    const paint = [g[1], g[0]], glass = this.dark ? ["#3B4A9A", "#0B0E24"] : ["#A9B8EE", "#2E3A78"];
+    const rim = (cx) => `<g><circle cx="${cx}" cy="92" r="19" fill="#0B0D17"/><circle cx="${cx}" cy="92" r="13.5" fill="url(#evrim)"/>
+      ${[0, 72, 144, 216, 288].map((a) => { const r1 = (a * Math.PI) / 180; return `<path d="M${cx} 92 L${(cx + 12.5 * Math.cos(r1 - 0.16)).toFixed(1)} ${(92 + 12.5 * Math.sin(r1 - 0.16)).toFixed(1)} L${(cx + 12.5 * Math.cos(r1 + 0.16)).toFixed(1)} ${(92 + 12.5 * Math.sin(r1 + 0.16)).toFixed(1)} Z" fill="${this.dark ? "#1A1F3D" : "#3A4170"}" opacity=".85"/>`; }).join("")}
+      <circle cx="${cx}" cy="92" r="4" fill="#C9CEF2"/><circle cx="${cx}" cy="92" r="1.6" fill="#0B0D17"/><path d="M${cx - 9} ${92 - 11} A14 14 0 0 1 ${cx + 9} ${92 - 11}" fill="none" stroke="${g[1]}" stroke-width="2.4" stroke-linecap="round" opacity=".9"/></g>`;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, charging)}
+      .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+      .hero .pc{font-size:46px;font-weight:700;line-height:1;font-family:${FONT_NUM};color:${col};letter-spacing:-1px}
+      .hero .pc small{font-size:20px}
+      .hero .sub{font-size:12px;color:${p.muted};margin-top:4px}
+      .hero .rg{text-align:right}
+      .hero .rg b{display:block;font-size:22px;font-family:${FONT_NUM}}
+      .hero .rg span{font-size:12px;color:${p.muted}}
+      .car{position:relative;border-radius:18px;overflow:hidden;background:radial-gradient(120% 90% at 60% 110%,${g[0]}33,transparent 60%),${p.inset}}
+      .car svg{display:block;width:100%;height:auto}
+      .cell.next{animation:roost-breathe 1.2s ease-in-out infinite}
+      .flow{stroke-dasharray:2 10}
+      ${charging ? `.flow{animation:roost-dash .7s linear infinite}@keyframes roost-dash{to{stroke-dashoffset:-12}}.led{animation:roost-breathe 1.4s ease-in-out infinite}
+      .wave{animation:roost-wave 2.4s ease-in-out infinite}@keyframes roost-wave{0%{transform:translateX(-60px);opacity:0}30%{opacity:.9}100%{transform:translateX(150px);opacity:0}}
+      .port{animation:roost-breathe 1.4s ease-in-out infinite}` : ""}
+    </style>
+    <div class="card">
+      ${head(charging ? "mdi:ev-station" : "mdi:car-electric", c.name || "Car", line)}
+      <div class="hero"><div><div class="pc num" data-tw="ev">${lvl == null ? "" : `${Math.round(lvl)}<small>%</small>`}</div><div class="sub t">${lim < 100 ? `Charges to ${Math.round(lim)}%` : "Battery"}</div></div>
+        ${this.val(c.range) ? `<div class="rg"><b class="num">${esc(this.val(c.range))}</b><span>range</span></div>` : ""}</div>
+      <div class="car" role="img" aria-label="Battery ${lvl == null ? "unknown" : `${Math.round(lvl)}%`}${charging ? ", charging" : ""}">
+        <svg viewBox="0 0 340 132" aria-hidden="true">
+          <defs>
+            <linearGradient id="evbody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${paint[0]}"/><stop offset=".55" stop-color="${paint[1]}"/><stop offset="1" stop-color="${this.dark ? "#0B0D17" : "#3A4170"}"/></linearGradient>
+            <linearGradient id="evglass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${glass[0]}"/><stop offset="1" stop-color="${glass[1]}"/></linearGradient>
+            <linearGradient id="evcell" x1="0" x2="1"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${col}"/></linearGradient>
+            <radialGradient id="evrim" cx="40%" cy="35%"><stop offset="0" stop-color="#F4F5FC"/><stop offset=".6" stop-color="#9AA3D9"/><stop offset="1" stop-color="#5A6199"/></radialGradient>
+            <radialGradient id="evshadow"><stop offset="0" stop-color="rgba(0,0,0,${this.dark ? 0.6 : 0.25})"/><stop offset="1" stop-color="rgba(0,0,0,0)"/></radialGradient>
+            <linearGradient id="evbeam" x1="0" x2="1"><stop offset="0" stop-color="rgba(125,211,252,.45)"/><stop offset="1" stop-color="rgba(125,211,252,0)"/></linearGradient>
+            <clipPath id="evclip"><path d="M62 88 C62 76 70 70 86 68 L124 64 C140 46 162 36 192 35 C222 34 246 40 268 58 L296 64 C314 67 324 74 324 84 L324 90 C324 94 320 96 316 96 L70 96 C65 96 62 93 62 90 Z"/></clipPath>
+          </defs>
+          <ellipse cx="193" cy="112" rx="150" ry="9" fill="url(#evshadow)"/>
+          <path d="M322 74 L340 64 L340 92 Z" fill="url(#evbeam)"/>
+          ${plugged ? `<rect x="6" y="36" width="24" height="50" rx="8" fill="${this.dark ? "#141831" : "#FFFFFF"}" stroke="${p.border}" stroke-width="1.5"/><rect x="11" y="44" width="14" height="5" rx="2.5" class="led" fill="${charging ? "#34D399" : p.muted}"/>
+            <path d="M18 86 C18 108 44 110 58 100 C66 94 64 82 70 76" fill="none" stroke="${this.dark ? "#3A4170" : "#9AA3D9"}" stroke-width="4.5" stroke-linecap="round"/>
+            <path class="flow" d="M18 86 C18 108 44 110 58 100 C66 94 64 82 70 76" fill="none" stroke="${charging ? "#FFFFFF" : "transparent"}" stroke-width="2.4" stroke-linecap="round"/>` : ""}
+          <path d="M62 88 C62 76 70 70 86 68 L124 64 C140 46 162 36 192 35 C222 34 246 40 268 58 L296 64 C314 67 324 74 324 84 L324 90 C324 94 320 96 316 96 L70 96 C65 96 62 93 62 90 Z" fill="url(#evbody)"/>
+          <g clip-path="url(#evclip)">
+            <path d="M84 70 C140 62 260 60 316 70" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="1.6"/>
+            ${charging ? `<rect class="wave" x="130" y="58" width="40" height="40" fill="${col}" opacity=".0" style="filter:blur(6px)"/>` : ""}
+          </g>
+          <path d="M132 64 C146 50 164 42 188 41 L188 64 Z" fill="url(#evglass)"/><path d="M196 41 C220 41 240 47 258 62 L196 64 Z" fill="url(#evglass)"/>
+          <path d="M148 58 L162 44" stroke="rgba(255,255,255,.35)" stroke-width="3" stroke-linecap="round"/><path d="M210 58 L222 44" stroke="rgba(255,255,255,.25)" stroke-width="2.4" stroke-linecap="round"/>
+          <rect x="304" y="70" width="18" height="4" rx="2" fill="#E0F2FE" style="filter:drop-shadow(0 0 5px #7DD3FC)"/>
+          <rect x="62" y="72" width="9" height="4" rx="2" fill="#F43F6B" style="filter:drop-shadow(0 0 4px #F43F6B)"/>
+          ${plugged ? `<circle class="port" cx="72" cy="76" r="3.4" fill="${charging ? "#34D399" : p.muted}" style="filter:drop-shadow(0 0 5px ${charging ? "#34D399" : "transparent"})"/>` : ""}
+          <rect x="132" y="76" width="126" height="12" rx="6" fill="rgba(11,13,23,.35)" stroke="rgba(255,255,255,.25)" stroke-width="1"/>
+          ${Array.from({ length: cells }, (_, k) => `<rect class="cell ${charging && k === full && k < limCell ? "next" : ""}" x="${135 + k * 12.1}" y="78.5" width="10" height="7" rx="2" fill="${k < full ? "url(#evcell)" : k < limCell ? "rgba(255,255,255,.18)" : "transparent"}" stroke="${k < limCell ? "none" : "rgba(255,255,255,.35)"}" stroke-dasharray="${k < limCell ? "" : "2 2"}"/>`).join("")}
+          ${rim(108)}${rim(280)}
+        </svg>
+      </div>
+      <div class="stat">${stat("Charging at", charging && pw != null ? `${fmt(pw, 1)} kW` : "")}${stat("Full in", toFull != null ? minsText(toFull) : "")}</div>
+      ${chS && chS.entity_id.startsWith("switch.") ? `<button class="big ${charging ? "off" : ""}" data-ch="1"><ha-icon icon="${charging ? "mdi:stop" : "mdi:lightning-bolt"}"></ha-icon>${charging ? "Stop charging" : "Start charging"}</button>` : ""}
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.battery));
+    r.querySelector("[data-ch]")?.addEventListener("click", () => { this.vibrate(); this.call("switch", charging ? "turn_off" : "turn_on", { entity_id: c.charging }); });
+  }
+}
+
+// ------------------------------------------------------------------ Roost Plant
+// A potted plant: the soil darkens with water, the leaves droop when it is thirsty, and it says what it needs.
+const PLANT_RANGES = { moisture: [20, 60], light: [1500, 40000], temperature: [12, 32], conductivity: [350, 2000] };
+class RoostPlant extends RoostBase {
+  static get defaults() { return { color: "green", theme: "auto" }; }
+
+  validate(c) { if (!c.moisture && !c.entity) throw new Error("Choose the plant's soil moisture (or the plant)"); }
+
+  watched() { const c = this._config; return [c.entity, c.moisture, c.light, c.temperature, c.conductivity].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "entity", label: "Plant (optional)", selector: { entity: { domain: "plant" } } }] },
+      { type: "grid", name: "", schema: [{ name: "moisture", label: "Soil moisture", selector: { entity: { domain: "sensor" } } }, { name: "light", selector: { entity: { domain: "sensor" } } }] },
+      { type: "grid", name: "", schema: [{ name: "temperature", selector: { entity: { domain: "sensor" } } }, { name: "conductivity", label: "Food (conductivity)", selector: { entity: { domain: "sensor" } } }] },
+      { type: "grid", name: "", schema: [{ name: "min_moisture", label: "Water when below (%)", selector: { number: { mode: "box" } } }, { name: "max_moisture", label: "Too wet above (%)", selector: { number: { mode: "box" } } }] },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { sample: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), pl = this.sx(c.entity)?.attributes || {};
+    const val = (k) => this.n(c[k]) ?? num(pl[k] ?? (k === "light" ? pl.brightness : undefined));
+    const m = val("moisture"), lo = Number(c.min_moisture) || PLANT_RANGES.moisture[0], hi = Number(c.max_moisture) || PLANT_RANGES.moisture[1];
+    const needs = [];
+    if (m != null && m < lo) needs.push(["Needs water", "mdi:water-alert", "#38BDF8"]);
+    if (m != null && m > hi) needs.push(["Too wet, let it dry", "mdi:water-off", "#38BDF8"]);
+    const li = val("light"); if (li != null && li < PLANT_RANGES.light[0]) needs.push(["Needs more light", "mdi:white-balance-sunny", "#F5B94A"]);
+    const t = val("temperature"); if (t != null && (t < PLANT_RANGES.temperature[0] || t > PLANT_RANGES.temperature[1])) needs.push([t < PLANT_RANGES.temperature[0] ? "Too cold" : "Too hot", "mdi:thermometer-alert", "#FF9F6B"]);
+    const co = val("conductivity"); if (co != null && co < PLANT_RANGES.conductivity[0]) needs.push(["Needs plant food", "mdi:sprout", "#34D399"]);
+    const thirsty = m != null && m < lo, droop = thirsty ? 26 : 0;
+    const wet = m == null ? 0.5 : Math.max(0, Math.min(1, m / 80));
+    const soil = `rgb(${Math.round(150 - wet * 90)},${Math.round(110 - wet * 70)},${Math.round(80 - wet * 50)})`;
+    const leaf = thirsty ? "#9CB86A" : "#34D399";
+    const line = needs.length ? needs.map((x) => x[0]).join(" · ") : "Happy";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, !needs.length)}
+      .mid{display:grid;grid-template-columns:110px minmax(0,1fr);gap:16px;align-items:center}
+      .pot{width:110px;height:130px}
+      .lf{transform-box:fill-box;transform-origin:bottom center;animation:roost-sway 4s ease-in-out infinite}
+      .side{display:flex;flex-direction:column;gap:8px;min-width:0}
+      .need{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;background:${p.inset};font-size:13px;font-weight:600}
+      .need ha-icon{--mdc-icon-size:18px}
+      .ok{color:#34D399}
+      .stat{flex-wrap:nowrap}
+    </style>
+    <div class="card">
+      ${head(thirsty ? "mdi:flower-outline" : "mdi:flower", c.name || this.name(c.entity || c.moisture, "Plant"), line)}
+      <div class="mid">
+        <svg class="pot" viewBox="0 0 110 130" aria-hidden="true">
+          <g transform="translate(55 78)">${[[-34, 0], [-14, 1], [10, 2], [32, 3]].map(([a, i]) => `<path class="lf" style="animation-delay:${i * 0.4}s" d="M0 0 Q${a * 0.4} -30 ${a} ${-46 + Math.abs(a) * 0.5 + droop} Q${a * 0.7} -18 0 0" fill="${leaf}" opacity="${0.85 - i * 0.08}" transform="rotate(${a > 0 ? droop / 2 : -droop / 2})"/>`).join("")}
+            <path d="M0 0 V-40" stroke="${leaf}" stroke-width="3" stroke-linecap="round" transform="rotate(${droop / 3})"/></g>
+          <path d="M22 78 H88 L80 126 H30 Z" fill="${this.dark ? "#B4593E" : "#D9774F"}"/><rect x="18" y="72" width="74" height="12" rx="4" fill="${this.dark ? "#C96748" : "#E58A62"}"/>
+          <ellipse cx="55" cy="78" rx="34" ry="4" fill="${soil}"/>
+          ${thirsty ? '<path d="M92 30 q4 6 0 9 q-4 -3 0 -9" fill="#38BDF8" style="animation:roost-bounce 1.6s ease-in-out infinite"/>' : ""}
+        </svg>
+        <div class="side">
+          ${needs.length ? needs.map(([w, ic, col]) => `<div class="need"><ha-icon icon="${ic}" style="color:${col}"></ha-icon><span class="t">${esc(w)}</span></div>`).join("") : '<div class="need"><ha-icon class="ok" icon="mdi:check-circle"></ha-icon><span class="t">All good</span></div>'}
+          <div class="stat">${stat("Soil", m != null ? `${Math.round(m)}%` : "")}${stat("Light", li != null ? `${fmt(li, 0)} lx` : "")}${stat("Warmth", this.val(c.temperature) || (t != null ? `${fmt(t, decOf(String(t)))}°` : ""))}</div>
+        </div>
+      </div>
+    </div>`;
+    this.shadowRoot.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.moisture || c.entity));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Printer
+// Ink or toner levels as little bottles, or a 3D print growing layer by layer with the nozzle moving, time left and temperatures.
+class RoostPrinter extends ticking(RoostBase, 60000) {
+  static get defaults() { return { kind: "ink", inks: [], color: "purple", theme: "auto" }; }
+
+  validate(c) { if (c.kind === "3d" ? !c.progress && !c.entity : !(c.inks || []).length && !c.entity) throw new Error("Choose the printer's ink levels or print progress"); }
+
+  watched() { const c = this._config; return [c.entity, c.progress, c.remaining, c.nozzle, c.bed, c.camera, ...(c.inks || []).map((i) => i.entity)].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { type: "grid", name: "", schema: [{ name: "kind", label: "Printer", selector: pick([["ink", "Paper printer (ink or toner)"], ["3d", "3D printer"]]) }, { name: "name", selector: { text: {} } }] },
+      { name: "entity", label: "Printer state (optional)", selector: { entity: {} } },
+      { name: "inks", label: "Ink or toner levels", selector: { object: { multiple: true, label_field: "name", fields: {
+        entity: { label: "Level (%)", required: true, selector: { entity: { domain: "sensor" } } }, name: { label: "Name", selector: { text: {} } },
+        color: { label: "Colour", selector: { select: { mode: "dropdown", options: [{ value: "#1F2333", label: "Black" }, { value: "#22D3EE", label: "Cyan" }, { value: "#EC4899", label: "Magenta" }, { value: "#FACC15", label: "Yellow" }, { value: "#94A3B8", label: "Grey" }] } } },
+      } } } },
+      { type: "expandable", name: "", title: "3D printer", icon: "mdi:printer-3d", schema: [
+        { type: "grid", name: "", schema: [{ name: "progress", label: "Progress (%)", selector: { entity: { domain: "sensor" } } }, { name: "remaining", label: "Time left / finishes at", selector: { entity: { domain: "sensor" } } }] },
+        { type: "grid", name: "", schema: [{ name: "nozzle", label: "Nozzle temperature", selector: { entity: { domain: "sensor" } } }, { name: "bed", label: "Bed temperature", selector: { entity: { domain: "sensor" } } }] },
+        { name: "camera", selector: { entity: { domain: ["camera", "image"] } } },
+      ] },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { sample: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), s = this.st();
+    const state = s && !UNAVAILABLE.includes(s.state) ? String(s.state).replace(/_/g, " ") : "";
+    if (c.kind === "3d") {
+      const pr = this.n(c.progress), left = minutesOf(this.sx(c.remaining));
+      const printing = pr != null && pr > 0 && pr < 100 && !/idle|off|paused|error/i.test(state);
+      const layers = 14, done = Math.round(((pr ?? 0) / 100) * layers);
+      const cam = this.sx(c.camera)?.attributes.entity_picture;
+      const line = [state ? state.charAt(0).toUpperCase() + state.slice(1) : printing ? "Printing" : "Idle", printing && left != null ? `${minsText(left)} left` : ""].filter(Boolean).join(" · ");
+      this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, printing)}
+        .mid{display:grid;grid-template-columns:140px minmax(0,1fr);gap:16px;align-items:center}
+        .pr{position:relative;width:140px;height:130px;border-radius:16px;background:${p.inset};overflow:hidden}
+        .pr img{width:100%;height:100%;object-fit:cover}
+        .gan{position:absolute;left:10px;right:10px;top:16px;height:6px;border-radius:3px;background:${p.track}}
+        .noz{position:absolute;top:12px;width:16px;height:18px;margin-left:-8px;border-radius:3px 3px 8px 8px;background:${p.muted};left:30%}
+        ${printing ? ".noz{animation:roost-noz 2.4s ease-in-out infinite}@keyframes roost-noz{0%,100%{left:28%}50%{left:72%}}" : ""}
+        .bed{position:absolute;left:14px;right:14px;bottom:14px;height:5px;border-radius:2px;background:${p.muted}}
+        .lay{position:absolute;left:50%;width:56px;margin-left:-28px;height:5px;border-radius:2px}
+        .side{display:flex;flex-direction:column;gap:10px;min-width:0}
+        .bar{height:8px;border-radius:4px;background:${p.track};overflow:hidden}
+        .bar i{display:block;height:100%;background:linear-gradient(90deg,${g[0]},${g[1]})}
+        .big2{font-size:30px;font-weight:700;font-family:${FONT_NUM}}
+      </style>
+      <div class="card">
+        ${head("mdi:printer-3d", c.name || this.name(c.entity || c.progress, "3D printer"), line)}
+        <div class="mid">
+          <div class="pr" role="img" aria-label="${esc(line)}">${cam ? `<img src="${esc(cam)}" alt="Printer camera">` : `<div class="gan"></div><div class="noz"></div><div class="bed"></div>
+            ${Array.from({ length: done }, (_, i) => `<div class="lay" style="bottom:${19 + i * 6}px;background:${i % 2 ? g[1] : g[0]};width:${56 - Math.abs(i - layers / 2) * 2}px;margin-left:${-(56 - Math.abs(i - layers / 2) * 2) / 2}px"></div>`).join("")}`}</div>
+          <div class="side">
+            <div class="big2" data-tw="pp">${pr != null ? `${Math.round(pr)}%` : ""}</div>
+            ${pr != null ? `<div class="bar"><i data-bar="pp" style="width:${Math.round(pr)}%"></i></div>` : ""}
+            <div class="stat">${stat("Left", printing && left != null ? minsText(left) : "")}${stat("Nozzle", this.val(c.nozzle))}${stat("Bed", this.val(c.bed))}</div>
+          </div>
+        </div>
+      </div>`;
+    } else {
+      const inks = (c.inks || []).map((i) => ({ ...i, v: this.n(i.entity) })).filter((i) => this.sx(i.entity));
+      const low = inks.filter((i) => i.v != null && i.v <= 15);
+      const line = [state ? state.charAt(0).toUpperCase() + state.slice(1) : "", low.length ? `${low.map((i) => i.name || this.name(i.entity)).join(", ")} running low` : inks.length ? "Ink is fine" : ""].filter(Boolean).join(" · ");
+      this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, !low.length)}
+        .inks{display:grid;grid-template-columns:repeat(${Math.max(1, inks.length)},minmax(0,1fr));gap:10px;align-items:end}
+        .ink{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11.5px;color:${p.muted};text-align:center}
+        .bt{position:relative;width:44px;height:86px;border-radius:10px 10px 12px 12px;background:${p.inset};border:1.5px solid ${p.border};overflow:hidden}
+        .bt::before{content:"";position:absolute;left:14px;right:14px;top:-1px;height:8px;border-radius:0 0 4px 4px;background:${p.border}}
+        .bt i{position:absolute;left:0;right:0;bottom:0;transition:height .12s}
+        .bt i::after{content:"";position:absolute;left:0;right:0;top:-3px;height:6px;border-radius:50%;background:inherit;filter:brightness(1.2)}
+        .ink b{font-size:13px;color:${p.text};font-family:${FONT_NUM}}
+        .ink.low b{color:#F43F6B}
+      </style>
+      <div class="card">
+        ${head("mdi:printer", c.name || this.name(c.entity, "Printer"), line)}
+        <div class="inks">${inks.map((i, k) => { const col = i.color || ["#1F2333", "#22D3EE", "#EC4899", "#FACC15"][k % 4]; return `<div class="ink ${i.v != null && i.v <= 15 ? "low" : ""}"><div class="bt"><i style="height:${Math.max(3, i.v ?? 0)}%;background:${col === "#1F2333" && this.dark ? "#5A6199" : col}"></i></div><b>${i.v != null ? `${Math.round(i.v)}%` : ""}</b><span class="t">${esc(i.name || this.name(i.entity).replace(/ink|toner|level/gi, "").trim())}</span></div>`; }).join("")}</div>
+      </div>`;
+    }
+    this.shadowRoot.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.entity || c.progress || c.inks?.[0]?.entity));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Moments
+// The day in moments (morning, work, evening, bedtime): the card suggests the scene for now, and shows the rest of the day as a strip.
+class RoostMoments extends ticking(RoostBase, 60000) {
+  static get defaults() {
+    return { color: "purple", moments: [
+      { name: "Morning", icon: "mdi:weather-sunset-up", from: "05:30" }, { name: "Day", icon: "mdi:white-balance-sunny", from: "09:00" },
+      { name: "Evening", icon: "mdi:weather-sunset-down", from: "17:30" }, { name: "Bedtime", icon: "mdi:weather-night", from: "22:00" }], theme: "auto" };
+  }
+
+  validate(c) { if (!(c.moments || []).length) throw new Error("Add the moments of your day"); }
+
+  watched() { return (this._config.moments || []).map((m) => m.entity).filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "name", selector: { text: {} } },
+      { name: "moments", label: "Moments (each starts at its time and lasts until the next)", selector: { object: { multiple: true, label_field: "name", fields: {
+        name: { label: "Name", required: true, selector: { text: {} } }, icon: { label: "Icon", selector: { icon: {} } },
+        from: { label: "Starts at (HH:MM)", required: true, selector: { text: {} } },
+        entity: { label: "Scene or script to suggest", selector: { entity: { domain: ["scene", "script", "automation"] } } },
+        tap_action: { label: "Or what to do", selector: { ui_action: {} } },
+      } } } },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return {}; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), now = new Date();
+    const mins = (t) => { const m = String(t || "").match(/^(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : 0; };
+    const list = [...(c.moments || [])].map((m, i) => ({ ...m, i, at: mins(m.from) })).sort((a, b) => a.at - b.at);
+    const nowM = now.getHours() * 60 + now.getMinutes();
+    let cur = list.filter((m) => m.at <= nowM).pop() || list[list.length - 1];
+    const next = list[(list.indexOf(cur) + 1) % list.length];
+    const toNext = ((next.at - nowM + 1440) % 1440) || 1440;
+    const what = cur.entity ? this.name(cur.entity) : cur.tap_action ? "Run it" : "";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, true)}
+      .now{display:flex;align-items:center;gap:14px;padding:14px;border-radius:18px;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 14px 28px -14px ${g[2]}}
+      .now ha-icon{--mdc-icon-size:30px}
+      .now .w{flex:1;min-width:0}
+      .now b{display:block;font-size:20px;font-family:${FONT_NUM}}
+      .now span{font-size:12.5px;opacity:.9}
+      .go{height:40px;padding:0 14px;border-radius:999px;border:0;background:rgba(255,255,255,.22);color:inherit;font:inherit;font-weight:700;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;flex:none}
+      .strip{display:flex;gap:6px}
+      .m{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:14px;background:${p.inset};border:0;color:${p.muted};font:inherit;font-size:11.5px;cursor:pointer;text-align:center}
+      .m ha-icon{--mdc-icon-size:20px}
+      .m.on{background:${g[0]}33;color:${p.text};font-weight:600}
+      .m small{font-size:10.5px;opacity:.8}
+    </style>
+    <div class="card">
+      ${head("mdi:clock-time-four-outline", c.name || "Right now", `${cur.name} until ${next.from} · ${minsText(toNext)} left`)}
+      <div class="now"><ha-icon icon="${esc(cur.icon || "mdi:star-four-points")}"></ha-icon><div class="w"><b class="t">${esc(cur.name)}</b><span class="t">${what ? `Suggested: ${esc(what)}` : `Next: ${esc(next.name)} at ${esc(next.from)}`}</span></div>
+        ${cur.entity || cur.tap_action ? '<button class="go" data-go="1"><ha-icon icon="mdi:play" style="--mdc-icon-size:18px"></ha-icon>Go</button>' : ""}</div>
+      <div class="strip">${list.map((m) => `<button class="m ${m === cur ? "on" : ""}" data-m="${m.i}"><ha-icon icon="${esc(m.icon || "mdi:star-four-points")}"></ha-icon><span class="t">${esc(m.name)}</span><small>${esc(m.from)}</small></button>`).join("")}</div>
+    </div>`;
+    const go = (m) => { this.vibrate(); if (m.tap_action) return this.run(m.tap_action, m.entity); if (!m.entity) return undefined; const d = m.entity.split(".")[0]; return this.call(d, d === "automation" ? "trigger" : "turn_on", { entity_id: m.entity }); };
+    const r = this.shadowRoot;
+    r.querySelector("[data-go]")?.addEventListener("click", () => go(cur));
+    r.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => go(c.moments[+b.dataset.m])));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Family Map
+// Where everyone is, drawn simply (no map tiles, nothing leaves the house): home in the middle, places as circles, people as faces with how far away.
+class RoostFamilyMap extends RoostBase {
+  static get defaults() { return { entities: [], zones: [], color: "active", theme: "auto" }; }
+
+  validate(c) { if (!(c.entities || []).length) throw new Error("Pick the people"); }
+
+  watched() { const c = this._config; return [...(c.entities || []), ...(c.zones || [])]; }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "entities", label: "People", selector: { entity: { multiple: true, domain: ["person", "device_tracker"] } } },
+      { name: "zones", label: "Places to draw (home is always there)", selector: { entity: { multiple: true, domain: "zone" } } },
+      { name: "name", selector: { text: {} } },
+      THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig(hass) { return { entities: Object.keys(hass.states).filter((i) => i.startsWith("person.")).slice(0, 4) }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, h = this._hass;
+    const homeZ = this.sx(c.zone_home || "zone.home") || this.sx("zone.sample_home");
+    const lat0 = num(homeZ?.attributes.latitude) ?? h.config?.latitude ?? 0, lon0 = num(homeZ?.attributes.longitude) ?? h.config?.longitude ?? 0;
+    const km = (lat, lon) => { const x = (lon - lon0) * 111.32 * Math.cos((lat0 * Math.PI) / 180), y = (lat - lat0) * 110.57; return [x, y]; };
+    const people = (c.entities || []).map((id, k) => { const s = this.sx(id); if (!s) return null; const a = s.attributes; const has = num(a.latitude) != null; const [x, y] = has ? km(a.latitude, a.longitude) : [0, 0]; return { id, s, x, y, has, d: Math.hypot(x, y), k }; }).filter(Boolean);
+    const zones = [homeZ, ...(c.zones || []).map((z) => this.sx(z))].filter(Boolean).map((z) => { const [x, y] = km(z.attributes.latitude, z.attributes.longitude); return { z, x, y, r: (num(z.attributes.radius) || 100) / 1000 }; });
+    const far = Math.max(1, ...people.map((q) => q.d), ...zones.map((z) => Math.hypot(z.x, z.y) + z.r)) * 1.25;
+    const P = (x, y) => [50 + (x / far) * 46, 50 - (y / far) * 46];
+    const PG = [["#38BDF8", "#6D4BFF"], ["#FF5577", "#FF9F6B"], ["#10B981", "#6EE7B7"], ["#F59E0B", "#FDE68A"]];
+    const where = (q) => { const st = q.s.state; return st === "home" ? "Home" : st === "not_home" ? (q.has ? `${fmt(q.d, q.d < 10 ? 1 : 0)} km away` : "Away") : UNAVAILABLE.includes(st) ? "No location yet" : String(st).replace(/_/g, " "); };
+    const homeN = people.filter((q) => q.s.state === "home").length;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, ACTIVE, homeN > 0)}
+      .map{position:relative;height:240px;border-radius:18px;overflow:hidden;background:${p.inset};
+        background-image:radial-gradient(circle at 50% 50%,${ACTIVE[0]}22 0,transparent 60%),linear-gradient(${this.dark ? "rgba(255,255,255,.035)" : "rgba(40,48,96,.05)"} 1px,transparent 1px),linear-gradient(90deg,${this.dark ? "rgba(255,255,255,.035)" : "rgba(40,48,96,.05)"} 1px,transparent 1px);background-size:auto,24px 24px,24px 24px}
+      .rg{position:absolute;left:50%;top:50%;border-radius:50%;border:1px dashed ${p.border};transform:translate(-50%,-50%)}
+      .zn{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:${p.muted}}
+      .zn i{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:${p.off};border:1.5px solid ${p.border}}
+      .zn ha-icon{--mdc-icon-size:18px}
+      .pp{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;transition:left .12s,top .12s;cursor:pointer}
+      .av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:14px;border:2.5px solid ${this.dark ? "#0B0D17" : "#fff"};overflow:hidden;box-shadow:0 6px 14px -6px rgba(0,0,0,.5)}
+      .av img{width:100%;height:100%;object-fit:cover}
+      .pp span{font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:999px;background:${this.dark ? "rgba(11,13,23,.75)" : "rgba(255,255,255,.85)"};color:${p.text};white-space:nowrap}
+      .list{display:flex;flex-direction:column;gap:6px}
+      .row{display:flex;align-items:center;gap:10px;font-size:13px}
+      .row .av{width:28px;height:28px;font-size:12px;border-width:0}
+      .row b{flex:1;font-weight:600}
+      .row > span:last-child{color:${p.muted}}
+    </style>
+    <div class="card">
+      ${head("mdi:map-marker-radius", c.name || "Family", `${homeN ? `${homeN} at home` : "No one at home"}${people.length - homeN ? ` · ${people.length - homeN} out` : ""}`)}
+      <div class="map" role="img" aria-label="Where everyone is">
+        ${[0.33, 0.66].map((f) => `<span class="rg" style="width:${f * 92}%;aspect-ratio:1"></span>`).join("")}
+        ${zones.map((z, i) => { const [x, y] = P(z.x, z.y); return `<div class="zn" style="left:${x}%;top:${y}%"><i><ha-icon icon="${esc(z.z.attributes.icon || (i === 0 ? "mdi:home" : "mdi:map-marker"))}"></ha-icon></i><span class="t">${esc(z.z.attributes.friendly_name || "")}</span></div>`; }).join("")}
+        ${people.map((q, i) => { let [x, y] = P(q.x, q.y); const homeOnes = people.filter((o) => o.s.state === "home" || !o.has);
+          if (q.s.state === "home" || !q.has) { const j = homeOnes.indexOf(q); [x, y] = P(0, 0); x += (j - (homeOnes.length - 1) / 2) * 13; y += 17; }
+          else if (zones.some((z) => (z.z.attributes.friendly_name || "") === q.s.state)) { x += 9; y -= 10; }
+          else if (Math.hypot(...P(q.x, q.y).map((v, k) => v - P(0, 0)[k])) < 14) { const [hx, hy] = P(0, 0); const a = Math.atan2(y - hy, x - hx); x = hx + Math.cos(a) * 16; y = hy + Math.sin(a) * 16; } const pic = q.s.attributes.entity_picture; const nm = this.name(q.id).split(" ")[0]; return `<div class="pp" data-p="${esc(q.id)}" data-glide="${esc(q.id)}" style="left:${x}%;top:${y}%"><span class="av" style="background:linear-gradient(135deg,${PG[q.k % 4][0]},${PG[q.k % 4][1]})">${pic ? `<img src="${esc(pic)}" alt="">` : esc(nm.charAt(0))}</span>${homeOnes.includes(q) && homeOnes.length > 1 ? "" : `<span class="t">${esc(nm)}</span>`}</div>`; }).join("")}
+      </div>
+      <div class="list">${people.map((q) => `<div class="row"><span class="av" style="background:linear-gradient(135deg,${PG[q.k % 4][0]},${PG[q.k % 4][1]})">${esc(this.name(q.id).charAt(0))}</span><b class="t">${esc(this.name(q.id))}</b><span class="t">${esc(where(q))}</span></div>`).join("")}</div>
+    </div>`;
+    this.shadowRoot.querySelectorAll("[data-p]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.p)));
+    this.shadowRoot.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.entities[0]));
+  }
+}
+
 // ------------------------------------------------------------------ Roost Lock
 // A lock (or garage door): slide to open, tap to lock. Says when it is jammed, and can show the door's sensor.
 class RoostLock extends RoostBase {
@@ -5199,7 +6333,7 @@ class RoostLock extends RoostBase {
     const busy = ["locking", "unlocking", "opening", "closing"].includes(st);
     const jam = st === "jammed";
     const g = jam ? COLORS.coral : shut ? this.colour() : COLORS.amber;
-    const ds = this.st(c.door);
+    const ds = this.sx(c.door);
     const word = !s ? "Not found" : jam ? "Jammed" : { locked: "Locked", unlocked: "Unlocked", locking: "Locking", unlocking: "Unlocking", open: "Open", closed: "Closed", opening: "Opening", closing: "Closing" }[st] || st;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px}
@@ -5467,7 +6601,7 @@ class RoostCamera extends RoostBase {
   refreshImg() { const img = this.shadowRoot?.querySelector("img.pic"); if (img && !document.hidden) img.src = this.url(); }
 
   ringing() {
-    const c = this._config, d = this.st(c.doorbell);
+    const c = this._config, d = this.sx(c.doorbell);
     if (!d) return false;
     if (d.entity_id.startsWith("event.")) return !UNAVAILABLE.includes(d.state) && Date.now() - new Date(d.state) < c.ring_minutes * 60000;
     // ringing now, or rang in the last few minutes
@@ -5553,7 +6687,7 @@ class RoostSensors extends RoostBase {
       .warn ha-icon{animation:roost-breathe 1.6s ease-in-out infinite}
     </style>
     <div class="grid">${this.items().map((it) => {
-      const s = this.st(it.entity), v = s ? num(s.state) : null, dc = s?.attributes.device_class;
+      const s = this.sx(it.entity), v = s ? num(s.state) : null, dc = s?.attributes.device_class;
       const warn = v != null && ((it.above != null && it.above !== "" && v > it.above) || (it.below != null && it.below !== "" && v < it.below));
       const g = warn ? COLORS.coral : tint[dc] || COLORS.purple;
       const unit = s?.attributes.unit_of_measurement || "";
@@ -5624,7 +6758,7 @@ class RoostButtons extends RoostBase {
       .b.done ha-icon{animation:roost-pulse .5s ease-out 1}
     </style>
     <div class="bar">${c.items.map((it, i) => {
-      const s = this.st(it.entity), on = s && !UNAVAILABLE.includes(s.state) && !OFF_STATES.includes(s.state);
+      const s = this.sx(it.entity), on = s && !UNAVAILABLE.includes(s.state) && !OFF_STATES.includes(s.state);
       return `<button class="b ${on ? "on" : ""}" data-i="${i}" data-pop="${on ? 1 : 0}" data-popkey="${i}" aria-label="${esc(it.name || it.icon)}"><ha-icon icon="${esc(it.icon)}"></ha-icon>${c.show_names && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</button>`;
     }).join("")}</div>`;
     this.shadowRoot.querySelectorAll(".b").forEach((b) => {
@@ -5788,8 +6922,9 @@ class RoostPage extends RoostBase {
 
   async build() {
     const helpers = window.loadCardHelpers ? await window.loadCardHelpers() : null;
-    this._cards = (this._config.cards || []).map((cfg) => {
+    this._cards = (this._config.cards || []).map((cfg0) => {
       let el;
+      const cfg = withTheme(cfg0, this._config.theme);
       try {
         el = helpers ? helpers.createCardElement(cfg) : document.createElement(String(cfg.type || "").replace(/^custom:/, ""));
         if (!helpers) el.setConfig?.(cfg);
@@ -5959,7 +7094,7 @@ class RoostPanel extends RoostPage {
     this._hass = hass;
     if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
     (this._cards || []).forEach((el) => { el.hass = hass; });
-    const rows = this.watched().map((id) => this.st(id)?.state).join("|");
+    const rows = this.watched().map((id) => this.sx(id)?.state).join("|");
     const sig = `${this.dark ? 1 : 0}|${this._built ? 1 : 0}|${rows}|${this._isOpen ? 1 : 0}`;
     if (sig === this._sig) return;
     this._sig = sig;
@@ -5968,7 +7103,7 @@ class RoostPanel extends RoostPage {
 
   // One row per device: icon in a box, name, and its state in colour (like the original "Security" box).
   row(e) {
-    const id = typeof e === "string" ? e : e?.entity, s = this.st(id), p = this.p;
+    const id = typeof e === "string" ? e : e?.entity, s = this.sx(id), p = this.p;
     const d = id.split(".")[0], cls = s?.attributes.device_class;
     const name = (typeof e === "object" && e.name) || s?.attributes.friendly_name || id;
     let icon = (typeof e === "object" && e.icon) || null, col = p.muted, word = !s ? "Not found" : UNAVAILABLE.includes(s.state) ? "Offline" : s.state, wc = p.muted;
@@ -6052,6 +7187,18 @@ const CARDS = [
   ["roost-energy", RoostEnergy, "Roost Energy", "Power used now, today against yesterday, and the hungriest devices."],
   ["roost-timer", RoostTimer, "Roost Timer", "A countdown ring for a timer, with start, pause, cancel and quick times."],
   ["roost-fan", RoostFan, "Roost Fan", "A fan that spins as fast as it is set, with speed buttons, swing and modes."],
+  ["roost-air", RoostAir, "Roost Air", "An air purifier or a room's air: a ring coloured by how clean the air is, air drawn in while it runs, mode, speed and filter."],
+  ["roost-water-heater", RoostWaterHeater, "Roost Water Heater", "A water tank that shows how hot it is, bubbles while it heats, the set temperature and “heat for 30 min”."],
+  ["roost-doorbell", RoostDoorbell, "Roost Doorbell", "The door camera, a banner when someone rings, the last rings and the door lock."],
+  ["roost-laundry", RoostLaundry, "Roost Laundry", "A washer, dryer or dishwasher: the drum turns, the steps of the cycle, time left and “ready to unload”."],
+  ["roost-garage", RoostGarage, "Roost Garage", "A garage door that rolls up (or a gate that slides or swings), how long it is open, and a warning when it stays open."],
+  ["roost-flow", RoostFlow, "Roost Energy Flow", "Sun, house, battery and grid with power flowing between them."],
+  ["roost-irrigation", RoostIrrigation, "Roost Irrigation", "Garden zones: tap to water, see what is watering and skip when rain is coming."],
+  ["roost-ev", RoostEV, "Roost Car", "An electric car charging: battery, range, charging power, limit and when it will be full."],
+  ["roost-plant", RoostPlant, "Roost Plant", "A potted plant that droops when thirsty and says what it needs: water, light, warmth or food."],
+  ["roost-printer", RoostPrinter, "Roost Printer", "Ink or toner levels as little bottles, or a 3D print growing layer by layer."],
+  ["roost-moments", RoostMoments, "Roost Moments", "Your day in moments (morning, evening, bedtime) with the scene that fits right now."],
+  ["roost-family", RoostFamilyMap, "Roost Family Map", "Where everyone is, drawn simply around home: places as circles, people as faces, how far away."],
   ["roost-vacuum", RoostVacuum, "Roost Vacuum", "A robot vacuum on its little floor: cleans in lanes, mops, spirals, goes home and charges. Rooms, suction, mop settings, care of its brushes and its map."],
   ["roost-lock", RoostLock, "Roost Lock", "A lock or garage door: slide to open, tap to lock."],
   ["roost-agenda", RoostAgenda, "Roost Agenda", "Today's and the next days' calendar events. Bin day stands out."],

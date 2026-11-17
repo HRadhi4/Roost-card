@@ -436,6 +436,148 @@ actions:                # optional: what a key does instead (YAML only)
   ok: { action: perform-action, perform_action: remote.send_command, target: { entity_id: remote.tv }, data: { command: select } }
 ```
 
+### Roost Air
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/air.gif" width="320" alt="Roost air card in action">
+
+```yaml
+type: custom:roost-air
+entity: fan.air_purifier        # optional: the purifier (on/off, mode, speed)
+air: sensor.living_room_pm25    # PM2.5, an air quality index or CO₂
+scale: auto                     # auto, pm25, aqi or co2
+filter: sensor.purifier_filter_life
+temperature: sensor.living_room_temperature
+humidity: sensor.living_room_humidity
+```
+
+### Roost Water Heater
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/water-heater.gif" width="320" alt="Roost water heater card in action">
+
+```yaml
+type: custom:roost-water-heater
+entity: water_heater.boiler     # or a switch, with temperature: sensor.boiler_water
+timer: timer.boiler             # optional: “heat for” starts this timer; an automation turns the heater off when it ends
+boost: [30, 60]                 # the “heat for” buttons, in minutes
+```
+
+### Roost Doorbell
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/doorbell.gif" width="320" alt="Roost doorbell card in action">
+
+```yaml
+type: custom:roost-doorbell
+camera: camera.front_door
+ring: binary_sensor.doorbell    # or event.doorbell
+motion: binary_sensor.front_door_person   # optional
+lock: lock.front_door           # optional: tap twice to unlock
+```
+
+### Roost Laundry
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/laundry.gif" width="320" alt="Roost laundry card in action">
+
+```yaml
+type: custom:roost-laundry
+kind: washer                    # washer, dryer or dishwasher
+entity: sensor.washer_state     # its state, a power reading (with power_on: 5) or a switch
+remaining: sensor.washer_time_left   # minutes left, or the finish time
+progress: sensor.washer_progress
+stage: sensor.washer_stage      # wash, rinse, spin…
+```
+
+### Roost Garage
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/garage.gif" width="320" alt="Roost garage card in action">
+
+```yaml
+type: custom:roost-garage
+entity: cover.garage_door       # or a switch / button with sensor: binary_sensor.garage_open
+style: garage                   # garage, gate (slides) or swing (two wings)
+warn_after: 10                  # minutes open before it turns red
+```
+
+### Roost Energy Flow
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/flow.gif" width="320" alt="Roost energy flow card in action">
+
+```yaml
+type: custom:roost-flow
+solar: sensor.solar_power
+home: sensor.house_power
+grid: sensor.grid_power         # + buying, − selling (grid_invert: true if yours is the other way)
+battery: sensor.battery_power   # + giving, − charging (battery_invert: true if the other way)
+battery_level: sensor.battery_level
+```
+
+### Roost Irrigation
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/irrigation.gif" width="320" alt="Roost irrigation card in action">
+
+```yaml
+type: custom:roost-irrigation
+minutes: 10                     # tap a zone to water it this long
+timer: timer.garden             # optional: an automation closes the valve when it ends
+rain: sensor.rain_today         # mm, or a rain sensor: “no need to water today”
+zones:
+  - { entity: valve.front_lawn, name: Front lawn, icon: mdi:grass }
+  - { entity: switch.flower_beds, name: Flower beds, icon: mdi:flower-tulip }
+```
+
+### Roost Car
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/ev.gif" width="320" alt="Roost car card in action">
+
+```yaml
+type: custom:roost-ev
+battery: sensor.car_battery
+range: sensor.car_range
+power: sensor.charger_power
+charging: switch.car_charging   # a switch shows Start / Stop charging
+plugged: binary_sensor.car_plugged_in
+limit: number.car_charge_limit
+capacity: 64                    # battery size in kWh, for “full in”
+```
+
+### Roost Plant
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/plant.gif" width="320" alt="Roost plant card in action">
+
+```yaml
+type: custom:roost-plant
+name: Monstera
+moisture: sensor.monstera_moisture
+light: sensor.monstera_illuminance
+temperature: sensor.monstera_temperature
+conductivity: sensor.monstera_conductivity
+min_moisture: 20
+```
+
+### Roost Printer
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/printer.gif" width="320" alt="Roost printer card in action">
+
+```yaml
+type: custom:roost-printer
+kind: ink                       # ink (paper printer) or 3d
+entity: sensor.printer_status
+inks:
+  - { entity: sensor.printer_black, color: "#1F2333" }
+  - { entity: sensor.printer_cyan, color: "#22D3EE" }
+# 3D printer: progress, remaining, nozzle, bed, camera
+```
+
+### Roost Moments
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/moments.gif" width="320" alt="Roost moments card in action">
+
+```yaml
+type: custom:roost-moments
+moments:
+  - { name: Morning, icon: mdi:weather-sunset-up, from: "05:30", entity: scene.morning }
+  - { name: Evening, icon: mdi:weather-sunset-down, from: "17:30", entity: scene.evening }
+  - { name: Bedtime, icon: mdi:weather-night, from: "22:00", entity: scene.good_night }
+```
+
+### Roost Family Map
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/family.gif" width="320" alt="Roost family map card in action">
+
+Nothing leaves the house: there are no map pictures, only home, your places and the people.
+```yaml
+type: custom:roost-family
+entities: [person.saeed, person.layla, person.daniel]
+zones: [zone.work, zone.school]
+```
+
 ### Roost Vacuum
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/vacuum.gif" width="320" alt="Roost vacuum card in action">
 

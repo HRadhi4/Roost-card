@@ -2,6 +2,30 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.5.0
+- **Twelve new cards**:
+  - **Air** (purifier and air quality);
+  - **Water Heater**;
+  - **Doorbell**;
+  - **Laundry** (washer, dryer, dishwasher);
+  - **Garage** (door or gate);
+  - **Energy Flow** (sun, house, battery, grid);
+  - **Irrigation**;
+  - **Car** (electric car charging);
+  - **Plant**;
+  - **Printer** (ink or 3D);
+  - **Moments** (the right scene for now);
+  - **Family Map**.
+
+  Each has sample data, so you can try it without the device.
+- **Clock**: the flip face now really flips, half by half, like a split-flap clock.
+- **Design check of every card**, in light and dark:
+  - Readings that are times (such as sunrise) no longer show as the number 2026.
+  - A setting left empty no longer borrows the card's main device by mistake.
+  - Light card colour chips stay on one row.
+  - Cards inside a Roost Page, Panel or Rooms follow its light/dark setting.
+  - Timer: the knob no longer covers the word under the time.
+
 ## 1.4.0
 - **New: Roost Vacuum**, a full card for robot vacuums.
   - The robot is drawn from above, like the common models: round with a laser tower (Roborock, Dreame, Xiaomi, Eufy X, Tapo), tower at the back (Ecovacs), hidden tower (Dreame X40/X50), round without a tower (Roomba, Eufy G, Shark ION), Shark AI, flat front (Roomba s9, Neato) and slim discs (Eufy 11S/30C). It picks the right one from the brand, or you can use your own picture.
