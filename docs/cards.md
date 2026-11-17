@@ -75,11 +75,12 @@ background: solid     # solid, glass or none
 type: custom:roost-thermostat
 entity: climate.living_room
 sensor: sensor.living_room_temperature   # optional, shows "Room 27.5°"
-color: blue
+style: nest              # nest (like the phone dashboard: glows, with a breeze while it runs) or classic
+color: blue              # classic only
 modes: [cool, dry, fan_only, heat_cool]
 show_power: true
 show_plus_minus: true
-max_width: 260           # dial size in px
+max_width: 250           # dial size in px
 ```
 Drag the knob or tap anywhere on the ring. The number follows your finger, and the temperature is sent when you let go.
 

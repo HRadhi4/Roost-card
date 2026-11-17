@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.3.3";
+const ROOST_VERSION = "1.3.4";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -882,7 +882,7 @@ class RoostChips extends RoostBase {
 // ------------------------------------------------------------------ Roost Thermostat
 class RoostThermostat extends RoostBase {
   static get defaults() {
-    return { color: "blue", show_power: true, show_plus_minus: true, modes: ["cool", "dry", "fan_only", "heat_cool", "auto"], max_width: 260, theme: "auto", radius: 24 };
+    return { style: "nest", color: "blue", show_power: true, show_plus_minus: true, modes: ["cool", "dry", "fan_only", "heat_cool", "auto"], theme: "auto", radius: 24 };
   }
 
   validate(c) { if (!c.entity) throw new Error("Choose an air conditioner or thermostat"); }
@@ -897,6 +897,7 @@ class RoostThermostat extends RoostBase {
         { name: "entity", required: true, selector: { entity: { domain: "climate" } } },
         { name: "name", selector: { text: {} } },
         { name: "sensor", selector: { entity: { domain: "sensor", device_class: "temperature" } } },
+        { name: "style", label: "Look", selector: pick([["nest", "Nest dial, like the phone dashboard (glows and breathes when on)"], ["classic", "Classic (your own dial colour)"]]) },
         { type: "expandable", name: "", title: "Colour and size", icon: "mdi:palette", schema: [
           ...colourFields("color", "Dial colour"),
           { name: "max_width", selector: { number: { min: 160, max: 360, step: 10, mode: "slider", unit_of_measurement: "px" } } },
@@ -930,8 +931,11 @@ class RoostThermostat extends RoostBase {
 
   render() {
     if (!this._hass || !this._config) return;
-    const c = this._config, p = this.p, g = this.colour();
+    const c = this._config, p = this.p, nest = c.style !== "classic";
+    // The Nest look is the phone dashboard's own dial: cyan to purple, fixed colours, a breeze while it runs.
+    const g = nest ? ["#38BDF8", "#A78BFA", "rgba(90,110,255,.9)", "#FFFFFF"] : this.colour();
     const { s, a, un, on, mn, mx, set, modes } = this.info;
+    const maxW = c.max_width || (nest ? 250 : 260);
     const shown = this._value ?? set ?? 24;
     const f = Math.max(0, Math.min(1, (shown - mn) / (mx - mn)));
     const R = 96, C = 2 * Math.PI * R, L = C * 0.75, th = ((135 + 270 * f) * Math.PI) / 180;
@@ -945,35 +949,41 @@ class RoostThermostat extends RoostBase {
     const room = roomV != null && !isNaN(roomV) ? Number(roomV).toFixed(1) : null; // never show "—"
     const noTemp = !un && set == null;
     const modeName = { cool: "Cool", heat: "Heat", dry: "Dry", fan_only: "Fan", heat_cool: "Auto", auto: "Auto" };
-    const status = un ? "Offline" : on ? `${modeName[s.state] || s.state} · running` : "Off";
+    const status = un ? "Offline" : on ? `${nest ? s.state.replace("_only", "").replace("heat_cool", "auto") : modeName[s.state] || s.state} · running` : "Off";
+    const breeze = nest && on ? [100, 125, 150].map((x, i) => `<rect x="${x - 1}" y="70" width="2" height="12" rx="1" fill="${this.dark ? "#9CD8FF" : "#1E5FB8"}" style="animation:roost-breathe 1.4s ease-in-out ${i * 0.4}s infinite"/>`).join("") : "";
+    const pillOn = nest ? `background:${this.dark ? "#1F3A66" : "#DCEBFF"};color:${this.dark ? "#9CD8FF" : "#1E5FB8"}` : `background:${g[0]}33;color:${g[1]}`;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .card{${c.plain ? `padding:0;background:none;border:0;color:${p.text}` : `border-radius:${c.radius}px;padding:18px;background:${p.panel};${p.fx || ""};border:1px solid ${p.border};color:${p.text}`}}
+      .card{${c.plain ? `padding:0;background:none;border:0;color:${p.text}` : `border-radius:${c.radius}px;padding:${nest ? 24 : 18}px;background:${p.panel};${p.fx || ""};border:1px solid ${p.border};color:${p.text}`}}
       .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
       .hd .n{font-size:15px;font-weight:600}
-      .pill{font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;background:${on ? `${g[0]}33` : p.inset};color:${on ? g[1] : p.muted}}
-      svg{width:100%;max-width:${c.max_width}px;display:block;margin:4px auto;touch-action:none;user-select:none;-webkit-user-select:none;cursor:${noTemp || un ? "default" : "pointer"}}
+      .pill{font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;${on ? pillOn : `background:${p.inset};color:${p.muted}`}}
+      svg{width:100%;max-width:${maxW}px;display:block;margin:${nest ? "10px auto 0" : "4px auto"};touch-action:none;user-select:none;-webkit-user-select:none;cursor:${noTemp || un ? "default" : "pointer"}}
       svg.on{animation:roost-arc 3s ease-in-out infinite}
-      .ctl{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-top:6px}
+      svg.drag #val{fill:#C084FC}
+      .ctl{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-top:${nest ? 10 : 6}px}
       @container (max-width: 260px){:host .ctl{gap:8px}}
       .rb{width:min(52px,24cqw);height:min(52px,24cqw);border-radius:50%;border:0;background:${p.inset};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer}
-      .rb.pw{width:min(64px,30cqw);height:min(64px,30cqw);background:${on ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${on ? "#fff" : p.text};box-shadow:${on ? `0 12px 28px -10px ${g[2]}` : "none"}}
+      .rb.pw{width:min(${nest ? 68 : 64}px,30cqw);height:min(${nest ? 68 : 64}px,30cqw);background:${on ? (nest ? "linear-gradient(135deg,#2F6BFF,#8B6CFF)" : `linear-gradient(135deg,${g[0]},${g[1]})`) : p.inset};color:${on ? "#fff" : nest ? p.muted : p.text};box-shadow:${on ? (nest ? "0 14px 30px -8px rgba(90,110,255,.9)" : `0 12px 28px -10px ${g[2]}`) : "none"}}
+      ${nest ? ".rb.pw ha-icon{--mdc-icon-size:28px}" : ""}
       .rb:active{transform:scale(.94)}
       .mi{justify-self:end}.pl{justify-self:start}
-      .modes{display:grid;grid-template-columns:repeat(${Math.max(1, modes.length)},minmax(0,1fr));gap:8px;margin-top:14px}
+      .modes{display:grid;grid-template-columns:repeat(${Math.max(1, modes.length)},minmax(0,1fr));gap:8px;margin-top:${nest ? 8 : 14}px}
       @container (max-width: 300px){:host .modes{grid-template-columns:repeat(2,minmax(0,1fr))}}
       .md{min-height:42px;border-radius:14px;border:0;background:${p.inset};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:6px 4px}
-      .md.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]}}
+      .md.on{background:${nest ? "linear-gradient(135deg,#2F6BFF,#38BDF8)" : `linear-gradient(135deg,${g[0]},${g[1]})`};color:${nest ? "#fff" : g[3]}}
+      ${nest ? ".md{min-height:0;padding:10px 0}" : ""}
     </style>
     <div class="card">
       <div class="hd"><span class="n t">${esc(this.name(c.entity))}</span><span class="pill">${esc(status)}</span></div>
       <svg viewBox="0 0 250 250" class="${on ? "on" : ""}">
-        <defs><linearGradient id="gon" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/></linearGradient>
+        <defs><linearGradient id="gon" x1="0" y1="1" x2="1" y2="0">${nest ? '<stop offset="0" stop-color="#38BDF8"/><stop offset=".55" stop-color="#6D4BFF"/><stop offset="1" stop-color="#C084FC"/>' : `<stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/>`}</linearGradient>
         <linearGradient id="goff" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${p.offArc[0]}"/><stop offset="1" stop-color="${p.offArc[1]}"/></linearGradient></defs>
         ${ticks}
         <circle cx="125" cy="125" r="${R}" fill="none" stroke="${p.track}" stroke-width="16" stroke-linecap="round" stroke-dasharray="${L.toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 125 125)"/>
         <circle id="arc" cx="125" cy="125" r="${R}" fill="none" stroke="url(#${on ? "gon" : "goff"})" stroke-width="16" stroke-linecap="round" stroke-dasharray="${(L * f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(135 125 125)"/>
         ${noTemp ? "" : `<circle id="knob" cx="${(125 + R * Math.cos(th)).toFixed(1)}" cy="${(125 + R * Math.sin(th)).toFixed(1)}" r="11" fill="#fff" stroke="rgba(255,255,255,.25)" stroke-width="6"/>`}
         <circle cx="125" cy="125" r="70" fill="${p.dial}"/>
+        ${breeze}
         <text id="lab" x="125" y="104" text-anchor="middle" font-size="10" letter-spacing="1.5" fill="${p.muted}">${un ? "" : noTemp ? (room != null ? "ROOM" : "") : "SET TO"}</text>
         <text id="val" x="125" y="146" text-anchor="middle" font-size="${un || (noTemp && room == null) ? 22 : 44}" font-weight="700" fill="${p.text}">${un ? "Offline" : noTemp ? (room != null ? `${room}°` : "No setting") : `${shown}°`}</text>
         <text x="125" y="168" text-anchor="middle" font-size="12" fill="${p.muted}">${noTemp || room == null ? "" : `Room ${room}°`}</text>
@@ -999,7 +1009,9 @@ class RoostThermostat extends RoostBase {
   }
 
   paint(v) {
-    const { mn, mx, on } = this.info, g = this.colour(), p = this.p, root = this.shadowRoot;
+    const { mn, mx, on } = this.info, p = this.p, root = this.shadowRoot;
+    const g = this._config.style !== "classic" ? ["#38BDF8", "#A78BFA"] : this.colour();
+    const svg = root.querySelector("svg"); svg.classList.toggle("drag", !!this._drag); if (this._drag) svg.classList.remove("on");
     const f = Math.max(0, Math.min(1, (v - mn) / (mx - mn)));
     const R = 96, C = 2 * Math.PI * R, L = C * 0.75, th = ((135 + 270 * f) * Math.PI) / 180;
     root.getElementById("arc").setAttribute("stroke-dasharray", `${(L * f).toFixed(1)} ${C.toFixed(1)}`);
@@ -3276,6 +3288,7 @@ class RoostAlarm extends RoostBase {
       const PILLS = [["disarm", "Disarm", "linear-gradient(135deg,#10B981,#34D399)", "disarmed"], ["arm_home", "Arm home", "linear-gradient(135deg,#2F6BFF,#38BDF8)", "armed_home"], ["arm_away", "Arm away", "linear-gradient(135deg,#F43F6B,#FF8F6B)", "armed_away"], ["arm_night", "Arm night", "linear-gradient(135deg,#6D4BFF,#B794FF)", "armed_night"]]
         .filter(([m]) => m === "disarm" || (c.modes || []).includes(m));
       this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+        :host{padding:0 ${Number(c.inset ?? 8)}px}
         .tt{font-size:17px;font-weight:700;letter-spacing:-.2px;padding:10px 6px 4px;color:${p.text}}
         .ps{display:grid;grid-template-columns:repeat(${PILLS.length},minmax(0,1fr));gap:8px;margin-top:8px}
         .pl{padding:10px 0;border-radius:14px;border:0;font:inherit;font-size:13px;font-weight:600;cursor:pointer;background:${p.inset};color:${p.text};-webkit-tap-highlight-color:transparent;transition:transform .12s}

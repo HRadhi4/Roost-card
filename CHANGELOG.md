@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.3.4 — 2026-11-17
+- **Roost Thermostat: new "Nest" look, now the default.** The same dial as the phone dashboard: a cyan-to-purple ring that glows, little breeze bars that breathe while the AC runs, a bigger glowing power button and blue mode buttons. The old look is still there as "Classic".
+- **Roost Alarm (pills)**: the title and the Disarm / Arm home / Arm away buttons now sit 8 px in from the sides, exactly like the phone dashboard (`inset` changes it).
+
 ## 1.3.3 — 2026-11-17
 - **To-do card fixed**: after switching pages the list stopped updating, so ticked or added items did not show. It now keeps listening, and ticks, new items and "Clear" show straight away.
 - **To-do card**: what you are typing is no longer lost when the list updates.
