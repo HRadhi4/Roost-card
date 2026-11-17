@@ -445,14 +445,13 @@ class RoostBase extends HTMLElement {
     const note = this._config?.out_of_order, root = this.shadowRoot;
     if (!note || !root) return;
     root.querySelector(".roost-broken")?.remove();
-    const host = root.querySelector(".card,.r,ha-card,.wrap") || root.lastElementChild;
-    if (!host) return;
-    if (window.getComputedStyle(host).position === "static") host.style.position = "relative";
+    // the note covers just this card: the card itself is the frame
+    this.style.position = "relative"; if (!this.style.display) this.style.display = "block";
     const el = document.createElement("div");
     el.className = "roost-broken"; el.setAttribute("role", "status");
-    el.style.cssText = "position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px;box-sizing:border-box;text-align:center;border-radius:inherit;background:rgba(10,8,30,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);color:#fff";
+    el.style.cssText = `position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px;box-sizing:border-box;text-align:center;border-radius:${Number(this._config.radius) || 22}px;background:rgba(10,8,30,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);color:#fff`;
     el.innerHTML = `<ha-icon icon="mdi:alert-circle-outline" style="--mdc-icon-size:28px;color:#FF9F6B"></ha-icon><b style="font-size:14px">Not working right now</b><span style="font-size:12px;opacity:.85;line-height:1.35">${esc(note)}</span>`;
-    host.appendChild(el);
+    root.appendChild(el);
   }
 
   // ---- small shared helpers for the newer cards
@@ -1720,7 +1719,6 @@ class RoostNav extends RoostBase {
     window.addEventListener("resize", this._onLoc);
     setTimeout(() => this.watchSide(), 300);
   }
-
 
   static getConfigForm() {
     return {
@@ -3758,7 +3756,6 @@ class RoostRoom extends RoostBase {
     kids.forEach((el) => box.appendChild(el));
     wrap.appendChild(box); root.appendChild(css);
   }
-
 
   validate(c) { if (!c.name) throw new Error("Give the room a name"); }
 
@@ -8048,7 +8045,7 @@ const RoostFull = {
     this.style(rootShadow, "roost-full", on && w.header ? `.header{display:none!important}
       :host{--header-height:0px!important}
       #view,hui-view-container{padding-top:env(safe-area-inset-top)!important;min-height:100vh!important}` : "");
-    this.style(mainRoot, "roost-full", on && w.sidebar ? "ha-drawer{--mdc-drawer-width:0px!important}ha-sidebar{display:none!important}" : "");
+    this.style(mainRoot, "roost-full", on && w.sidebar ? ":host{--ha-sidebar-width:0px!important}ha-drawer{--mdc-drawer-width:0px!important;--ha-sidebar-width:0px!important}ha-sidebar{display:none!important}" : "");
     this.style(drawerRoot, "roost-full", on && w.sidebar ? ".mdc-drawer{display:none!important}.mdc-drawer-app-content{margin-left:0!important;margin-inline-start:0!important;padding-inline-start:0!important}" : "");
     this.drawFab(on, root);
   },
