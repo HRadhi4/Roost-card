@@ -2,6 +2,14 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.6.5
+- **Sensors, redesigned.** Each reading now shows:
+  - a word for how it feels, in its colour (temperature: Cold, Cool, Comfortable, Warm, Hot; humidity: Dry, Comfortable, Humid; air quality: Fresh, Stuffy and so on);
+  - a smooth line of the last 24 hours;
+  - how it changed in the last hour, such as “↑ 1.4° in 1 h”;
+  - today's lowest and highest, with a dot for now.
+- The line and the range can be turned off, and the number of hours chosen, in the editor.
+
 ## 1.6.4
 - **Tile**: a new **Compact** size for wall panels: shorter, without the “for 2 h” line.
 - **Thermostat**: a **Compact** option. The power and +/- buttons sit in the open gap of the dial, so the card is about 70 px shorter.

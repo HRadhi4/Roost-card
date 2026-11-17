@@ -904,6 +904,10 @@ items:
   - { name: Movie, icon: mdi:movie, tap_action: { action: perform-action, perform_action: scene.turn_on, target: { entity_id: scene.movie } } }
 active_style: filled  # same choices as the nav bar: filled, soft, pill, line, dot or icon
 background: glass     # glass, solid or none
+show_graph: true          # a smooth line of the last hours under each reading
+show_range: true          # the lowest and highest in that time, with a dot for now
+hours: 24                 # how far back the line goes
+# each reading also gets a word for how it feels (Comfortable, Warm, Dry, Stuffy...) and its trend over the last hour
 ```
 
 
