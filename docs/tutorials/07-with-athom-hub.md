@@ -1,6 +1,6 @@
 # 7 · Use it with Athom Hub
 
-[Athom Hub](https://github.com/HRadhi4/Athom_For_Dummies) turns Athom IR/RF remotes and presence sensors into real Home Assistant devices. Two Roost cards are made for it.
+[Athom Hub](https://github.com/HRadhi4/Athom-Hub) turns Athom IR/RF remotes and presence sensors into real Home Assistant devices. Two Roost cards are made for it.
 
 ## A remote on your phone
 
