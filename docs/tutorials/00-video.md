@@ -15,7 +15,7 @@ Both videos are recorded on a real Home Assistant with its built-in demo devices
 
 [![Every Roost card in action](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/video/roost-every-card.jpg)](https://github.com/HRadhi4/Roost-card/blob/main/docs/video/roost-every-card.mp4)
 
-Every card on one page, each one used: buttons, scenes, light and dark, rooms, tiles, the thermostat, lights, the fan dial, curtains, TV and remote, alarm with its keypad, lock, camera, people, alerts, clock, prayer times, weather, agenda, to-do, timer, energy, sensors, the robot vacuum, water tank, pool, pet feeder, baby's room, internet, bins, medicine, house modes, sleep, the car, the family map and the bottom bar.
+Every card on one page, each one used: buttons, scenes, light and dark, rooms, tiles, a group tile with its round button, a room with one slider for its lights, the thermostat, lights, the fan dial, curtains, TV and remote, alarm with its keypad, lock, camera, people, alerts, the timeline, batteries, the popup, clock, prayer times, weather, agenda, to-do, timer, energy, sensors, your own values, the robot vacuum, water tank, pool, pet feeder, baby's room, internet, Grocy (fridge, shopping and chores), bins, medicine, house modes, sleep, the car, the family map and the bottom bar.
 
 Prefer to read? [Build a phone home screen](03-phone-home-screen.md) covers the same steps in writing.
 

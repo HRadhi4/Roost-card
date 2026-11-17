@@ -45,6 +45,10 @@
 
 Step by step, and without HACS: **[Install guide](docs/tutorials/01-install.md)**.
 
+**No time to build?** The first time you open Home Assistant after installing, Roost offers to make two ready dashboards (phone and tablet) from your own rooms and devices. [How it works](docs/tutorials/12-ready-dashboards.md).
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/auto-dashboard.gif" width="260" alt="Roost makes a dashboard from your own devices">
+
 ## Tutorials
 
 ### Videos
@@ -70,6 +74,8 @@ Recorded on a real Home Assistant (its built-in demo devices), so everything you
 9. [Looks: frosted glass, light and dark, tablets](docs/tutorials/08-looks.md)
 10. [Clock and prayer times](docs/tutorials/10-clock-and-prayer.md)
 11. [Try cards before you own the device](docs/tutorials/11-try-without-devices.md)
+12. [Ready dashboards made from your home](docs/tutorials/12-ready-dashboards.md) · no work
+13. [Batteries, Timeline, your own values, group tiles](docs/tutorials/13-batteries-timeline-values.md)
 
 ## All 64 cards
 

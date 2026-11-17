@@ -2,6 +2,14 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.9.0
+- **New: ready dashboards made from your home.** The first time, Roost asks once whether to make two dashboards from your own rooms and devices: **Roost Home** for phones and **Roost Tablet view** for tablets. They stay up to date by themselves. They are also in *Add dashboard → Community dashboards* (Home Assistant 2026.5 and newer), and anyone can use `strategy: { type: custom:roost }`.
+- **Bugs fixed:**
+  - Thermostat: a device with both “Auto” and “Heat and cool” showed “Auto” twice.
+  - Grocy: on narrow phones the last tabs were cut off; they now fit, with a dot for counts.
+  - Light: the colour dots ran off the edge; they now wrap to a second line.
+  - Timeline: in-between steps such as “Locking” or “Arming” are left out.
+
 ## 1.8.0
 Ideas taken from Homey's app, made the Roost way.
 - **New: Roost Batteries.** Every battery in the home, lowest first. Low ones glow orange, ones that stopped reporting say so. It finds them by itself.

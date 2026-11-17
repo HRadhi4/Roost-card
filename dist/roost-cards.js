@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.8.0";
+const ROOST_VERSION = "1.9.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1309,9 +1309,11 @@ class RoostThermostat extends RoostBase {
     const roomV = rs && !isNaN(parseFloat(rs.state)) ? parseFloat(rs.state) : a.current_temperature;
     const room = roomV != null && !isNaN(roomV) ? Number(roomV).toFixed(1) : null; // never show "—"
     const noTemp = !un && set == null;
-    const modeName = { cool: "Cool", heat: "Heat", dry: "Dry", fan_only: "Fan", heat_cool: "Auto", auto: "Auto" };
+    // a device with both "auto" and "heat_cool" would show "Auto" twice
+    const both = (a.hvac_modes || []).includes("auto") && (a.hvac_modes || []).includes("heat_cool");
+    const modeName = { cool: "Cool", heat: "Heat", dry: "Dry", fan_only: "Fan", heat_cool: both ? "Heat & cool" : "Auto", auto: "Auto" };
     const act = { heating: "Heating", cooling: "Cooling", drying: "Drying", fan: "Fan on", idle: "Resting", preheating: "Warming up", defrosting: "Defrosting" }[s?.attributes.hvac_action];
-    const modeWord = { heat: "Heat", cool: "Cool", dry: "Dry", fan_only: "Fan", heat_cool: "Auto", auto: "Auto" }[s?.state] || modeName[s?.state] || s?.state;
+    const modeWord = modeName[s?.state] || nice(s?.state);
     const status = un ? "Offline" : on ? act || `${modeWord} on` : "Off";
     const breeze = nest && on ? [100, 125, 150].map((x, i) => `<rect x="${x - 1}" y="70" width="2" height="12" rx="1" fill="${this.dark ? "#9CD8FF" : "#1E5FB8"}" style="animation:roost-breathe 1.4s ease-in-out ${i * 0.4}s infinite"/>`).join("") : "";
     const pillOn = nest ? `background:${this.dark ? "#1F3A66" : "#DCEBFF"};color:${this.dark ? "#9CD8FF" : "#1E5FB8"}` : `background:${g[0]}33;color:${g[1]}`;
@@ -4212,8 +4214,7 @@ class RoostLight extends RoostBase {
       .bar{position:relative;height:52px;border-radius:18px;background:${p.inset};overflow:hidden;cursor:pointer;touch-action:none}
       .bar .f{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,${on && a.rgb_color && !warmTone(a.rgb_color) ? `color-mix(in srgb, ${tint} 70%, #fff)` : g[0]},${tint});border-radius:18px}
       .bar ha-icon{position:absolute;left:14px;top:14px;--mdc-icon-size:24px;color:${on ? (a.rgb_color && !warmTone(a.rgb_color) ? "#fff" : g[3]) : p.muted}}
-      .chips{display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-      .chips::-webkit-scrollbar{display:none}
+      .chips{display:flex;flex-wrap:wrap;gap:8px}
       .chips button{flex:none;height:36px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
       .chips button i{display:block;width:14px;height:14px;border-radius:50%}
       .dotc{width:36px;padding:0!important;justify-content:center}
@@ -7550,7 +7551,8 @@ class RoostTimeline extends ticking(RoostBase, 60000) {
     try {
       const start = new Date(Date.now() - (Number(c.hours) || 24) * 3600e3).toISOString();
       const r = await h.callWS({ type: "logbook/get_events", start_time: start, entity_ids: ids });
-      this._events = (r || []).filter((e) => e.entity_id && e.state != null).sort((a, b) => b.when - a.when);
+      // "locking", "opening", "arming" are on the way to the real change, which gets its own row
+      this._events = (r || []).filter((e) => e.entity_id && e.state != null && !["locking", "unlocking", "opening", "closing", "arming", "pending", "disarming"].includes(e.state)).sort((a, b) => b.when - a.when);
       this._loadedAt = Date.now(); this._at = this._loadedAt;
     } catch (e) { this._events = this._events || []; this._failed = true; }
     this._loading = false;
@@ -7731,6 +7733,136 @@ class RoostValues extends RoostBase {
     R.querySelectorAll(".dt").forEach((el) => el.addEventListener("change", () => this.set(it[+el.dataset.k], el.value)));
     R.querySelectorAll("[data-c]").forEach((el) => el.addEventListener("click", () => this.set(it[+el.dataset.k], el.dataset.c)));
   }
+}
+
+// ------------------------------------------------------------------ Roost dashboards made from your home
+// Two ready dashboards, phone and tablet, built from your own areas, devices and entities. They follow your home
+// by themselves: a new light or room shows up on its own. "Take control" in Home Assistant turns one into a normal,
+// editable dashboard. On first use, an admin is asked once whether to add them.
+const RoostAuto = {
+  // what is in the home, sorted by area, without hidden, disabled or "settings" entities
+  scan(hass, config = {}) {
+    const reg = hass.entities || {}, dev = hass.devices || {}, areas = hass.areas || {};
+    // "hide" leaves out whole kinds ("camera") or single entities ("light.porch")
+    const hide = [].concat(config.hide || []), hidden = (id) => hide.includes(id) || hide.includes(id.split(".")[0]);
+    const ok = (id) => { if (hidden(id)) return false; const e = reg[id]; const s = hass.states[id]; return s && !(e && (e.hidden || e.entity_category)) && !UNAVAILABLE.includes(s.state) || (s && id.startsWith("person.")); };
+    const ids = Object.keys(hass.states).filter(ok).sort();
+    const areaOf = (id) => reg[id]?.area_id || dev[reg[id]?.device_id]?.area_id || null;
+    const dom = (d) => ids.filter((id) => id.startsWith(`${d}.`));
+    const cls = (d, c) => dom(d).filter((id) => [].concat(c).includes(hass.states[id].attributes.device_class));
+    const byArea = {};
+    for (const id of ids) { const a = areaOf(id); if (a && areas[a]) (byArea[a] = byArea[a] || []).push(id); }
+    const order = Object.values(areas).sort((a, b) => String(a.name).localeCompare(String(b.name))).map((a) => a.area_id).filter((a) => byArea[a]);
+    return { ids, dom, cls, byArea, order, areas, areaOf };
+  },
+
+  // the devices worth a tile in a room, most useful first
+  roomDevices(h, list) {
+    const rank = ["light", "climate", "cover", "fan", "media_player", "switch", "lock", "vacuum", "humidifier", "water_heater"];
+    return list.filter((id) => rank.includes(id.split(".")[0]) && !(id.startsWith("switch.") && /child|lock|led|indicator|restart|update/i.test(id)))
+      .sort((a, b) => rank.indexOf(a.split(".")[0]) - rank.indexOf(b.split(".")[0]));
+  },
+
+  areaIcon(a) {
+    if (a.icon) return a.icon;
+    const n = String(a.name || "").toLowerCase();
+    return [[/living|lounge|majlis|family/, "mdi:sofa"], [/kitchen/, "mdi:stove"], [/bed|master|guest room|kid/, "mdi:bed-king"], [/bath|toilet|wc/, "mdi:shower"], [/office|study/, "mdi:desk"], [/garage/, "mdi:garage"],
+      [/garden|yard|outside|roof|balcon/, "mdi:flower"], [/hall|entrance|corridor|stairs/, "mdi:door"], [/dining/, "mdi:silverware-fork-knife"], [/laundry/, "mdi:washing-machine"]].find(([r]) => r.test(n))?.[1] || "mdi:home-outline";
+  },
+
+  cards(hass, tablet, config = {}) {
+    const S = this.scan(hass, config), h = S, st = (id) => hass.states[id];
+    const T = (title) => ({ type: "custom:roost-title", title });
+    const out = { top: [], rooms: [], climate: [], media: [], security: [], info: [], care: [], perRoom: [] };
+    const weather = h.dom("weather")[0];
+    const people = h.dom("person");
+    out.top.push({ type: "custom:roost-hero", ...(weather ? { weather } : {}) });
+    const chipIds = [...h.dom("lock"), ...h.dom("alarm_control_panel"), ...h.dom("light"), ...h.dom("climate"), ...h.cls("binary_sensor", ["door", "window", "garage_door"]).slice(0, 8), ...people].slice(0, 40);
+    if (chipIds.length) out.top.push({ type: "custom:roost-chips", entities: chipIds });
+    const scenes = [...h.dom("scene"), ...h.dom("script")].slice(0, 6);
+    if (scenes.length) out.top.push({ type: "grid", columns: 2, square: false, cards: scenes.slice(0, 4).map((entity) => ({ type: "custom:roost-scene", entity })) });
+    // rooms: a pill per area, with that area's devices under it
+    const rooms = h.order.map((a) => ({ a, devs: this.roomDevices(hass, h.byArea[a]).slice(0, 8) })).filter((x) => x.devs.length);
+    if (rooms.length) out.rooms.push({ type: "custom:roost-rooms", show_names: "active", rooms: rooms.slice(0, 10).map((x) => ({ name: h.areas[x.a].name, icon: this.areaIcon(h.areas[x.a]), entities: x.devs })) });
+    else {
+      const loose = this.roomDevices(hass, h.ids).slice(0, 12);
+      if (loose.length) out.rooms.push({ type: "grid", columns: 2, square: false, cards: loose.map((entity) => ({ type: "custom:roost-tile", entity, size: "small" })) });
+    }
+    for (const x of rooms) {
+      const ar = h.byArea[x.a], temp = ar.find((id) => st(id).attributes.device_class === "temperature" && id.startsWith("sensor.")), hum = ar.find((id) => st(id).attributes.device_class === "humidity" && id.startsWith("sensor."));
+      const motion = ar.filter((id) => id.startsWith("binary_sensor.") && ["motion", "occupancy", "presence"].includes(st(id).attributes.device_class));
+      out.perRoom.push({ area: h.areas[x.a], cards: [
+        { type: "custom:roost-room", name: h.areas[x.a].name, icon: this.areaIcon(h.areas[x.a]), style: "card", light_slider: x.devs.some((id) => id.startsWith("light.")), ...(temp ? { temperature: temp } : {}), ...(hum ? { humidity: hum } : {}), entities: [...x.devs, ...motion] },
+        { type: "grid", columns: 2, square: false, cards: x.devs.map((entity) => ({ type: "custom:roost-tile", entity, size: "small", quick: "button" })) },
+      ] });
+    }
+    for (const entity of h.dom("climate").slice(0, tablet ? 3 : 2)) out.climate.push({ type: "custom:roost-thermostat", entity, ...(tablet ? { compact: true } : {}) });
+    for (const entity of h.dom("cover").filter((id) => ["curtain", "blind", "shade", "shutter", undefined].includes(st(id).attributes.device_class)).slice(0, 2)) out.climate.push({ type: "custom:roost-curtain", entity });
+    for (const entity of h.dom("media_player").filter((id) => !/_group|browser/i.test(id)).slice(0, 2)) out.media.push({ type: "custom:roost-media", entity });
+    for (const entity of h.dom("alarm_control_panel").slice(0, 1)) out.security.push({ type: "custom:roost-alarm", entity });
+    for (const entity of h.dom("lock").slice(0, 2)) out.security.push({ type: "custom:roost-lock", entity });
+    for (const entity of h.dom("camera").slice(0, tablet ? 4 : 2)) out.security.push({ type: "custom:roost-camera", entity });
+    if (people.length) out.info.push({ type: "custom:roost-people", entities: people.slice(0, 6) });
+    if (weather) out.info.push({ type: "custom:roost-weather", entity: weather });
+    const readings = [...h.cls("sensor", "temperature").slice(0, 2), ...h.cls("sensor", "humidity").slice(0, 2), ...h.cls("sensor", ["carbon_dioxide", "pm25", "aqi"]).slice(0, 2)];
+    if (readings.length) out.info.push({ type: "custom:roost-sensors", columns: 2, entities: readings.slice(0, 6) });
+    const todo = h.dom("todo")[0], cal = h.dom("calendar")[0];
+    if (cal) out.info.push({ type: "custom:roost-agenda", entities: h.dom("calendar").slice(0, 3) });
+    if (todo) out.info.push({ type: "custom:roost-todo", entity: todo });
+    for (const entity of h.dom("vacuum").slice(0, 1)) out.care.push({ type: "custom:roost-vacuum", entity });
+    if (h.cls("sensor", "battery").length || h.cls("binary_sensor", "battery").length) out.care.push({ type: "custom:roost-batteries", show: "all", max: 6 });
+    out.care.push({ type: "custom:roost-timeline", max: 6 });
+    return out;
+  },
+
+  phone(hass, config = {}) {
+    const o = this.cards(hass, false, config), sec = (cards) => ({ type: "grid", cards });
+    const home = [sec(o.top), sec(o.rooms), sec([...o.climate, ...o.media]), sec(o.security), sec([...o.info, ...o.care])].filter((s) => s.cards.length);
+    const views = [{ title: "Home", path: "home", icon: "mdi:home-variant", type: "sections", max_columns: 1, sections: home }];
+    if (o.perRoom.length) views.push({ title: "Rooms", path: "rooms", icon: "mdi:view-grid", type: "sections", max_columns: 1, sections: o.perRoom.map((r) => ({ type: "grid", cards: [{ type: "custom:roost-title", title: r.area.name }, ...r.cards] })) });
+    return { title: "Roost Home", views };
+  },
+
+  tablet(hass, config = {}) {
+    const o = this.cards(hass, true, config), sec = (cards) => ({ type: "grid", cards });
+    const left = [{ type: "custom:roost-fullscreen", mode: "button" }, ...o.top, ...o.info];
+    const sections = [sec(left), sec(o.rooms), sec([...o.climate, ...o.media]), sec([...o.security, ...o.care])].filter((s) => s.cards.length);
+    return { title: "Roost Tablet", views: [{ title: "Home", path: "home", icon: "mdi:tablet-dashboard", type: "sections", max_columns: 4, dense_section_placement: true, sections },
+      ...(o.perRoom.length ? [{ title: "Rooms", path: "rooms", icon: "mdi:view-grid", type: "sections", max_columns: 4, sections: o.perRoom.map((r) => ({ type: "grid", cards: [{ type: "custom:roost-title", title: r.area.name }, ...r.cards] })) }] : [])] };
+  },
+
+  // once, for an admin: "make two dashboards from your home?"
+  async welcome(tries = 0) {
+    const h = document.querySelector("home-assistant")?.hass;
+    if (!h?.user && tries < 5) { setTimeout(() => this.welcome(tries + 1), 6000); return; }
+    if (!h?.user?.is_admin || !h.callWS) return;
+    try {
+      const seen = await h.callWS({ type: "frontend/get_user_data", key: "roost_welcome" });
+      if (seen?.value) return;
+      const list = await h.callWS({ type: "lovelace/dashboards/list" });
+      if (list.some((d) => ["roost-home", "roost-home-tablet"].includes(d.url_path))) { await h.callWS({ type: "frontend/set_user_data", key: "roost_welcome", value: { at: Date.now(), made: false } }); return; }
+      RoostPop.setHass(h);
+      const yes = await RoostPop.confirm("Roost can make two dashboards from your own rooms and devices, one for phones and one for tablets. They stay up to date by themselves, and you can delete them any time.", { title: "Roost Cards is ready", icon: "mdi:home-heart", yes: "Make them", no: "Not now" });
+      await h.callWS({ type: "frontend/set_user_data", key: "roost_welcome", value: { at: Date.now(), made: !!yes } });
+      if (!yes) return;
+      for (const [url, title, icon, type] of [["roost-home", "Roost Home", "mdi:home-heart", "custom:roost"], ["roost-home-tablet", "Roost Tablet view", "mdi:tablet-dashboard", "custom:roost-tablet"]]) {
+        await h.callWS({ type: "lovelace/dashboards/create", url_path: url, title, icon, show_in_sidebar: true, require_admin: false });
+        await h.callWS({ type: "lovelace/config/save", url_path: url, config: { strategy: { type } } });
+      }
+      RoostPop.open({ id: "roost-welcome-done", kind: "info", title: "Your Roost dashboards are ready", icon: "mdi:check-circle", message: "Find “Roost Home” and “Roost Tablet view” in the sidebar.", close_after: 8, buttons: [{ name: "Open Roost Home", icon: "mdi:arrow-right", color: "active", tap_action: { action: "navigate", navigation_path: "/roost-home/home" }, close: true }] });
+    } catch (e) { /* older Home Assistant: no harm, just no offer */ }
+  },
+};
+
+class RoostStrategy extends HTMLElement {
+  static async generate(config, hass) { return RoostAuto.phone(hass, config || {}); }
+
+  static getCreateSuggestions() { return { title: "Roost Home", icon: "mdi:home-heart" }; }
+}
+class RoostStrategyTablet extends HTMLElement {
+  static async generate(config, hass) { return RoostAuto.tablet(hass, config || {}); }
+
+  static getCreateSuggestions() { return { title: "Roost Tablet", icon: "mdi:tablet-dashboard" }; }
 }
 
 // ------------------------------------------------------------------ Roost Medicine
@@ -8045,6 +8177,7 @@ class RoostGrocy extends ticking(RoostBase, 60000) {
       .tb button.on{flex:1 0 auto;background:${p.panel};color:${p.text};box-shadow:0 0 0 1px ${p.border}}
       .tb .n{min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};font-size:11px;line-height:18px}
       .tb button:not(.on) .lb{display:none}
+      @container (max-width: 360px){:host .tb button{flex:1 1 auto;padding:0 6px}:host .tb button:not(.on) .n{font-size:0;min-width:8px;width:8px;height:8px;padding:0;align-self:flex-start;margin-top:6px}}
       .ls{display:flex;flex-direction:column;gap:6px}
       .it{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:12px;padding:8px 10px;border-radius:14px;background:${p.inset};border:0;color:${p.text};font:inherit;text-align:left;cursor:pointer;min-height:52px;transition:transform .12s}
       .it:active{transform:scale(.98)}
@@ -9591,4 +9724,11 @@ for (const [tag, cls, name, description] of CARDS) {
   if (!customElements.get(tag)) customElements.define(tag, cls);
   if (!window.customCards.some((c) => c.type === tag)) window.customCards.push({ type: tag, name, description, preview: true, documentationURL: "https://github.com/HRadhi4/Roost-card" });
 }
+// the dashboards made from your home, in "Add dashboard" (Home Assistant 2026.5 and later) and by strategy type
+if (!customElements.get("ll-strategy-dashboard-roost")) customElements.define("ll-strategy-dashboard-roost", RoostStrategy);
+if (!customElements.get("ll-strategy-dashboard-roost-tablet")) customElements.define("ll-strategy-dashboard-roost-tablet", RoostStrategyTablet);
+window.customStrategies = window.customStrategies || [];
+if (!window.customStrategies.some((x) => x.type === "roost")) window.customStrategies.push({ type: "roost", strategyType: "dashboard", name: "Roost Home (phone)", description: "Roost cards made from your own rooms and devices, for phones.", documentationURL: "https://github.com/HRadhi4/Roost-card" });
+if (!window.customStrategies.some((x) => x.type === "roost-tablet")) window.customStrategies.push({ type: "roost-tablet", strategyType: "dashboard", name: "Roost Home (tablet)", description: "Roost cards made from your own rooms and devices, for a wall tablet.", documentationURL: "https://github.com/HRadhi4/Roost-card" });
+if (!window.__roostWelcome && typeof document !== "undefined" && document.querySelector) { window.__roostWelcome = true; setTimeout(() => RoostAuto.welcome(), 8000); }
 console.info(`%c ROOST CARDS %c ${ROOST_VERSION} `, "color:#fff;background:#6D4BFF;font-weight:700;border-radius:4px 0 0 4px;padding:2px 4px", "color:#6D4BFF;background:#EEF0FF;border-radius:0 4px 4px 0;padding:2px 4px");

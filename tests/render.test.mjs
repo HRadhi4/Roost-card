@@ -311,6 +311,12 @@ if (!calls.some((x) => x[0] === "homeassistant" && x[1] === "turn_off" && x[2].e
 // Batteries: the sample's low one comes first.
 const bt = document.createElement("roost-batteries"); bt.setConfig({ sample: true }); document.body.appendChild(bt); bt.hass = hass(false);
 if (!/Hallway motion/.test(bt.shadowRoot.querySelector(".r")?.textContent || "")) { fails++; console.error("FAIL batteries order"); }
+// The dashboards made from your home: a phone one and a tablet one, with Roost cards only.
+const SP = customElements.get("ll-strategy-dashboard-roost"), STb = customElements.get("ll-strategy-dashboard-roost-tablet");
+const dp = await SP.generate({}, hass(false)), dtab = await STb.generate({}, hass(false));
+const allCards = (d) => d.views.flatMap((v) => v.sections.flatMap((x) => x.cards));
+if (!dp.views.length || !allCards(dp).length || !allCards(dtab).length || !allCards(dp).some((x) => x.type === "custom:roost-hero")) { fails++; console.error("FAIL strategy", JSON.stringify(dp).slice(0, 300)); }
+for (const k of allCards(dp).concat(allCards(dtab))) { const tag = (k.type || "").replace("custom:", ""); if (tag.startsWith("roost-") && !customElements.get(tag)) { fails++; console.error("FAIL strategy unknown card", tag); } }
 // Room: any cards under it, in one box, kept between redraws, and folded away when asked.
 const rk = document.createElement("roost-room");
 rk.setConfig({ name: "Living", temperature: "sensor.cabinet", cards: [{ type: "custom:roost-tile", entity: "light.kitchen" }, { type: "custom:roost-scene", entity: "scene.movie" }], cards_columns: 2 });
@@ -373,5 +379,5 @@ for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }],
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 35} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 37} checks passed`);
 process.exit(fails ? 1 : 0);
