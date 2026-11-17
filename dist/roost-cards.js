@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.3.5";
+const ROOST_VERSION = "1.3.6";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1341,7 +1341,7 @@ class RoostNav extends RoostBase {
   static getConfigForm() {
     return {
       schema: [
-        { name: "items", selector: { object: { multiple: true, label_field: "name", fields: {
+        { name: "items", label: "Buttons in the bar", selector: { object: { multiple: true, label_field: "name", fields: {
           name: { label: "Name", selector: { text: {} } },
           icon: { label: "Icon", required: true, selector: { icon: {} } },
           path: { label: "Opens (for example /dashboard-home/0 or #rooms)", required: true, selector: { text: {} } },
@@ -1592,7 +1592,7 @@ class RoostRooms extends RoostBase {
   static getConfigForm() {
     return {
       schema: [
-        { name: "rooms", selector: { object: { multiple: true, label_field: "name", fields: {
+        { name: "rooms", label: "Rooms", selector: { object: { multiple: true, label_field: "name", fields: {
           name: { label: "Room name", required: true, selector: { text: {} } },
           icon: { label: "Icon", selector: { icon: {} } },
           color: { label: "Colour of this room's button (empty = the card's colour)", selector: { select: { mode: "dropdown", options: COLOR_OPTIONS.filter((o) => o.value !== "custom") } } },
@@ -1640,8 +1640,11 @@ class RoostRooms extends RoostBase {
   }
 
   static getStubConfig(hass) {
-    const lights = Object.keys(hass.states).filter((id) => id.startsWith("light.")).slice(0, 4);
-    return { rooms: [{ name: "Living", icon: "mdi:sofa", entities: lights.slice(0, 2) }, { name: "Bedroom", icon: "mdi:bed", entities: lights.slice(2, 4) }] };
+    // Four rooms to start with, each with a mix of the devices this home has (lights first, then AC, curtains, TV, fans, plugs).
+    const ids = Object.keys(hass.states), pick = (d) => ids.filter((id) => id.startsWith(d + "."));
+    const pool = ["light", "climate", "cover", "media_player", "fan", "switch"].flatMap((d) => pick(d).slice(0, 4));
+    const rooms = [["Living", "mdi:sofa"], ["Bedroom", "mdi:bed-king"], ["Kitchen", "mdi:stove"], ["Bathroom", "mdi:shower"]];
+    return { rooms: rooms.map(([name, icon], r) => ({ name, icon, entities: pool.filter((_, i) => i % 4 === r).slice(0, 4) })) };
   }
 
   getGridOptions() { return { columns: 12, rows: "auto" }; }

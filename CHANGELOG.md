@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.3.6 — 2026-11-17
+- **Roost Rooms** starts with four rooms (Living, Bedroom, Kitchen, Bathroom), each filled with a mix of your lights, air conditioners, curtains, TVs, fans and plugs.
+- Editor: the room list and the bottom bar's button list now have proper titles.
+
 ## 1.3.5 — 2026-11-17
 - **Roost Media**: when the cover picture can't load, the card shows its icon instead of a broken picture.
 

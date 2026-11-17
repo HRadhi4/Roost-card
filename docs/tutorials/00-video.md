@@ -2,14 +2,14 @@
 
 Both videos are recorded on a real Home Assistant with its built-in demo devices: the editor, the options and the cards are the real ones.
 
-## Build a dashboard in the visual editor · 6 minutes
+## Build a dashboard in the visual editor · 7 minutes
 
 [![Build a dashboard in the visual editor](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/video/roost-build-dashboard.jpg)](https://github.com/HRadhi4/Roost-card/blob/main/docs/video/roost-build-dashboard.mp4)
 
 1. Make a new dashboard (Settings → Dashboards → Add dashboard)
 2. Tap the pencil, then **+** to add a card, and search **roost**: every Roost card shows with a live preview
 3. Roost Hero, Chips, Thermostat, Light, Curtain, Media, Alarm, Buttons, Rooms and Nav: pick each one, choose your device, open its option groups, Save
-4. Tap **Done**, then use the dashboard on a phone: drag the thermostat dial, slide the light, close the curtains, arm the alarm, switch rooms
+4. Tap **Done**, then use the dashboard on a phone: switch between the four rooms, drag the thermostat dial, slide the light, close the curtains, arm the alarm
 
 ## Every card in action · 3 minutes
 
