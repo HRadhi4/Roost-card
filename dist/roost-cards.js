@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.3.0";
+const ROOST_VERSION = "1.3.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -2379,15 +2379,16 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
     return {
       schema: [
         { name: "title", label: "Title (optional)", selector: { text: {} } },
-        { name: "source", label: "Where the times come from", selector: pick([["calculate", "Calculated here (no internet needed)"], ["online", "Online (aladhan.com)"], ["sensors", "My sensors"]]) },
+        { name: "calendar_name", label: "Name of your calendar (shown at the bottom, e.g. Al-Hadi calendar)", selector: { text: {} } },
+        { name: "source", label: "Where the times come from", selector: pick([["calculate", "Calculated here (no internet needed)"], ["online", "Online (aladhan.com)"], ["sensors", "My own sensors (Al-Hadi calendar, Islamic Prayer Times)"]]) },
         { type: "expandable", name: "", title: "Calculation", icon: "mdi:calculator-variant-outline", schema: [
           { name: "method", label: "Method", selector: pick(Object.entries(PRAYER_METHODS).map(([k, v]) => [k, v.name])) },
           { name: "asr", label: "Asr", selector: pick([["standard", "Standard (Shafi'i, Maliki, Hanbali)"], ["hanafi", "Hanafi"]]) },
           { type: "grid", name: "", schema: [{ name: "latitude", label: "Latitude (empty = your home)", selector: { number: { mode: "box", step: "any" } } }, { name: "longitude", label: "Longitude", selector: { number: { mode: "box", step: "any" } } }] },
           { name: "adjust", label: "Move a time by minutes", selector: { object: {} } },
         ] },
-        { type: "expandable", name: "", title: "My sensors", icon: "mdi:clock-check-outline", schema: [
-          { type: "grid", name: "", schema: ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"].map((k) => ({ name: `${k}_entity`, label: PRAYER_NAMES[k][0], selector: { entity: { domain: "sensor" } } })) },
+        { type: "expandable", name: "", title: "My own times (for example the Al-Hadi calendar)", icon: "mdi:clock-check-outline", schema: [
+          { type: "grid", name: "", schema: ["imsak", "fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha", "midnight"].map((k) => ({ name: `${k}_entity`, label: PRAYER_NAMES[k][0], selector: { entity: { domain: "sensor" } } })) },
         ] },
         { name: "prayers", label: "Times to show", selector: { select: { multiple: true, mode: "list", options: prayerList.map(([value, label]) => ({ value, label })) } } },
         { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
@@ -2409,7 +2410,7 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
 
   getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
 
-  watched() { const c = this._config; return ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"].map((k) => c[`${k}_entity`]).filter(Boolean); }
+  watched() { const c = this._config; return Object.keys(PRAYER_NAMES).map((k) => c[`${k}_entity`]).filter(Boolean); }
 
   extraSignature() { const d = new Date(); return `${d.toDateString()} ${d.getHours()}:${d.getMinutes()}|${this._online ? 1 : 0}`; }
 
@@ -2418,21 +2419,12 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
     return { lat: Number(c.latitude ?? h?.config?.latitude ?? 26.2), lng: Number(c.longitude ?? h?.config?.longitude ?? 50.6), elev: Number(h?.config?.elevation ?? 0) };
   }
 
-  // Date objects for one day, by key
+  // Date objects for one day, by key. Calculated (or online) first; any time that has its own sensor
+  // (for example the Al-Hadi calendar's Imsak and Fajr) is then taken from that sensor instead.
   day(date) {
     const c = this._config, out = {};
-    if (c.source === "sensors") {
-      for (const k of ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"]) {
-        const s = this.st(c[`${k}_entity`]); if (!s || UNAVAILABLE.includes(s.state)) continue;
-        let d = new Date(s.state);
-        if (isNaN(d)) { const m = String(s.state).match(/^(\d{1,2}):(\d{2})/); if (!m) continue; d = new Date(date); d.setHours(+m[1], +m[2], 0, 0); }
-        else { const x = new Date(date); x.setHours(d.getHours(), d.getMinutes(), 0, 0); d = x; }
-        out[k] = d;
-      }
-    } else if (c.source === "online" && this._online && this._online.day === date.toDateString()) {
-      Object.assign(out, this._online.times);
-    }
-    if (!Object.keys(out).length || c.source === "calculate" || (c.source === "online" && !this._online)) {
+    if (c.source === "online" && this._online && this._online.day === date.toDateString()) Object.assign(out, this._online.times);
+    if (!Object.keys(out).length) {
       const { lat, lng, elev } = this.place();
       const tz = -new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12).getTimezoneOffset() / 60;
       const h = PrayerCalc.times(date, lat, lng, tz, c.method, c.asr === "hanafi" ? 2 : 1, elev);
@@ -2440,10 +2432,18 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
       for (const [k, v] of Object.entries(h)) {
         if (!isFinite(v)) continue;
         const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0); d.setMinutes(Math.round(v * 60));
-        if (!out[k]) out[k] = d;
+        out[k] = d;
       }
     }
     for (const [k, m] of Object.entries(c.adjust || {})) if (out[k] && Number(m)) out[k] = new Date(out[k].getTime() + Number(m) * 60000);
+    for (const k of Object.keys(PRAYER_NAMES)) {
+      const s = this.st(c[`${k}_entity`]);
+      if (!s || UNAVAILABLE.includes(s.state)) continue;
+      let d = new Date(s.state);
+      if (isNaN(d)) { const m = String(s.state).match(/^(\d{1,2}):(\d{2})/); if (!m) continue; d = new Date(date); d.setHours(+m[1], +m[2], 0, 0); }
+      else { const x = new Date(date); x.setHours(d.getHours(), d.getMinutes(), 0, 0); d = x; }
+      out[k] = d;
+    }
     return out;
   }
 
@@ -2547,7 +2547,7 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
         <div class="ring ${soon ? "soon" : ""}"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="${R}" class="bg"/><circle cx="40" cy="40" r="${R}" class="fg" data-pop="${nextKey}" data-popkey="ring" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - done)).toFixed(1)}"/></svg><span class="num">${esc(this.left(nextAt - now))}</span></div>
         ${line}</div>` : line ? `<div style="padding:4px 2px 2px">${line}</div>` : "";
     const empty = !keys.length ? `<div class="empty t">${c.source === "sensors" ? "Choose your prayer time sensors in the card settings" : "No times for this place"}</div>` : "";
-    const src = c.source === "sensors" ? "" : `<div class="src t">${esc((PRAYER_METHODS[c.method] || {}).name || "")}${c.asr === "hanafi" ? " · Hanafi Asr" : ""}${c.source === "online" ? (this._online ? " · online" : this._onlineFailed ? " · offline, calculated here" : " · loading online") : ""}</div>`;
+    const src = c.source === "sensors" ? (c.calendar_name ? `<div class="src t">${esc(c.calendar_name)}</div>` : "") : `<div class="src t">${esc((PRAYER_METHODS[c.method] || {}).name || "")}${c.asr === "hanafi" ? " · Hanafi Asr" : ""}${c.source === "online" ? (this._online ? " · online" : this._onlineFailed ? " · offline, calculated here" : " · loading online") : ""}</div>`;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${c.frame ? `${panelCss(p, c.radius)};padding:12px` : "padding:0"};display:flex;flex-direction:column;gap:10px;color:${p.text}}
       .ti{font-size:17px;font-weight:700;padding:4px 6px 0}

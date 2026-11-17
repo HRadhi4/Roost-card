@@ -2,6 +2,9 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.3.1 — 2026-11-17
+- **Roost Prayer Times** keeps your own calendar: any time (Imsak, Fajr, Dhuhr and the rest) can come from your own sensor, such as the Al-Hadi calendar, and only the times you have no sensor for are calculated. You can name your calendar at the bottom of the card.
+
 ## 1.3.0 — 2026-11-17
 **New: Roost Prayer Times**
 - Today's prayer times, the next one with a countdown ring, a line of the day, and the Hijri date.

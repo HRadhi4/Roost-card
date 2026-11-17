@@ -359,7 +359,13 @@ numerals: western         # western or eastern (١٢٣)
 show_hijri: true
 hijri_offset: 0           # correct the Hijri day by ±1 or 2
 jumuah: true              # "Jumu'ah" instead of Dhuhr on Fridays
-# source: sensors →  fajr_entity: sensor.fajr_prayer  (and dhuhr_entity, asr_entity )
+# Your own calendar (for example the Al-Hadi calendar): any time can come from your own sensor,
+# the rest is calculated.
+source: sensors
+calendar_name: Al-Hadi calendar
+imsak_entity: sensor.my_calendar_imsak
+fajr_entity: sensor.my_calendar_fajr
+dhuhr_entity: sensor.islamic_prayer_times_dhuhr_prayer
 ```
 Your home's location is used unless you set `latitude` and `longitude`.
 
