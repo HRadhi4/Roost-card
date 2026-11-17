@@ -2,6 +2,21 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.8.0
+Ideas taken from Homey's app, made the Roost way.
+- **New: Roost Batteries.** Every battery in the home, lowest first. Low ones glow orange, ones that stopped reporting say so. It finds them by itself.
+- **New: Roost Timeline.** What happened at home, newest first: “Front door opened · 5 min ago”, “Layla arrived home”, “Kitchen leak sensor: water found”. The newest one pulses.
+- **New: Roost Values.** Your own settings in one card: slide a number, tap a choice, flip a switch, type a short note.
+- **Tile:**
+  - **Round quick button (like Homey):** the button in the corner switches; tapping the tile opens all the controls.
+  - **Groups:** several lights or curtains in one tile, switched together. It says “2 of 3 on · 70%” with a dot for each one.
+  - **“Not seen for 2 days”:** an orange clock when a device stops reporting, often a flat battery.
+- **Room:** “Someone here” with a soft pulsing dot (and which sensor saw them), or “Empty · movement 12 min ago”. One slider for all the room's lights.
+- **Graph:** the line now runs across the whole width with a pulsing dot for now, and a steady reading draws a calm flat line instead of a short stub.
+- **People:** “Location off” instead of “Unknown”.
+- **Vacuum:** each setting says what it is (“Suction · Balanced”, “Water · Medium”).
+- **Medicine:** the tick circles are easier to see.
+
 ## 1.7.0
 - **Sensors: calmer, and you choose what shows.**
   - By default each reading now shows its icon, name, number, how it feels and its line. The hourly change and the lowest/highest are off; turn them on if you want them.

@@ -45,6 +45,12 @@ const cases = [
   ["roost-tile", { entity: "light.kitchen", animation: "glow", power_entity: "sensor.power" }],
   ["roost-tile", { entity: "light.hall", color: "custom", color_start: [10, 20, 30], color_end: [200, 100, 50], size: "small" }],
   ["roost-tile", { entity: "switch.missing" }],
+  ["roost-tile", { entity: "light.kitchen", quick: "button", entities: ["light.hall", "light.color"], stale_hours: 1 }],
+  ["roost-batteries", {}],
+  ["roost-room", { name: "Living", style: "card", light_slider: true, entities: ["light.kitchen", "light.hall"] }],
+  ["roost-batteries", { sample: true, show: "low" }],
+  ["roost-timeline", { sample: true }],
+  ["roost-values", { sample: true, name: "Settings" }],
   ["roost-remote", { athom_remote: "TV", show_numbers: true }],
   ["roost-remote", { entity: "remote.box" }],
   ["roost-remote", { entity: "media_player.tv", show_extra: false }],
@@ -296,6 +302,15 @@ if (!calls.some((x) => x[0] === "grocy" && x[1] === "remove_product_in_shopping_
 const sh = document.createElement("roost-sensors"); sh.setConfig({ entities: [{ entity: "sensor.cabinet", hide: ["comfort", "name"] }, { entity: "sensor.hum", name: "Humidity" }] }); document.body.appendChild(sh); sh.hass = hass(false);
 const shs = [...sh.shadowRoot.querySelectorAll(".sq")];
 if (shs[0].querySelector(".n.t") || shs[0].querySelector(".chip") || !shs[1].querySelector(".n.t") || sh.shadowRoot.querySelector(".rg")) { fails++; console.error("FAIL sensors hide"); }
+// Tile: a group shows "2 of 3 on" and the round button switches the whole group off.
+const tg = document.createElement("roost-tile"); tg.setConfig({ entity: "light.kitchen", quick: "button", entities: ["light.hall", "light.color"] }); document.body.appendChild(tg); tg.hass = hass(false);
+if (!/2 of 3 on/.test(tg.shadowRoot.innerHTML)) { fails++; console.error("FAIL tile group text"); }
+calls.length = 0; tg.shadowRoot.querySelector("[data-qb]").dispatchEvent(new window.Event("click"));
+await new Promise((r) => setTimeout(r, 5));
+if (!calls.some((x) => x[0] === "homeassistant" && x[1] === "turn_off" && x[2].entity_id.length === 3)) { fails++; console.error("FAIL tile group off", JSON.stringify(calls)); }
+// Batteries: the sample's low one comes first.
+const bt = document.createElement("roost-batteries"); bt.setConfig({ sample: true }); document.body.appendChild(bt); bt.hass = hass(false);
+if (!/Hallway motion/.test(bt.shadowRoot.querySelector(".r")?.textContent || "")) { fails++; console.error("FAIL batteries order"); }
 // Room: any cards under it, in one box, kept between redraws, and folded away when asked.
 const rk = document.createElement("roost-room");
 rk.setConfig({ name: "Living", temperature: "sensor.cabinet", cards: [{ type: "custom:roost-tile", entity: "light.kitchen" }, { type: "custom:roost-scene", entity: "scene.movie" }], cards_columns: 2 });
@@ -358,5 +373,5 @@ for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }],
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 32} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 35} checks passed`);
 process.exit(fails ? 1 : 0);

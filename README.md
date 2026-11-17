@@ -1,7 +1,7 @@
 <h1 align="center">Roost Cards</h1>
 
 <p align="center"><b>Beautiful, animated dashboard cards for Home Assistant. Made for phones and tablets.</b><br>
-61 cards · a visual editor for every setting · light and dark · no code needed</p>
+64 cards · a visual editor for every setting · light and dark · no code needed</p>
 
 <p align="center">
 <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
@@ -71,7 +71,7 @@ Recorded on a real Home Assistant (its built-in demo devices), so everything you
 10. [Clock and prayer times](docs/tutorials/10-clock-and-prayer.md)
 11. [Try cards before you own the device](docs/tutorials/11-try-without-devices.md)
 
-## All 61 cards
+## All 64 cards
 
 Each GIF shows the card in use, then in the other colour mode, then as frosted glass.
 
@@ -123,6 +123,9 @@ Each GIF shows the card in use, then in the other colour mode, then as frosted g
 | **Roost Pet** | A pet feeder and water fountain: food and water left, when it last ate, meals today and “feed now”. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pet.gif" width="180" alt="Roost Pet"> |
 | **Roost Nursery** | The baby's room: camera, warmth and humidity, a banner when the baby cries, night light and lullaby. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/nursery.gif" width="180" alt="Roost Nursery"> |
 | **Roost Network** | The internet (download, upload, ping, devices online) or a server (CPU, memory, disk, heat), with a restart you tap twice. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/network.gif" width="180" alt="Roost Network"> |
+| **Roost Batteries** | Every battery in the home, lowest first, with a calm “All good” when none are low. Finds them by itself. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/batteries.gif" width="180" alt="Roost Batteries"> |
+| **Roost Timeline** | What happened at home, newest first: doors, locks, people coming and going, alarms and leaks. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/timeline.gif" width="180" alt="Roost Timeline"> |
+| **Roost Values** | Your own settings in one card: numbers to slide, choices to tap, switches, short texts. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/values.gif" width="180" alt="Roost Values"> |
 | **Roost Bins** | Which bin goes out next, drawn as coloured wheelie bins; tonight's one bounces. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/bins.gif" width="180" alt="Roost Bins"> |
 | **Roost Medicine** | Today's doses as pills to tick off, the next dose, and a warning for a missed one. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/medicine.gif" width="180" alt="Roost Medicine"> |
 | **Roost Modes** | House modes (home, away, holiday, guests): away checks doors and windows, guests get a Wi-Fi code to scan. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/modes.gif" width="180" alt="Roost Modes"> |

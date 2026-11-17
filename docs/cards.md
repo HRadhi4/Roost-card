@@ -46,7 +46,10 @@ align: left            # left or center
 off_tint: false        # true: a hint of the colour when off
 show_state: true       # "On · 78%"
 problem: ""            # e.g. "Not working · battery" greys the tile out
-show_switch: true
+quick: switch          # switch (a switch in the corner; tap the tile to switch),
+                       # button (a round button in the corner switches; tap the tile for all its controls, like Homey) or none
+entities: [light.ceiling, light.lamp]   # optional group: they switch together, the tile says “2 of 3 on · 70%”
+stale_hours: 24        # optional: “Not seen for 2 days” when the device stops reporting (often a flat battery)
 show_since: true       # "for 5 min"
 power_entity: sensor.kitchen_power   # optional
 locked: false          # true: no switch, shows a lock (for things that must stay on)
@@ -306,7 +309,15 @@ entities: [light.living, climate.living_ac, cover.living_curtain, media_player.t
 style: row               # row, card, or tile (the big coloured tile of the Rooms page)
 subtitle: TV off · curtain open   # optional: your own line instead of the automatic one
 tap_action: { action: navigate, navigation_path: "#living" }
+light_slider: true       # one slider for every light in the room (slim row and card)
 ```
+When the room has a motion or presence sensor in `entities`, the line says “Someone here” (and which sensor, when there are several) with a soft pulsing dot, or “Empty · movement 12 min ago”.
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/room-lights.gif" width="320" alt="Roost room card with one slider for all its lights">
+
+A group tile with the round button:
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile-group.gif" width="240" alt="Roost tile with a group of lights and the round quick button">
 
 **Cards under the room** — any card, Roost or Home Assistant's own:
 
@@ -796,6 +807,46 @@ ping: sensor.speedtest_ping
 clients: sensor.router_devices_online
 restart: button.router_restart  # tap twice to restart
 # server: cpu, memory, disk, temperature, uptime
+```
+
+### Roost Batteries
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/batteries.gif" width="320" alt="Roost batteries card in action">
+
+Every battery in the home in one place, lowest first. Nothing to set up: it finds them by itself.
+```yaml
+type: custom:roost-batteries
+low: 20                  # low below this %
+show: all                # all (lowest first) or low (only the low ones, with a calm “All good” when none)
+max: 8                   # rows before “Show all”
+exclude: [sensor.phone_battery]        # leave some out
+# or pick them yourself:
+# entities: [{ entity: sensor.hall_motion_battery, name: Hallway motion }]
+```
+
+### Roost Timeline
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/timeline.gif" width="320" alt="Roost timeline card in action">
+
+What happened at home, newest first: “Front door opened · 5 min ago”, “Layla arrived home”, “Kitchen leak sensor: water found”.
+```yaml
+type: custom:roost-timeline
+hours: 24                # how far back
+max: 8                   # rows before “Show more”
+show_motion: false       # motion makes many rows in a busy home
+# entities: [lock.front_door, binary_sensor.front_door, person.layla]   # empty = people, doors, windows, locks, curtains, alarm and leaks
+```
+
+### Roost Values
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/values.gif" width="320" alt="Roost values card in action">
+
+Your own settings in one card: a number to slide, a choice to tap, a switch, a short text, a date or time, a counter.
+```yaml
+type: custom:roost-values
+name: House settings
+entities:
+  - input_number.ac_at_night
+  - input_select.who_is_visiting
+  - { entity: input_boolean.guest_mode, name: Guests, icon: mdi:account-heart }
+  - input_text.note_for_the_cleaner
 ```
 
 ### Roost Bins
