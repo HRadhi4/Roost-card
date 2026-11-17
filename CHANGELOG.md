@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.3.2 — 2026-11-17
+- **Frosted glass on every card**: each card now has a "See-through" setting (solid, frosted glass or fully clear) with sliders for how see-through it is and how strong the blur is. The nav bar gets the same sliders for its glass.
+- **Roost Buttons are coloured like the nav bar**: the same six looks when a button is on (filled, soft, pill, line, dot or icon only) and the same bar backgrounds (frosted glass, solid or none).
+
 ## 1.3.1 — 2026-11-17
 - **Roost Prayer Times** keeps your own calendar: any time (Imsak, Fajr, Dhuhr and the rest) can come from your own sensor, such as the Al-Hadi calendar, and only the times you have no sensor for are calculated. You can name your calendar at the bottom of the card.
 

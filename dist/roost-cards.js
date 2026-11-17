@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.3.1";
+const ROOST_VERSION = "1.3.2";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -333,7 +333,20 @@ class RoostBase extends HTMLElement {
     return t === "auto" ? !!this._hass?.themes?.darkMode : t === "dark";
   }
 
-  get p() { return this.dark ? PALETTE.dark : PALETTE.light; }
+  /**
+   * The colours to draw with. With "Frosted glass" the card's background becomes see-through and blurs
+   * what is behind it; "Clear" leaves only the content. How see-through and how blurred can be set.
+   */
+  get p() {
+    const base = this.dark ? PALETTE.dark : PALETTE.light, c = this._config || {};
+    const glassNav = this.localName === "roost-nav" && (c.background || "glass") === "glass";
+    if (!glassNav && (!c.surface || c.surface === "solid")) return base;
+    if (c.surface === "clear") return { ...base, panel: "transparent", off: "transparent", border: "transparent", fx: "" };
+    const tint = this.dark ? "20,24,49" : "255,255,255";
+    const op = Math.max(0, Math.min(100, Number(c.opacity ?? (glassNav ? 86 : 55)))) / 100, blur = Math.max(0, Number(c.blur ?? 18));
+    const fx = blur ? `backdrop-filter:blur(${blur}px) saturate(150%);-webkit-backdrop-filter:blur(${blur}px) saturate(150%)` : "";
+    return { ...base, panel: `rgba(${tint},${op})`, off: `rgba(${tint},${Math.min(1, op + 0.06)})`, border: this.dark ? `rgba(255,255,255,${(0.06 + op * 0.06).toFixed(2)})` : `rgba(22,25,54,${(0.06 + op * 0.06).toFixed(2)})`, fx };
+  }
 
   /** The card's colour: a preset name, or the two custom colours. */
   colour(key = "color") {
@@ -491,6 +504,12 @@ function fitSchema(schema, data) {
   return out;
 }
 
+// How see-through a card is: solid, frosted glass (blurs what is behind) or clear. Added to every card's editor.
+const SURFACE_FIELDS = (nav) => ({ type: "expandable", name: "", title: "See-through (frosted glass)", icon: "mdi:blur", schema: [
+  ...(nav ? [] : [{ name: "surface", label: "Background", selector: pick([["solid", "Solid"], ["frosted", "Frosted glass"], ["clear", "Clear (no background)"]]) }]),
+  { type: "grid", name: "", schema: [{ name: "opacity", label: "How solid (%)", selector: slider(0, 100, 5, "%") }, { name: "blur", label: "Blur", selector: slider(0, 40, 2) }] },
+] });
+
 class RoostEditor extends HTMLElement {
   setConfig(config) { this._config = { ...config }; this.draw(); }
 
@@ -499,7 +518,10 @@ class RoostEditor extends HTMLElement {
   draw() {
     const cls = this.cardClass;
     if (!cls || !this._hass || !this._config) return;
-    const { schema, computeLabel: label } = cls.getConfigForm();
+    const form = cls.getConfigForm();
+    const label = form.computeLabel;
+    const noSurface = ["roost-page", "roost-fullscreen", "roost-title", "roost-theme"].includes(cls.tag);
+    const schema = noSurface ? form.schema : [...form.schema, SURFACE_FIELDS(cls.tag === "roost-nav")];
     this._data = { ...cls.defaults, ...this._config };
     if (!this._form) {
       this._form = document.createElement("ha-form");
@@ -827,7 +849,7 @@ class RoostChips extends RoostBase {
       .chip ha-icon{--mdc-icon-size:${h > 44 ? 22 : 18}px;display:flex}
       .av{width:${h - 14}px;height:${h - 14}px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid ${p.off};overflow:hidden;position:relative;flex:none}
       .av img{width:100%;height:100%;object-fit:cover}
-      .list{margin:12px 0 16px;border-radius:20px;border:1px solid ${p.border};background:${p.panel};padding:6px 14px}
+      .list{margin:12px 0 16px;border-radius:20px;border:1px solid ${p.border};background:${p.panel};${p.fx || ""};padding:6px 14px}
       .it{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid ${p.border}}
       .it:first-child{border-top:0}
       .it .n{flex:1;min-width:0;font-size:14px;color:${p.text}}
@@ -925,7 +947,7 @@ class RoostThermostat extends RoostBase {
     const modeName = { cool: "Cool", heat: "Heat", dry: "Dry", fan_only: "Fan", heat_cool: "Auto", auto: "Auto" };
     const status = un ? "Offline" : on ? `${modeName[s.state] || s.state} · running` : "Off";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .card{${c.plain ? `padding:0;background:none;border:0;color:${p.text}` : `border-radius:${c.radius}px;padding:18px;background:${p.panel};border:1px solid ${p.border};color:${p.text}`}}
+      .card{${c.plain ? `padding:0;background:none;border:0;color:${p.text}` : `border-radius:${c.radius}px;padding:18px;background:${p.panel};${p.fx || ""};border:1px solid ${p.border};color:${p.text}`}}
       .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
       .hd .n{font-size:15px;font-weight:600}
       .pill{font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;background:${on ? `${g[0]}33` : p.inset};color:${on ? g[1] : p.muted}}
@@ -1323,7 +1345,7 @@ class RoostNav extends RoostBase {
           ...colourFields("color", "Colour of the chosen button"),
           { name: "active_style", selector: pick([["filled", "Filled square with glow"], ["soft", "Soft tinted square"], ["pill", "Filled pill"], ["line", "Line under it"], ["dot", "Dot under it"], ["icon", "Coloured icon only"]]) },
           { type: "grid", name: "", schema: [
-            { name: "background", selector: pick([["glass", "See-through glass"], ["solid", "Solid"], ["none", "None"]]) },
+            { name: "background", selector: pick([["glass", "Frosted glass"], ["solid", "Solid"], ["none", "None (clear)"]]) },
             { name: "radius", selector: slider(0, 40, 2) },
           ] },
           { type: "grid", name: "", schema: [{ name: "bar_height", selector: slider(40, 76, 2) }, { name: "icon_size", selector: slider(16, 32) }] },
@@ -1380,7 +1402,7 @@ class RoostNav extends RoostBase {
       .edit{font-size:12px;color:${p.muted};text-align:center;margin:0 0 6px}
       nav{${pos};display:${rail ? "flex" : "grid"};${rail ? "flex-direction:column" : `grid-template-columns:repeat(${shown.length},minmax(0,1fr))`};gap:${rail ? 12 : 7}px;padding:${rail ? "14px 10px" : "8px"};border-radius:${Number(c.radius) + (rail ? 2 : 0)}px;
         ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};box-shadow:0 18px 40px -16px rgba(0,0,0,.5);`
-    : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 18px 40px -12px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;`}
+    : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);-webkit-backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);box-shadow:0 18px 40px -12px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;`}
         ${rail ? "width:max-content" : `width:${fixed ? "calc(100% - 24px)" : "100%"};max-width:536px`};${fixed ? "" : "margin:0 auto"}}
       a{position:relative;min-width:${rail ? 56 : 0}px;min-height:${Number(c.bar_height) || 54}px;border-radius:${c.active_style === "pill" ? 999 : Math.max(8, Number(c.radius) - 8)}px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
         color:${p.muted};text-decoration:none;font-size:clamp(8.5px, 2.7vw, 10.5px);font-weight:600;-webkit-tap-highlight-color:transparent;padding:4px 6px;transition:background .12s}
@@ -1481,7 +1503,7 @@ class RoostRow extends RoostBase {
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       @container (max-width: 280px){:host .row{gap:10px;padding:12px}:host .ring{width:min(${Math.max(40, Number(c.ring_size) || 58)}px,30cqw);height:min(${Math.max(40, Number(c.ring_size) || 58)}px,30cqw)}:host .ring .v{font-size:min(${Math.round(Math.max(40, Number(c.ring_size) || 58) * 0.3)}px,9cqw)}:host .ch{display:none}:host .n{font-size:15px}}
       @container (max-width: 220px){:host .row{flex-wrap:wrap}:host .tx{flex:1 1 100%}}
-      .row{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:${c.radius}px;background:${p.panel};border:1px solid ${p.border};color:${p.text};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s;opacity:${un ? 0.55 : 1}}
+      .row{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:${c.radius}px;background:${p.panel};${p.fx || ""};border:1px solid ${p.border};color:${p.text};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s;opacity:${un ? 0.55 : 1}}
       .row:active{transform:scale(.98)}
       .ring{position:relative;width:${rs}px;height:${rs}px;flex:none;display:flex;align-items:center;justify-content:center}
       .ring svg{position:absolute;inset:0}
@@ -1843,7 +1865,7 @@ class RoostCurtain extends RoostBase {
       .win.moving .note{display:flex}
       .note ha-icon{--mdc-icon-size:16px;animation:roost-breathe 1s ease-in-out infinite}
       .btns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
-      .btn{min-height:44px;border-radius:14px;border:1px solid ${p.border};background:${p.panel};color:${p.text};font:inherit;font-size:14px;font-weight:600;cursor:pointer;
+      .btn{min-height:44px;border-radius:14px;border:1px solid ${p.border};background:${p.panel};${p.fx || ""};color:${p.text};font:inherit;font-size:14px;font-weight:600;cursor:pointer;
         display:flex;align-items:center;justify-content:center;gap:6px;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .btn:active{transform:scale(.96)}
       .btn.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 10px 22px -10px ${g[2]}}
@@ -1986,7 +2008,7 @@ const fmt = (v, dec) => (v == null ? "" : Number(v).toFixed(dec == null ? (Math.
 const decOf = (state, unit) => (/^(W|Wh|lx|ppm|rpm|mA)$/.test(String(unit || "")) ? 0 : Math.min(2, (String(state).split(".")[1] || "").length));
 // "26°" and "52%" sit next to the number; "1460 W" and "612 ppm" get a space
 const unitGap = (u) => (!u ? "" : /^(°|°C|°F|%)$/.test(u) ? u : ` ${u}`);
-const panelCss = (p, radius = 22) => `background:${p.panel};border:1px solid ${p.border};border-radius:${radius}px;color:${p.text}`;
+const panelCss = (p, radius = 22) => `background:${p.panel};${p.fx || ""};border:1px solid ${p.border};border-radius:${radius}px;color:${p.text}`;
 // a ring: the track and the coloured part, in a 0..1 fraction
 function ringSvg({ size = 210, r = 80, width = 14, f = 0, track, id = "g", from, to, inner, innerFill }) {
   const C = 2 * Math.PI * r, L = C * 0.75, cx = size / 2;
@@ -2129,7 +2151,7 @@ class RoostAutomations extends ticking(RoostBase, 60000) {
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}${switchCss(p, g)}
       .ttl{font-size:17px;font-weight:700;color:${p.text};margin:2px 4px 10px}
       .list{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:8px}
-      .row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:${c.radius}px;background:${p.off};border:1px solid ${p.border};color:${p.text};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:${c.radius}px;background:${p.off};${p.fx || ""};border:1px solid ${p.border};color:${p.text};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .row:active{transform:scale(.98)}
       .ic{width:38px;height:38px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;background:${p.inset};color:${p.muted}}
       .row.on .ic{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 8px 18px -8px ${g[2]}}
@@ -2139,7 +2161,7 @@ class RoostAutomations extends ticking(RoostBase, 60000) {
       .tx{flex:1;min-width:0}
       .n{font-size:14px;font-weight:600;line-height:1.25}
       .l{font-size:12px;color:${p.muted};margin-top:2px}
-      .run{flex:none;width:34px;height:34px;border-radius:50%;border:1px solid ${p.border};background:${p.panel};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer}
+      .run{flex:none;width:34px;height:34px;border-radius:50%;border:1px solid ${p.border};background:${p.panel};${p.fx || ""};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer}
       .run ha-icon{--mdc-icon-size:18px}
       .run.go ha-icon{animation:roost-pulse .8s ease-in-out 2}
       .empty{padding:18px;border-radius:${c.radius}px;border:1px dashed ${p.border};color:${p.muted};text-align:center;font-size:14px}
@@ -3003,7 +3025,7 @@ class RoostMedia extends RoostBase {
       .pw ha-icon{--mdc-icon-size:22px}
       .now{font-size:13px;line-height:1.35;color:${p.text};padding:10px 12px;border-radius:14px;background:${p.inset}}
       .row{display:flex;align-items:center;gap:8px}
-      .b{width:42px;height:42px;border-radius:50%;flex:none;border:1px solid ${p.border};background:${p.off};color:${p.text};cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+      .b{width:42px;height:42px;border-radius:50%;flex:none;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .b:active{transform:scale(.9)}
       .b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent}
       .b ha-icon{--mdc-icon-size:20px}
@@ -3013,7 +3035,7 @@ class RoostMedia extends RoostBase {
       .vol .v{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${p.text};mix-blend-mode:${this.dark ? "normal" : "multiply"}}
       .ctl{display:flex;justify-content:center;gap:14px}
       .src{display:flex;flex-wrap:wrap;gap:6px}
-      .src button{padding:7px 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+      .src button{padding:7px 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
       .src button.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]};border-color:transparent}
     </style>
     <div class="card">
@@ -3272,13 +3294,13 @@ class RoostAlarm extends RoostBase {
       .btns{display:grid;grid-template-columns:repeat(${Math.max(1, (c.modes || []).length + 1)},minmax(0,1fr));gap:8px}
       .top > span:last-child{min-width:0}
       @container (max-width: 320px){:host .top{flex-direction:column;align-items:flex-start;gap:10px}:host .btns{grid-template-columns:repeat(2,minmax(0,1fr))}:host .sh{width:56px;height:56px;border-radius:18px}}
-      .b{min-height:64px;border-radius:16px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
+      .b{min-height:64px;border-radius:16px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;
         display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px 4px;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .b:active{transform:scale(.95)}
       .b ha-icon{--mdc-icon-size:22px}
       .b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 10px 22px -10px ${g[2]}}
       .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-      .pad button{height:48px;border-radius:14px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:18px;font-weight:600;cursor:pointer}
+      .pad button{height:48px;border-radius:14px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:18px;font-weight:600;cursor:pointer}
       .code{text-align:center;font-size:22px;letter-spacing:8px;min-height:30px;color:${p.text}}
       .doors{display:flex;flex-wrap:wrap;gap:6px}
       .dr{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12.5px;background:${p.inset};color:${p.text};cursor:pointer}
@@ -3367,7 +3389,7 @@ class RoostLight extends RoostBase {
       .bar .f{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,${on && a.rgb_color && !warmTone(a.rgb_color) ? `color-mix(in srgb, ${tint} 70%, #fff)` : g[0]},${tint});border-radius:18px}
       .bar ha-icon{position:absolute;left:14px;top:14px;--mdc-icon-size:24px;color:${on ? (a.rgb_color && !warmTone(a.rgb_color) ? "#fff" : g[3]) : p.muted}}
       .chips{display:flex;flex-wrap:wrap;gap:8px}
-      .chips button{height:36px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+      .chips button{height:36px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
       .chips button i{display:block;width:14px;height:14px;border-radius:50%}
       .dotc{width:36px;padding:0!important;justify-content:center}
     </style>
@@ -3662,10 +3684,10 @@ class RoostAlerts extends ticking(RoostBase, 60000) {
     const shown = list.slice(0, c.max);
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .wrap{display:flex;flex-direction:column;gap:8px}
-      .a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:${p.panel};border:1px solid ${p.border};color:${p.text};cursor:pointer;border-left-width:4px}
+      .a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:${p.panel};${p.fx || ""};border:1px solid ${p.border};color:${p.text};cursor:pointer;border-left-width:4px}
       .a ha-icon{--mdc-icon-size:22px;flex:none;animation:roost-breathe 1.8s ease-in-out infinite}
       .a span{flex:1;font-size:13.5px;font-weight:600;line-height:1.3}
-      .ok{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;background:${p.panel};border:1px solid ${p.border};color:${p.muted};font-size:13.5px}
+      .ok{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;background:${p.panel};${p.fx || ""};border:1px solid ${p.border};color:${p.muted};font-size:13.5px}
       .ok ha-icon{color:#3DD68C;--mdc-icon-size:22px}
       .more{font-size:12px;color:${p.muted};text-align:center}
     </style>
@@ -3787,7 +3809,7 @@ class RoostRemote extends RoostBase {
       .card{${panelCss(p, c.radius)};padding:18px;display:flex;flex-direction:column;gap:16px;align-items:center;--k:min(56px,15cqw)}
       .top{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px}
       .n{font-size:16px;font-weight:600}
-      .k{width:var(--k);height:var(--k);border-radius:50%;border:1px solid ${p.border};background:${p.off};color:${p.text};cursor:pointer;display:flex;align-items:center;justify-content:center;font:inherit;font-size:18px;font-weight:600;
+      .k{width:var(--k);height:var(--k);border-radius:50%;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};cursor:pointer;display:flex;align-items:center;justify-content:center;font:inherit;font-size:18px;font-weight:600;
         -webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s}
       .k:active{transform:scale(.88);background:${g[0]}33}
       .k{padding:0;flex:none;overflow:hidden}
@@ -4154,12 +4176,12 @@ class RoostTimer extends RoostBase {
       .v{font-size:38px;font-weight:700}
       .w{font-size:12px;color:${state === "active" ? g[this.dark ? 1 : 0] : p.muted}}
       .btns{display:flex;gap:10px}
-      .b{width:52px;height:52px;border-radius:50%;border:1px solid ${p.border};background:${p.off};color:${p.text};cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .12s}
+      .b{width:52px;height:52px;border-radius:50%;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .12s}
       .b:active{transform:scale(.9)}
       .b.main{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 10px 22px -10px ${g[2]}}
       .b ha-icon{--mdc-icon-size:24px}
       .q{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
-      .q button{height:32px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+      .q button{height:32px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
     </style>
     <div class="card">
       <div class="n t"><ha-icon icon="${esc(c.icon || "mdi:timer-outline")}"></ha-icon>${esc(this.name(c.entity, "Timer"))}</div>
@@ -4224,7 +4246,7 @@ class RoostFan extends RoostBase {
       .n{font-size:16px;font-weight:600}
       .l{font-size:12.5px;color:${p.muted};margin-top:2px}
       .row{display:flex;gap:8px;flex-wrap:wrap}
-      .b{flex:1;min-width:52px;height:44px;border-radius:14px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+      .b{flex:1;min-width:52px;height:44px;border-radius:14px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
       .b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent}
       .b ha-icon{--mdc-icon-size:18px}
     </style>
@@ -4630,7 +4652,7 @@ class RoostSensors extends RoostBase {
 // ------------------------------------------------------------------ Roost Buttons
 // Several small actions in one rounded bar. A button lights up when its device is on.
 class RoostButtons extends RoostBase {
-  static get defaults() { return { items: [], show_names: true, color: "active", radius: 22, theme: "auto" }; }
+  static get defaults() { return { items: [], show_names: true, color: "active", active_style: "filled", background: "glass", radius: 22, theme: "auto" }; }
 
   validate(c) { if (!Array.isArray(c.items) || !c.items.length) throw new Error("Add some buttons"); }
 
@@ -4647,6 +4669,10 @@ class RoostButtons extends RoostBase {
         } } } },
         { type: "grid", name: "", schema: [{ name: "show_names", label: "Names under the icons", selector: { boolean: {} } }, { name: "radius", selector: slider(0, 40, 2) }] },
         ...colourFields("color", "Colour when on"),
+        { type: "grid", name: "", schema: [
+          { name: "active_style", label: "When on", selector: pick([["filled", "Filled square with glow"], ["soft", "Soft tinted square"], ["pill", "Filled pill"], ["line", "Line under it"], ["dot", "Dot under it"], ["icon", "Coloured icon only"]]) },
+          { name: "background", selector: pick([["glass", "Frosted glass"], ["solid", "Solid"], ["none", "None (clear)"]]) },
+        ] },
         THEME_FIELD,
       ],
       computeLabel,
@@ -4661,12 +4687,22 @@ class RoostButtons extends RoostBase {
     if (!this._hass || !this._config) return;
     const c = this._config, p = this.p, g = this.colour();
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .bar{${panelCss(p, c.radius)};padding:6px;display:grid;grid-template-columns:repeat(${c.items.length},minmax(0,1fr));gap:4px}
+      .bar{border-radius:${c.radius}px;color:${p.text};padding:6px;display:grid;grid-template-columns:repeat(${c.items.length},minmax(0,1fr));gap:4px;
+        ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};`
+    : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);-webkit-backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);box-shadow:0 18px 40px -16px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.04) inset;`}}
       @container (max-width: ${c.items.length * 66}px){:host .b span{display:none}:host .b{min-height:48px}}
       .b{min-height:${c.show_names ? 62 : 48}px;border-radius:${Math.max(8, c.radius - 6)}px;border:0;background:transparent;color:${p.muted};font:inherit;font-size:11px;font-weight:600;cursor:pointer;
         display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 2px;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .b:active{transform:scale(.92)}
-      .b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 8px 20px -10px ${g[2]}}
+      .b{position:relative;border-radius:${c.active_style === "pill" ? 999 : Math.max(8, c.radius - 6)}px}
+      ${{
+    filled: `.b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -8px color-mix(in srgb, ${g[0]} 95%, transparent), inset 0 1px 0 rgba(255,255,255,.35)}`,
+    pill: `.b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 22px -8px ${g[2]}}`,
+    soft: `.b.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]}}`,
+    line: `.b.on{color:${g[this.dark ? 1 : 0]}}.b.on::after{content:"";position:absolute;bottom:3px;left:30%;right:30%;height:3px;border-radius:3px;background:linear-gradient(90deg,${g[0]},${g[1]})}`,
+    dot: `.b.on{color:${g[this.dark ? 1 : 0]}}.b.on::after{content:"";position:absolute;bottom:3px;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:${g[1]};box-shadow:0 0 8px ${g[2]}}`,
+    icon: `.b.on{color:${g[this.dark ? 1 : 0]}}.b.on ha-icon{filter:drop-shadow(0 0 6px ${g[2]})}`,
+  }[c.active_style] || ""}
       .b ha-icon{--mdc-icon-size:22px}
       .b.done ha-icon{animation:roost-pulse .5s ease-out 1}
     </style>
@@ -5105,7 +5141,8 @@ const CARDS = [
   ["roost-fullscreen", RoostFullscreen, "Roost Full Screen", "Full screen without Home Assistant's top bar and sidebar: by itself, or as a button that maximizes and minimizes."],
 ];
 window.customCards = window.customCards || [];
-for (const [, cls] of CARDS) {
+for (const [tag, cls] of CARDS) {
+  cls.tag = tag;
   cls.getConfigElement = function getConfigElement() { const el = document.createElement("roost-editor"); el.cardClass = cls; return el; };
 }
 for (const [tag, cls, name, description] of CARDS) {

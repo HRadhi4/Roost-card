@@ -11,6 +11,13 @@ Every card has these colour and look settings:
 - **Size** and **corner roundness** (on tiles, scenes and the thermostat).
 - **Look when on** (tiles and scenes): colour fade, one colour, see-through glass, or a coloured outline only. **Glow**: soft, strong or none.
 - **Icon box** (tiles): rounded square, circle, square, or no box. Icon size and name size are sliders.
+- **See-through (frosted glass)**, on every card: solid, frosted glass or fully clear, with sliders for how see-through it is and how strong the blur is. On the nav bar the same sliders tune its frosted glass.
+
+```yaml
+surface: frosted   # solid, frosted or clear
+opacity: 55        # 0 = fully see-through, 100 = solid
+blur: 18           # blur behind the card, in pixels
+```
 
 ### Roost Tile
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile.gif" width="320" alt="Roost tile card in action">
@@ -475,6 +482,8 @@ type: custom:roost-buttons
 items:
   - { name: Lights, icon: mdi:lightbulb-group, entity: light.living }
   - { name: Movie, icon: mdi:movie, tap_action: { action: perform-action, perform_action: scene.turn_on, target: { entity_id: scene.movie } } }
+active_style: filled  # same choices as the nav bar: filled, soft, pill, line, dot or icon
+background: glass     # glass, solid or none
 ```
 
 
