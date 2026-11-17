@@ -2,6 +2,14 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.6.2
+- **Side rail**: a full screen button that switches it on and off, with the icon following, and only for the people you choose. No more floating button over the page.
+- **Clock line of times**:
+  - it counts down only to the times marked for it, so the next prayer is Fajr, not “end of the night”;
+  - the line has the colours of the day's sky and a glowing dot for now;
+  - names of close times sit side by side instead of on top of each other;
+  - “Next prayer” stays beside the clock.
+
 ## 1.6.1
 Everything a hand-built wall tablet needed, so a whole tablet dashboard can be made from Roost cards alone:
 - **Rooms**:

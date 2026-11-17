@@ -176,6 +176,8 @@ active_style: filled  # filled, soft, pill, line, dot or icon
 background: glass     # glass, solid or none
 bar_height: 54
 icon_size: 22
+# a button that switches full screen on and off (its icon follows); put it on the side rail, only for you:
+#  - { name: Full screen, icon: mdi:fullscreen, action: fullscreen, bottom: true, users: [person.me] }
 ```
 
 ### Roost Rooms
@@ -391,6 +393,8 @@ smooth: true              # sweeping second hand
 size: large               # small, medium, large, huge
 world:                    # optional: world clocks underneath
   - { label: London, timezone: Europe/London }
+line: sky                 # the line of times: sky (colours of the day) or plain
+# times marked countdown: true are the only ones counted down to (for example the prayers, not sunrise)
 ```
 
 ### Roost Prayer Times
