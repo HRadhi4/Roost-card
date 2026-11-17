@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.3.4";
+const ROOST_VERSION = "1.3.5";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -3051,7 +3051,7 @@ class RoostMedia extends RoostBase {
       .src button.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]};border-color:transparent}
     </style>
     <div class="card">
-      <div class="top"><span class="ic" data-more data-pop="${on ? 1 : 0}" data-popkey="ic">${art ? `<img src="${esc(art)}" alt="">` : `<ha-icon icon="${esc(c.icon || "mdi:television")}"></ha-icon>`}</span>
+      <div class="top"><span class="ic" data-more data-pop="${on ? 1 : 0}" data-popkey="ic">${art ? `<img src="${esc(art)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('ha-icon'),{icon:'${esc(c.icon || "mdi:television")}'}))">` : `<ha-icon icon="${esc(c.icon || "mdi:television")}"></ha-icon>`}</span>
         <span class="tx"><div class="n t">${esc(this.name(c.entity))}</div><div class="l t">${playing ? '<span class="eq"><i></i><i></i><i></i></span>' : ""}${esc(line)}</div></span>
         <button class="pw" data-a="power" aria-label="Power"><ha-icon icon="mdi:power"></ha-icon></button></div>
       ${on && now ? `<div class="now t">${esc(now)}</div>` : ""}

@@ -47,15 +47,18 @@ Step by step, and without HACS: **[Install guide](docs/tutorials/01-install.md)*
 
 ## Tutorials
 
-### Video: build a full dashboard
+### Videos
 
-[![Video tutorial: build a full phone dashboard with Roost Cards](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/video/roost-full-dashboard.jpg)](https://github.com/HRadhi4/Roost-card/blob/main/docs/video/roost-full-dashboard.mp4)
+Recorded on a real Home Assistant (its built-in demo devices), so everything you see is the real editor and the real cards.
 
-From an empty page to a full phone home screen, all in the visual editor, and a quick look at all 37 cards at the end. (4 minutes, no sound.)
+| Build a dashboard in the visual editor (6 min) | Every card in action (3 min) |
+|:-:|:-:|
+| [![Build a dashboard in the visual editor](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/video/roost-build-dashboard.jpg)](https://github.com/HRadhi4/Roost-card/blob/main/docs/video/roost-build-dashboard.mp4) | [![Every Roost card in action](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/video/roost-every-card.jpg)](https://github.com/HRadhi4/Roost-card/blob/main/docs/video/roost-every-card.mp4) |
+| Make a dashboard, add each card from the card list, pick your devices, open its options, save. Then use it on a phone. | All 37 cards on one page, each one tapped, dragged or switched so you can see what it does. |
 
 ### Written, with pictures
 
-0. [Video: build a full dashboard](docs/tutorials/00-video.md) · 4 min
+0. [Videos: build a dashboard, and every card in action](docs/tutorials/00-video.md)
 1. [Install Roost Cards](docs/tutorials/01-install.md) · 2 min
 2. [Add your first card](docs/tutorials/02-first-card.md) · 1 min
 3. [Build a phone home screen](docs/tutorials/03-phone-home-screen.md) · 10 min
