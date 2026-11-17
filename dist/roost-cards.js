@@ -1639,7 +1639,7 @@ class RoostNav extends RoostBase {
 
   watched() { return []; }
 
-  extraSignature() { return `${location.pathname}${location.hash}|${window.innerWidth >= 768}|${this.editing()}|${RoostNav.sideEdge()}|${RoostNav.topEdge()}`; }
+  extraSignature() { return `${location.pathname}${location.hash}|${RoostFull.isOn() ? 1 : 0}|${window.innerWidth >= 768}|${this.editing()}|${RoostNav.sideEdge()}|${RoostNav.topEdge()}`; }
 
   logoHtml() {
     const l = String(this._config.logo || "").trim();
@@ -1726,7 +1726,8 @@ class RoostNav extends RoostBase {
         { name: "items", label: "Buttons in the bar", selector: { object: { multiple: true, label_field: "name", fields: {
           name: { label: "Name", selector: { text: {} } },
           icon: { label: "Icon", required: true, selector: { icon: {} } },
-          path: { label: "Opens (for example /dashboard-home/0 or #rooms)", required: true, selector: { text: {} } },
+          path: { label: "Opens (for example /dashboard-home/0 or #rooms)", selector: { text: {} } },
+          action: { label: "Or does", selector: { select: { mode: "dropdown", options: [{ value: "navigate", label: "Open the page above" }, { value: "fullscreen", label: "Full screen on and off (its icon follows)" }] } } },
           match: { label: "Also lights up on these pages", selector: { select: { multiple: true, custom_value: true, options: [] } } },
           users: { label: "Only for these people (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
           bottom: { label: "At the far end of the side rail (for example Settings)", selector: { boolean: {} } },
@@ -1763,6 +1764,7 @@ class RoostNav extends RoostBase {
   getGridOptions() { return { columns: 12, rows: "auto" }; }
 
   active(path, it) {
+    if (it?.action === "fullscreen" || !path) return false;
     if (Array.isArray(it?.match) && it.match.some((m) => (String(m).startsWith("#") ? location.hash === m : location.pathname.startsWith(m)))) return true;
     const here = `${location.pathname}${location.hash}`;
     if (path.startsWith("#")) return location.hash === path || (!location.hash && this._config.items[0]?.path === path);
@@ -1837,8 +1839,8 @@ class RoostNav extends RoostBase {
         background:linear-gradient(135deg,${g[0]},#38BDF8);color:#fff;font-weight:700;font-size:20px;box-shadow:0 8px 24px -6px ${g[2]}}
       .logo img{width:100%;height:100%;object-fit:cover}
     </style>
-    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${rail ? this.logoHtml() : ""}${shown.map(({ it, i }, k) => `${rail && it.bottom && !shown.slice(0, k).some((x) => x.it.bottom) ? '<span class="grow"></span>' : ""}<a href="${esc(it.path)}" data-i="${i}" class="${this.active(it.path, it) ? "on" : ""}" aria-label="${esc(it.name || it.path)}">
-      <ha-icon icon="${esc(it.icon || "mdi:circle")}"></ha-icon>${c.show_labels && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</a>`).join("")}</nav>`;
+    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${rail ? this.logoHtml() : ""}${shown.map(({ it, i }, k) => `${rail && it.bottom && !shown.slice(0, k).some((x) => x.it.bottom) ? '<span class="grow"></span>' : ""}<a href="${esc(it.path || "#")}" data-i="${i}" class="${this.active(it.path, it) ? "on" : ""}" aria-label="${esc(it.action === "fullscreen" ? (RoostFull.isOn() ? "Leave full screen" : "Full screen") : it.name || it.path)}">
+      <ha-icon icon="${esc(it.action === "fullscreen" ? (RoostFull.isOn() ? "mdi:fullscreen-exit" : "mdi:fullscreen") : it.icon || "mdi:circle")}"></ha-icon>${c.show_labels && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</a>`).join("")}</nav>`;
     const pillCss = { filled: `background:linear-gradient(135deg,${g[0]},${g[1]});box-shadow:0 10px 24px -8px color-mix(in srgb, ${g[0]} 95%, transparent), inset 0 1px 0 rgba(255,255,255,.35)`,
       pill: `background:linear-gradient(135deg,${g[0]},${g[1]});box-shadow:0 10px 22px -8px ${g[2]}`, soft: `background:${g[0]}2E` }[c.active_style];
     if (pillCss) {
@@ -1861,6 +1863,8 @@ class RoostNav extends RoostBase {
       ev.preventDefault();
       const mk = (c.items || []).map((x) => x.path).join("|"); ((RoostNav.memo = RoostNav.memo || {})[mk] = RoostNav.memo[mk] || {}).go = Date.now();
       this.vibrate();
+      if (it.action === "fullscreen") { RoostFull.toggle({}); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 80); return; }
+      if (!it.path) return;
       if (it.path.startsWith("#")) { if (location.hash === it.path) RoostNav.jump(it.path, it.path === c.items[0]?.path); else location.hash = it.path; }
       else { history.pushState(null, "", it.path); this.fire("location-changed", { replace: false }); }
       this._sig = null; this.hass = this._hass;
@@ -2804,10 +2808,13 @@ class RoostClockClassic extends ticking(RoostBase, 15000) {
     let times = (c.times || []).map((t) => ({ ...t, at: this.when(t.entity) })).filter((t) => t.at);
     if (!times.length && c.prayer_method) times = this.prayerTimes(now);
     const mins = (d) => d.getHours() * 60 + d.getMinutes();
-    let next = times.filter((t) => t.countdown !== false && mins(t.at) > mins(now)).sort((a, b) => mins(a.at) - mins(b.at))[0];
+    // when some times are marked "count down to it", only those are counted down to (prayers, not sunrise or the end of the night)
+    const marked = times.some((t) => t.countdown === true);
+    const counts = (t) => (marked ? t.countdown === true : t.countdown !== false);
+    let next = times.filter((t) => counts(t) && mins(t.at) > mins(now)).sort((a, b) => mins(a.at) - mins(b.at))[0];
     let nextAt = next ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), next.at.getHours(), next.at.getMinutes()) : null;
     if (!next) {
-      next = times.filter((t) => t.countdown !== false).sort((a, b) => mins(a.at) - mins(b.at))[0];
+      next = times.filter((t) => counts(t)).sort((a, b) => mins(a.at) - mins(b.at))[0];
       if (next) { nextAt = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, next.at.getHours(), next.at.getMinutes()); }
     }
     const left = nextAt ? Math.max(0, Math.round((nextAt - now) / 60000)) : 0;
@@ -2815,30 +2822,36 @@ class RoostClockClassic extends ticking(RoostBase, 15000) {
     const fmtT = (d) => d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: !c.hour24 });
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${c.frame ? panelCss(p, c.radius) : `color:${p.text}`};padding:${c.frame ? 20 : 0}px;display:flex;flex-direction:column;gap:14px}
-      .top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+      .top{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+      .top > div:first-child{min-width:0}
       .clk{display:flex;align-items:baseline;gap:6px}
-      .hm{font-size:clamp(30px,17cqw,56px);font-weight:700;letter-spacing:-1.5px;line-height:1}
+      .hm{font-size:clamp(30px,14cqw,52px);font-weight:700;letter-spacing:-1.5px;line-height:1}
       .ap{font-size:18px;font-weight:600;color:${p.muted}}
       .dt{font-size:14px;color:${p.muted};margin-top:6px}
-      .nx{display:flex;flex-direction:column;align-items:flex-end;text-align:right}
+      .nx{display:flex;flex-direction:column;align-items:flex-end;text-align:right;flex:none}
       .nx .w{font-size:12px;color:${p.muted}}
-      .nx .n{font-size:16px;font-weight:700}
-      .nx .c{font-size:13px;font-weight:600;color:${g[1]}}
-      .line{position:relative;height:52px;margin:0 8px}
-      .bar{position:absolute;left:0;right:0;top:10px;height:4px;border-radius:4px;background:${p.track}}
-      .fill{position:absolute;left:0;top:10px;height:4px;border-radius:4px;background:linear-gradient(90deg,${g[0]},${g[1]})}
-      .dot{position:absolute;top:6px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
-      .dot i{display:block;width:8px;height:8px;border-radius:50%;background:${this.dark ? "#0B0D17" : "#fff"};border:2px solid ${p.tick}}
-      .dot.nx2 i{width:12px;height:12px;margin-top:-2px;border:0;background:${g[1]};box-shadow:0 0 10px ${g[1]}}
-      .dot.nx2 i::after{content:"";position:absolute;left:50%;top:-1px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:${g[1]};animation:roost-ping 1.8s ease-out infinite}
-      .dot span{font-size:10px;color:${p.muted}}
-      .now{position:absolute;top:2px;width:2px;height:20px;border-radius:2px;background:${p.text};transform:translateX(-50%)}
+      .nx .n{font-size:17px;font-weight:700;color:${this.dark ? "#C4B5FD" : "#5B3FE0"};white-space:nowrap}
+      .nx .c{font-size:12px;color:${p.muted}}
+      .line{position:relative;height:44px;margin:0 8px}
+      .bar{position:absolute;left:0;right:0;top:10px;height:6px;border-radius:999px;background:${c.line === "plain" ? p.track : "linear-gradient(90deg,#1B1E52,#38BDF8 25%,#FCD34D 50%,#FF9F6B 70%,#6D4BFF 85%,#1B1E52)"}}
+      .fill{${c.line === "plain" ? `position:absolute;left:0;top:10px;height:6px;border-radius:999px;background:linear-gradient(90deg,${g[0]},${g[1]})` : "display:none"}}
+      .dot{position:absolute;top:7px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
+      .dot i{display:block;width:8px;height:8px;border-radius:50%;background:${this.dark ? "#0B0D17" : "#fff"};border:2px solid ${this.dark ? "#C4B5FD" : "#8B6CFF"}}
+      .dot.nx2 i{width:12px;height:12px;margin-top:-2px;border:0;background:#B794FF;box-shadow:0 0 10px #B794FF}
+      .dot span{font-size:10px;color:${p.muted};white-space:nowrap}
+      .dot.l span{transform:translateX(-40%)}.dot.r span{transform:translateX(40%)}
+      .now{position:absolute;top:5px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:${this.dark ? "#fff" : "#161936"};box-shadow:0 0 12px ${this.dark ? "rgba(255,255,255,.9)" : "rgba(22,25,54,.5)"}}
+      .now::after{content:"";position:absolute;inset:0;border-radius:50%;background:inherit;animation:roost-ping 1.8s ease-out infinite}
     </style>
     <div class="card">
       <div class="top"><div><div class="clk"><span class="hm num">${esc(hm)}</span>${ap ? `<span class="ap">${esc(ap)}</span>` : ""}</div>${c.show_date ? `<div class="dt t">${esc(date)}</div>` : ""}</div>
-        ${next ? `<div class="nx"><span class="w t">${esc(c.countdown_title)}</span><span class="n t">${esc(next.name)} · ${esc(fmtT(nextAt))}</span><span class="c">in ${esc(cd)}</span></div>` : ""}</div>
+        ${next ? `<div class="nx"><span class="w t">${esc(c.countdown_title)}</span><span class="n">${esc(next.name)} · ${esc(cd)}</span><span class="c">at ${esc(fmtT(nextAt))}</span></div>` : ""}</div>
       ${c.show_timeline && times.length ? `<div class="line"><span class="bar"></span><span class="fill" style="width:${(mins(now) / 1440 * 100).toFixed(2)}%"></span>
-        ${times.slice().sort((a, b) => mins(a.at) - mins(b.at)).map((t, k, arr) => { const close = k > 0 && (mins(t.at) - mins(arr[k - 1].at)) / 1440 < 0.07 && !(k > 1 && (mins(arr[k - 1].at) - mins(arr[k - 2].at)) / 1440 < 0.07); return `<span class="dot ${next && t.name === next.name ? "nx2" : ""}" style="left:${(mins(t.at) / 1440 * 100).toFixed(2)}%"><i></i><span${close ? ' style="margin-top:12px"' : ""}>${esc(t.short || t.name.slice(0, 2))}</span></span>`; }).join("")}
+        ${times.slice().sort((a, b) => mins(a.at) - mins(b.at)).map((t, k, arr) => {
+          // two times close together: their names lean apart instead of sitting on top of each other
+          const gap = (x, y) => (x && y ? (mins(y.at) - mins(x.at)) / 1440 : 1);
+          const side = gap(arr[k - 1], t) < 0.06 ? " r" : gap(t, arr[k + 1]) < 0.06 ? " l" : "";
+          return `<span class="dot${next && t.name === next.name ? " nx2" : ""}${side}" style="left:${(mins(t.at) / 1440 * 100).toFixed(2)}%"><i></i><span>${esc(t.short || t.name.slice(0, 2))}</span></span>`; }).join("")}
         <span class="now" style="left:${(mins(now) / 1440 * 100).toFixed(2)}%"></span></div>` : ""}
     </div>`;
   }
@@ -3242,6 +3255,7 @@ class RoostClockFace extends RoostClockClassic {
             countdown: { label: "Count down to it", selector: { boolean: {} } },
           } } } },
           { name: "countdown_title", label: "Word before the next time", selector: { text: {} } },
+          { name: "line", label: "The line", selector: pick([["sky", "Colours of the day's sky"], ["plain", "Plain, filled up to now"]]) },
         ] },
         { name: "world", label: "World clocks underneath", selector: { object: { multiple: true, label_field: "label", fields: {
           label: { label: "Name", required: true, selector: { text: {} } }, timezone: { label: "Time zone (e.g. Europe/London)", required: true, selector: { text: {} } } } } } },
