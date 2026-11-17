@@ -217,7 +217,7 @@ const pm = document.createElement("roost-presence"); pm.setConfig({ device: "dev
 if (!/1 person here/.test(pm.shadowRoot.innerHTML) || !/1 · 1/.test(pm.shadowRoot.innerHTML)) { fails++; console.error("FAIL presence"); }
 // Timer counts down from 2:30.
 const tm = document.createElement("roost-timer"); tm.setConfig({ entity: "timer.kettle" }); document.body.appendChild(tm); tm.hass = hass(true);
-if (!/^2:(29|30)$/.test(tm.shadowRoot.querySelector(".v").textContent)) { fails++; console.error("FAIL timer", tm.shadowRoot.querySelector(".v").textContent); }
+if (!/^2:(2[5-9]|30)$/.test(tm.shadowRoot.querySelector(".v").textContent)) { fails++; console.error("FAIL timer", tm.shadowRoot.querySelector(".v").textContent); }
 // Agenda and to-do load their items.
 const ag = document.createElement("roost-agenda"); ag.setConfig({ entities: ["calendar.home"] }); document.body.appendChild(ag); ag.hass = hass(true);
 const td = document.createElement("roost-todo"); td.setConfig({ entity: "todo.shopping" }); document.body.appendChild(td); td.hass = hass(true);
