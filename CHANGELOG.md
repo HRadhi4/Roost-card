@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.15.1
+
+- Details sheet: more sensors say what they mean in plain words (Running or Stopped, Charging, Hot, Cold, Safe, Update ready).
+
 ## 1.15.0
 
 - Details sheet for every kind of device, in the same "only what matters, swipe up for more" style:

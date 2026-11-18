@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.15.0";
+const ROOST_VERSION = "1.15.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -9355,7 +9355,9 @@ const RoostSheet = {
     const on = s.state === "on", c = s.attributes.device_class;
     const w = { door: ["Open", "Closed"], window: ["Open", "Closed"], garage_door: ["Open", "Closed"], opening: ["Open", "Closed"], motion: ["Movement", "No movement"], occupancy: ["Someone there", "Empty"],
       presence: ["Someone there", "Empty"], moisture: ["Wet", "Dry"], smoke: ["Smoke!", "Clear"], gas: ["Gas!", "Clear"], battery: ["Low", "Normal"], connectivity: ["Connected", "Offline"], lock: ["Unlocked", "Locked"],
-      plug: ["Plugged in", "Unplugged"], problem: ["Problem", "OK"], vibration: ["Shaking", "Still"], sound: ["Sound", "Quiet"] }[c] || ["On", "Off"];
+      plug: ["Plugged in", "Unplugged"], problem: ["Problem", "OK"], vibration: ["Shaking", "Still"], sound: ["Sound", "Quiet"], running: ["Running", "Stopped"],
+      update: ["Update ready", "Up to date"], power: ["Power on", "No power"], heat: ["Hot", "Normal"], cold: ["Cold", "Normal"], light: ["Light", "Dark"], tamper: ["Tampered", "OK"], safety: ["Unsafe", "Safe"],
+      carbon_monoxide: ["CO detected!", "Clear"], battery_charging: ["Charging", "Not charging"], moving: ["Moving", "Still"] }[c] || ["On", "Off"];
     return on ? w[0] : w[1];
   },
   stateWord(s) {
