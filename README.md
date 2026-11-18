@@ -91,6 +91,7 @@ Recorded on a real Home Assistant (its built-in demo devices), so everything you
 11. [Try cards before you own the device](docs/tutorials/11-try-without-devices.md)
 12. [Ready dashboards made from your home](docs/tutorials/12-ready-dashboards.md) · no work
 13. [Batteries, Timeline, your own values, group tiles](docs/tutorials/13-batteries-timeline-values.md)
+14. [Real-looking curtains, blinds, garage, plant, pet and pool](docs/tutorials/14-real-looks.md)
 
 ## All 64 cards
 

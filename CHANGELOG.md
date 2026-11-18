@@ -2,6 +2,19 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.10.0
+Real-looking styles for six cards, chosen in each card's editor.
+- **Curtains:**
+  - **New looks:** pinch pleat drapes on a metal rod, a wave curtain on rings, or a sheer behind a blackout curtain. Folds bunch up as they open.
+  - **Blinds:** venetian slats that tilt, a roller blind that rolls into a tube, or a Roman shade with soft folds.
+  - **Fabrics and finishes:** linen, sand, sage, navy, charcoal, blush, white, oak, walnut, stone grey and black.
+  - **New control:** one slide bar with two small arrows, instead of three buttons. Drag to any position; tap while it moves to stop. The three buttons are still an option.
+- **Garage door:** a sectional panel door with a row of windows, or an aluminium roller shutter, in six finishes. The door rolls up into the wall and the car shows behind it.
+- **Plant:** a lifelike monstera with split leaves whose leaves droop and fade when thirsty. Three looks: the plant with each reading's good range, a health ring with a score, or the pot cut open to show how deep the water reaches.
+- **Pet:** real bowls on a mat, a smart feeder and fountain with today's meals, or your pet's face (cat or dog) with a ring that fills.
+- **Pool:** from above with tiles, steps and moving light; a side view from shallow to deep end; or water quality gauges with a plain tip. Four tile colours.
+- **Rooms GIF:** now shows eight full rooms.
+
 ## 1.9.0
 - **New: ready dashboards made from your home.** The first time, Roost asks once whether to make two dashboards from your own rooms and devices: **Roost Home** for phones and **Roost Tablet view** for tablets. They stay up to date by themselves. They are also in *Add dashboard → Community dashboards* (Home Assistant 2026.5 and newer), and anyone can use `strategy: { type: custom:roost }`.
 - **Bugs fixed:**

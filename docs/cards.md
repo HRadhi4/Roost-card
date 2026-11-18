@@ -265,6 +265,24 @@ stop_action:            # optional: what Stop does as well as stopping the curta
   target: { entity_id: script.curtain_stop }
 ```
 
+**Real-looking curtains and blinds.** Pick a look and a fabric or finish in the editor (*Look*):
+```yaml
+look: pleat          # classic, pleat (pinch pleat drapes on a rod), wave (wave curtain on rings) or sheer (sheer behind a blackout)
+blind_look: venetian # for style: blind: classic, venetian (slats that tilt), roller (rolls into a tube) or roman (soft folds)
+fabric: linen        # linen, sand, sage, navy, charcoal, blush, white, oak, walnut, grey, black (empty = the card colour)
+controls: slider     # slider (one slide bar and two arrows), buttons (Open, Stop, Close) or none
+```
+Drag the slide bar to send it to any position; tap the bar while it moves to stop it. Venetian slats tilt with the blind's tilt position.
+
+| Pleat | Wave | Sheer |
+|:-:|:-:|:-:|
+| <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/curtain-pleat.gif" width="220" alt="curtain-pleat"> | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/curtain-wave.gif" width="220" alt="curtain-wave"> | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/curtain-sheer.gif" width="220" alt="curtain-sheer"> |
+
+
+| Venetian | Roller | Roman |
+|:-:|:-:|:-:|
+| <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/blind-venetian.gif" width="220" alt="blind-venetian"> | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/blind-roller.gif" width="220" alt="blind-roller"> | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/blind-roman.gif" width="220" alt="blind-roman"> |
+
 **Opens with the sun**
 ```yaml
 open_at: sunrise     # or "06:30"
@@ -574,6 +592,17 @@ style: garage                   # garage, gate (slides) or swing (two wings)
 warn_after: 10                  # minutes open before it turns red
 ```
 
+**Real-looking garage doors:**
+```yaml
+door: sectional      # classic, sectional (panels with a row of windows) or shutter (aluminium roller shutter)
+finish: white        # white, anthracite, oak, silver, walnut or sand
+```
+The door rolls up into the wall and the car shows behind it.
+
+| Sectional | Shutter |
+|:-:|:-:|
+| <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/garage-sectional.gif" width="260" alt="garage-sectional"> | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/garage-shutter.gif" width="260" alt="garage-shutter"> |
+
 ### Roost Energy Flow
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/flow.gif" width="320" alt="Roost energy flow card in action">
 
@@ -637,6 +666,15 @@ temperature: sensor.monstera_temperature
 conductivity: sensor.monstera_conductivity
 min_moisture: 20
 ```
+
+**Three looks with a lifelike monstera** (its leaves droop and turn yellow when it is thirsty):
+```yaml
+look: portrait       # classic, portrait (the plant and each reading's good range), ring (one ring per need and a score) or pot (see inside the pot)
+```
+
+| Portrait | Ring | Pot |
+|:-:|:-:|:-:|
+| <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/plant-portrait.gif" width="220" alt="plant-portrait"> | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/plant-ring.gif" width="220" alt="plant-ring"> | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/plant-pot.gif" width="220" alt="plant-pot"> |
 
 ### Roost Printer
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/printer.gif" width="320" alt="Roost printer card in action">
@@ -769,6 +807,16 @@ heater: switch.pool_heater
 light: light.pool
 ```
 
+**Three looks and four tile colours:**
+```yaml
+look: top            # classic, top (from above), side (shallow to deep end) or gauges (water quality)
+tiles: blue          # blue, turquoise, slate or white
+```
+
+| Top | Side | Gauges |
+|:-:|:-:|:-:|
+| <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pool-top.gif" width="220" alt="pool-top"> | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pool-side.gif" width="220" alt="pool-side"> | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pool-gauges.gif" width="220" alt="pool-gauges"> |
+
 ### Roost Pet
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pet.gif" width="320" alt="Roost pet card in action">
 
@@ -781,6 +829,16 @@ food: sensor.feeder_food_level
 water: sensor.fountain_water_level
 meals: sensor.feeder_meals_today
 ```
+
+**Three looks:**
+```yaml
+look: bowls          # classic, bowls (real bowls on a mat), feeder (smart feeder and fountain with today's meals) or portrait (your pet's face and a ring that fills)
+meals_per_day: 4     # for the feeder look
+```
+
+| Bowls | Feeder | Portrait |
+|:-:|:-:|:-:|
+| <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pet-bowls.gif" width="220" alt="pet-bowls"> | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pet-feeder.gif" width="220" alt="pet-feeder"> | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/pet-portrait.gif" width="220" alt="pet-portrait"> |
 
 ### Roost Nursery
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/nursery.gif" width="320" alt="Roost nursery card in action">
