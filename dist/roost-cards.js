@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.15.1";
+const ROOST_VERSION = "1.15.2";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -9309,7 +9309,7 @@ class RoostCamera extends RoostBase {
 }
 
 // The page keeps room for its scroll bar, so switching to a room with more cards never nudges the other cards sideways.
-try { if (!document.getElementById("roost-gutter")) { const st = document.createElement("style"); st.id = "roost-gutter"; st.textContent = "html{scrollbar-gutter:stable}"; document.head.appendChild(st); } } catch (e) { /* no page */ }
+try { if (!document.getElementById("roost-gutter")) { const st = document.createElement("style"); st.id = "roost-gutter"; st.textContent = "html{scrollbar-gutter:stable;overflow-y:scroll}"; document.head.appendChild(st); } } catch (e) { /* no page */ }
 
 // ------------------------------------------------------------------ Roost details sheet
 // Holding a Roost card opens this sheet instead of Home Assistant's window: half height, only what matters

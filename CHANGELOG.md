@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.15.2
+
+- Tablets and computers: the page keeps the same width whether it scrolls or not, so switching to a room with more cards (like the kitchen) never moves the greeting or the other cards.
+
 ## 1.15.1
 
 - Details sheet: more sensors say what they mean in plain words (Running or Stopped, Charging, Hot, Cold, Safe, Update ready).
