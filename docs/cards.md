@@ -1,3 +1,11 @@
+
+## Details sheet (hold any card)
+
+Holding a Roost card opens Roost's own details sheet: the name, the state and one main control. Swipe up for what happened lately, a few details and **More in Home Assistant**.
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/details-sheet.png" width="720" alt="Roost details sheets for a light, an AC, a curtain, a sensor, a plug and a lock, dark and light">
+
+To keep Home Assistant's own window on a card: `details: home-assistant`.
 # Every card and its settings
 
 Everything below can also be set in the **visual editor** (tap a card while editing the dashboard). The YAML is here for people who like to copy and paste.

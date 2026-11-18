@@ -37,6 +37,10 @@ Drag the AC dial, dim with your finger, watch the curtains slide, slide to unloc
 |:-:|:-:|:-:|
 | ![Drag the dial](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/thermostat-drag.gif)<br>**Drag the dial** | ![Curtains slide](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/curtain-slide.gif)<br>**Curtains really slide** | ![Slide to unlock](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/lock-slide.gif)<br>**Slide to unlock** |
 
+Hold any card and Roost's own details sheet slides up: the name, the state and one main control, nothing else. Swipe up for history and details.
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/details-sheet.png" width="720" alt="Roost details sheets, dark and light">
+
 ### 3 · Rooms in one card
 Swipe between rooms and get each room's devices, temperature, “Someone here” and one slider for all its lights, instead of one long page per room.
 

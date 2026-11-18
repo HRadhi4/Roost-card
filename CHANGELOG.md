@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.14.0
+
+- **Details sheet.** Holding any Roost card now opens Roost's own sheet from the bottom instead of Home Assistant's window. It shows only what matters: the name, the state and one main control (brightness for lights, − and + for ACs, a drag bar for curtains, a big power button for plugs, the reading and a small curve for sensors, one button for locks, play and volume for TVs). Swipe up for what happened lately, a few details and "More in Home Assistant". Light and dark both. A card can keep Home Assistant's window with `details: home-assistant`.
+- Design rules: the details sheet, square room tiles, one shape per stack and white icons are now written down.
+
 ## 1.13.0
 
 - Roost Rooms is now called **Roost Rooms Selector** in the card picker (nothing to change in your dashboards).
