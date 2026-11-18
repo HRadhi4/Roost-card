@@ -5,6 +5,8 @@ Holding a Roost card opens Roost's own details sheet: the name, the state and on
 
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/details-sheet.png" width="720" alt="Roost details sheets for a light, an AC, a curtain, a sensor, a plug and a lock, dark and light">
 
+Every kind of device has its sheet: lights, ACs, curtains and garage doors, plugs and fans, sensors, locks, TVs, cameras, the alarm, robot vacuums, water heaters, people, weather, lists and numbers. Holding a room card opens the room's sheet: one bar for its lights and its devices as small tiles.
+
 To keep Home Assistant's own window on a card: `details: home-assistant`.
 # Every card and its settings
 

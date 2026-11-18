@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.14.1";
+const ROOST_VERSION = "1.15.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -4254,8 +4254,16 @@ class RoostRoom extends RoostBase {
     this.press(this.shadowRoot.querySelector(".r"), () => {
       if ((c.tap_action || {}).action && c.tap_action.action !== "none") this.run(c.tap_action);
       else if (c.temperature) this.moreInfo(c.temperature);
-    }, () => (c.hold_action && c.hold_action.action !== "none" ? this.run(c.hold_action) : c.temperature && this.moreInfo(c.temperature)));
+    }, () => (c.hold_action && c.hold_action.action !== "none" ? this.run(c.hold_action) : this.roomSheet()));
     this.placeKids();
+  }
+
+  // Holding a room tile opens the room's own sheet (its devices and one bar for its lights).
+  roomSheet() {
+    const c = this._config;
+    if (c.details === "home-assistant" || !window.RoostSheet) { if (c.temperature) this.fire("hass-more-info", { entityId: c.temperature }); return; }
+    const path = (c.tap_action || {}).action === "navigate" ? c.tap_action.navigation_path : null;
+    window.RoostSheet.openRoom({ name: c.name, icon: c.icon, ids: this.ids(), temperature: c.temperature, humidity: c.humidity, path });
   }
 
   // The big room tile, laid out by the card's options: where the icon, the temperature and the buttons sit,
@@ -4349,7 +4357,7 @@ class RoostRoom extends RoostBase {
     this.press(this.shadowRoot.querySelector(".r"), () => {
       if ((c.tap_action || {}).action && c.tap_action.action !== "none") this.run(c.tap_action);
       else if (c.temperature) this.moreInfo(c.temperature);
-    }, () => (c.hold_action && c.hold_action.action !== "none" ? this.run(c.hold_action) : c.temperature && this.moreInfo(c.temperature)));
+    }, () => (c.hold_action && c.hold_action.action !== "none" ? this.run(c.hold_action) : this.roomSheet()));
     this.placeKids();
   }
 
@@ -4411,7 +4419,7 @@ class RoostRoom extends RoostBase {
     this.press(this.shadowRoot.querySelector(".r"), () => {
       if ((c.tap_action || {}).action && c.tap_action.action !== "none") this.run(c.tap_action);
       else if (c.temperature) this.moreInfo(c.temperature);
-    }, () => c.temperature && this.moreInfo(c.temperature));
+    }, () => this.roomSheet());
     this.placeKids();
   }
 }
@@ -9310,18 +9318,24 @@ try { if (!document.getElementById("roost-gutter")) { const st = document.create
 const RoostSheet = {
   ha() { return document.querySelector("home-assistant"); },
   hass() { return this.ha()?.hass; },
-  open(entityId) {
+  open(entityId, room) {
     const h = this.hass();
-    if (!h || !h.states[entityId]) { this.ha()?.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true })); return; }
+    if (!room && (!h || !h.states[entityId])) { this.ha()?.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true })); return; }
     this.close();
     const host = document.createElement("roost-sheet-host");
     host.style.cssText = "position:fixed;inset:0;z-index:998;display:block";
     const root = host.attachShadow({ mode: "open" });
     document.body.appendChild(host);
-    this.el = { host, root, id: entityId, full: false, hist: null, last: null };
+    this.el = { host, root, id: entityId, room: room || null, full: false, hist: null, last: null };
     this._key = (e) => { if (e.key === "Escape") this.close(); };
     window.addEventListener("keydown", this._key);
-    this._tick = setInterval(() => { const s = this.hass()?.states[entityId]; if (this.el && s !== this.el.last && !this.el.busy) this.draw(); }, 600);
+    this._tick = setInterval(() => {
+      if (!this.el || this.el.busy) return;
+      const h = this.hass(); if (!h) return;
+      if (this.el.room) { const key = this.el.room.ids.map((x) => h.states[x]?.last_updated).join("|"); if (key !== this.el.roomKey) { this.el.roomKey = key; this.draw(); } return; }
+      const s = h.states[this.el.id];
+      if (s !== this.el.last || (this.el.id.startsWith("camera.") && Date.now() - (this.el.drawn || 0) > 2000)) this.draw();
+    }, 600);
     this.draw();
   },
   close() {
@@ -9337,6 +9351,13 @@ const RoostSheet = {
       humidifier: COLORS.teal, alarm_control_panel: s?.state === "disarmed" ? COLORS.green : COLORS.blue }[dom] || COLORS.purple;
     return { g, on };
   },
+  binWord(s) {
+    const on = s.state === "on", c = s.attributes.device_class;
+    const w = { door: ["Open", "Closed"], window: ["Open", "Closed"], garage_door: ["Open", "Closed"], opening: ["Open", "Closed"], motion: ["Movement", "No movement"], occupancy: ["Someone there", "Empty"],
+      presence: ["Someone there", "Empty"], moisture: ["Wet", "Dry"], smoke: ["Smoke!", "Clear"], gas: ["Gas!", "Clear"], battery: ["Low", "Normal"], connectivity: ["Connected", "Offline"], lock: ["Unlocked", "Locked"],
+      plug: ["Plugged in", "Unplugged"], problem: ["Problem", "OK"], vibration: ["Shaking", "Still"], sound: ["Sound", "Quiet"] }[c] || ["On", "Off"];
+    return on ? w[0] : w[1];
+  },
   stateWord(s) {
     const dom = s.entity_id.split(".")[0], a = s.attributes;
     if (UNAVAILABLE.includes(s.state)) return "Offline";
@@ -9344,6 +9365,12 @@ const RoostSheet = {
     if (dom === "climate") return s.state === "off" ? "Off" : `${s.state.replace("_only", "").replace("heat_cool", "auto").replace(/^./, (m) => m.toUpperCase())}${a.current_temperature != null ? ` · Room ${a.current_temperature}°` : ""}`;
     if (dom === "cover") { const v = coverView(s); return a.current_position != null ? `${v.position ?? a.current_position}% open` : v.state.replace(/^./, (m) => m.toUpperCase()); }
     if (dom === "sensor" && num(s.state) != null) return `${fmt(num(s.state), decOf(s.state))}${unitGap(a.unit_of_measurement || "")}`;
+    if (dom === "binary_sensor") return this.binWord(s);
+    if (dom === "person" || dom === "device_tracker") return s.state === "home" ? "Home" : s.state === "not_home" ? "Away" : s.state;
+    if (dom === "alarm_control_panel") return { disarmed: "Off", armed_home: "On · home", armed_away: "On · away", armed_night: "On · night", armed_vacation: "On · holiday", arming: "Turning on", pending: "Pending", triggered: "Alarm!" }[s.state] || s.state;
+    if (dom === "weather") return `${s.state.replace(/-/g, " ").replace(/^./, (m) => m.toUpperCase())}${a.temperature != null ? ` · ${a.temperature}°` : ""}`;
+    if (dom === "water_heater") return `${s.state.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase())}${a.current_temperature != null ? ` · ${a.current_temperature}°` : ""}`;
+    if (dom === "vacuum") return `${s.state.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase())}${a.battery_level != null ? ` · battery ${a.battery_level}%` : ""}`;
     return s.state.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase());
   },
   // the one main control, by kind of device
@@ -9369,7 +9396,8 @@ const RoostSheet = {
     }
     if (dom === "cover") {
       const pos = a.current_position;
-      return `${pos != null ? bar(pos, `linear-gradient(90deg,${g[0]},${g[1]})`, `${pos}% open`, "cover") : ""}<div class="g2">${wide("Close", "mdi:arrow-collapse-horizontal", false, "close")}${wide("Open", "mdi:arrow-expand-horizontal", true, "open")}</div>`;
+      const garage = ["garage", "gate", "door"].includes(a.device_class);
+      return `${pos != null ? bar(pos, `linear-gradient(90deg,${g[0]},${g[1]})`, `${pos}% open`, "cover") : ""}<div class="g2"${pos == null ? ' style="grid-template-columns:repeat(3,minmax(0,1fr))"' : ""}>${wide("Close", garage ? "mdi:arrow-down" : "mdi:arrow-collapse-horizontal", false, "close")}${pos == null ? wide("Stop", "mdi:stop", false, "stop") : ""}${wide("Open", garage ? "mdi:arrow-up" : "mdi:arrow-expand-horizontal", true, "open")}</div>`;
     }
     if (dom === "lock") return `${wide(s.state === "locked" ? "Unlock" : "Lock", s.state === "locked" ? "mdi:lock-open-variant" : "mdi:lock", true, s.state === "locked" ? "unlock" : "lock")}`;
     if (dom === "media_player") {
@@ -9385,6 +9413,43 @@ const RoostSheet = {
       return `<div class="sens"><div class="big num">${fmt(num(s.state), decOf(s.state))}<small>${esc(a.unit_of_measurement || "")}</small></div>${h && h.length > 2 ? this.spark(h, g[1]) : ""}</div>
         ${h && h.length > 2 ? `<div class="note">Lowest ${fmt(Math.min(...h), decOf(s.state))} · Highest ${fmt(Math.max(...h), decOf(s.state))} today</div>` : ""}`;
     }
+    if (dom === "camera") {
+      const pic = a.entity_picture;
+      return pic ? `<div class="cam"><img src="${esc(pic)}${pic.includes("?") ? "&" : "?"}t=${Math.floor(Date.now() / 2000)}" alt="${esc(a.friendly_name || id)}"></div>` : `<div class="note">No picture right now.</div>`;
+    }
+    if (dom === "alarm_control_panel") {
+      const modes = [["arm_home", "Home", "armed_home"], ["arm_away", "Away", "armed_away"], ["disarm", "Off", "disarmed"]];
+      return `<div class="seg" style="grid-template-columns:repeat(3,minmax(0,1fr))">${modes.map(([m, w, st]) => `<button class="${s.state === st ? "on" : ""}" data-act="alarm:${m}">${w}</button>`).join("")}</div>${a.code_format ? `<div class="note">Asks for its code when you choose.</div>` : ""}`;
+    }
+    if (dom === "vacuum") {
+      const busy = ["cleaning", "returning"].includes(s.state);
+      return `<div class="row c">${round(busy ? "mdi:pause" : "mdi:play", busy ? "Pause" : "Start cleaning", true, busy ? "vac:pause" : "vac:start", 72)}${round("mdi:home-import-outline", "Back to dock", false, "vac:return_to_base")}${round("mdi:map-marker-question-outline", "Find it", false, "vac:locate")}</div>`;
+    }
+    if (dom === "water_heater") {
+      const t = a.temperature, ops = (a.operation_list || []).slice(0, 4);
+      return `${t != null ? `<div class="dial">${round("mdi:minus", "Lower", false, "wt:-1", 64)}<div class="big num">${fmt(t, 0)}°</div>${round("mdi:plus", "Raise", false, "wt:1", 64)}</div>` : ""}
+        ${ops.length ? `<div class="seg" style="grid-template-columns:repeat(${ops.length},minmax(0,1fr))">${ops.map((m) => `<button class="${a.operation_mode === m || s.state === m ? "on" : ""}" data-act="op:${esc(m)}">${esc(m.replace(/_/g, " ").replace(/^./, (x) => x.toUpperCase()))}</button>`).join("")}</div>` : ""}`;
+    }
+    if (dom === "binary_sensor") return `<div class="big">${esc(this.binWord(s))}</div><div class="note">Since ${esc(ago(s.last_changed))}</div>`;
+    if (dom === "person" || dom === "device_tracker") {
+      const pic = a.entity_picture, home = s.state === "home";
+      return `<div class="pp"><span class="av" style="${home ? `background:linear-gradient(135deg,${g[0]},${g[1]})` : ""}">${pic ? `<img src="${esc(pic)}" alt="">` : esc((a.friendly_name || id).charAt(0).toUpperCase())}</span>
+        <span><div class="big" style="font-size:32px">${esc(this.stateWord(s))}</div><div class="note">Since ${esc(ago(s.last_changed))}${a.battery_level != null ? ` · battery ${a.battery_level}%` : ""}</div></span></div>`;
+    }
+    if (dom === "weather") {
+      return `<div class="sens"><div class="big num">${a.temperature != null ? `${fmt(a.temperature, 0)}°` : ""}</div><div class="note">${esc(s.state.replace(/-/g, " ").replace(/^./, (m) => m.toUpperCase()))}</div></div>
+        <div class="note">${[a.humidity != null ? `Humidity ${a.humidity}%` : "", a.wind_speed != null ? `Wind ${a.wind_speed} ${a.wind_speed_unit || "km/h"}` : ""].filter(Boolean).join(" · ")}</div>`;
+    }
+    if (["select", "input_select"].includes(dom)) {
+      const opts = a.options || [], nice = (o) => String(o).replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase());
+      return opts.length <= 4 && opts.every((o) => String(o).length <= 10) ? `<div class="seg" style="grid-template-columns:repeat(${Math.max(1, opts.length)},minmax(0,1fr))">${opts.map((o) => `<button class="${s.state === o ? "on" : ""}" data-act="sel:${esc(o)}">${esc(nice(o))}</button>`).join("")}</div>`
+        : `<div class="chips">${opts.map((o) => `<button class="${s.state === o ? "on" : ""}" data-act="sel:${esc(o)}">${esc(nice(o))}</button>`).join("")}</div>`;
+    }
+    if (["number", "input_number"].includes(dom) && num(s.state) != null) {
+      const mn = Number(a.min ?? 0), mx = Number(a.max ?? 100), v = num(s.state);
+      return bar(Math.round(((v - mn) / ((mx - mn) || 1)) * 100), `linear-gradient(90deg,${g[0]},${g[1]})`, `${fmt(v, decOf(s.state))}${unitGap(a.unit_of_measurement || "")}`, "num");
+    }
+    if (dom === "update") return s.state === "on" ? wide(`Install ${a.latest_version || "update"}`, "mdi:download", true, "install") : `<div class="note">Up to date${a.installed_version ? ` · ${esc(a.installed_version)}` : ""}</div>`;
     if (["scene", "script"].includes(dom)) return wide("Start", "mdi:play", true, "run");
     if (dom === "automation") return `<div class="g2">${wide("Run now", "mdi:play", true, "trigger")}${wide(s.state === "on" ? "Turn off" : "Turn on", "mdi:power", false, "toggle")}</div>`;
     if (["button", "input_button"].includes(dom)) return wide("Press", "mdi:gesture-tap", true, "press");
@@ -9410,21 +9475,44 @@ const RoostSheet = {
     } catch (e) { this.el.hist = []; this.el.changes = []; }
     if (this.el) this.draw();
   },
-  draw() {
-    const el = this.el, h = this.hass(); if (!el || !h) return;
-    const s = h.states[el.id]; if (!s) { this.close(); return; }
-    el.last = s;
-    if (el.hist === null) { el.hist = []; this.history(el.id); }
-    const dark = !!h.themes?.darkMode, p = PALETTE[dark ? "dark" : "light"], dom = el.id.split(".")[0];
-    const { g } = this.look(dom, s), a = s.attributes;
-    const name = a.friendly_name || el.id;
-    const icon = a.icon || { light: "mdi:lightbulb", switch: "mdi:power-socket-uk", climate: "mdi:snowflake", cover: "mdi:curtains", lock: "mdi:lock", media_player: "mdi:television", fan: "mdi:fan", sensor: "mdi:thermometer", binary_sensor: "mdi:door", scene: "mdi:palette", script: "mdi:script-text-play", automation: "mdi:robot" }[dom] || "mdi:information-outline";
+  // Holding a room tile: the room's devices as small tiles (tap switches), one bar for all its lights.
+  openRoom(room) {
+    this.open(null, room);
+  },
+  drawRoom() {
+    const el = this.el, h = this.hass(), rm = el.room, dark = !!h.themes?.darkMode, p = PALETTE[dark ? "dark" : "light"], g = rm.colour || COLORS.purple;
+    const sts = rm.ids.map((x) => h.states[x]).filter(Boolean);
+    const isOn = (x) => !UNAVAILABLE.includes(x.state) && !OFF_STATES.includes(x.state);
+    const devs = sts.filter((x) => /^(light|switch|fan|climate|cover|media_player|humidifier|input_boolean|lock|vacuum)\./.test(x.entity_id));
+    const lights = devs.filter((x) => x.entity_id.startsWith("light."));
+    rm.lights = lights.map((x) => x.entity_id);
+    const lon = lights.filter((x) => x.state === "on"), pct = lon.length ? Math.round(lon.reduce((t, x) => t + (x.attributes.brightness ?? 255), 0) / lon.length / 2.55) : 0;
+    const t = num(h.states[rm.temperature]?.state), hu = num(h.states[rm.humidity]?.state);
+    const word = [`${devs.filter(isOn).length} on`, t != null ? `${fmt(t, 1)}°` : "", hu != null ? `${Math.round(hu)}%` : ""].filter(Boolean).join(" · ");
+    const shown = el.full ? devs : devs.slice(0, 6);
+    const tile = (x) => { const d = x.entity_id.split(".")[0], on = isOn(x), lg = this.look(d, x).g;
+      return `<button class="${on ? "on" : ""}" style="${on ? `background:linear-gradient(135deg,${lg[0]},${lg[1]})` : ""}" data-act="${["climate", "media_player", "vacuum", "lock"].includes(d) ? "open:" : "dev:"}${esc(x.entity_id)}"><ha-icon icon="${esc(x.attributes.icon || this.iconFor(d))}"></ha-icon><span>${esc(x.attributes.friendly_name || x.entity_id)}</span><small>${esc(this.stateWord(x))}</small></button>`; };
+    el.root.innerHTML = `<style>${this.css(p, g, dark, el)}</style>
+    <div class="dim" data-act="close"></div>
+    <div class="sh" role="dialog" aria-modal="true" aria-label="${esc(rm.name)}">
+      <button class="hd" data-act="grow" aria-label="${el.full ? "Show less" : "Show more"}"></button>
+      <div class="hdr"><span class="ic"><ha-icon icon="${esc(rm.icon || "mdi:home-outline")}"></ha-icon></span><span class="nm"><b>${esc(rm.name)}</b><span>${esc(word)}</span></span>
+        <button class="x" data-act="close" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button></div>
+      ${lights.length ? `<div class="bar" data-bar="rlights"><i style="width:${pct}%;background:linear-gradient(90deg,#E07B00,#FDE68A)"></i><b>${lon.length ? `Lights ${pct}%` : "Lights off"}</b></div>` : ""}
+      ${devs.length ? `<div class="tiles">${shown.map(tile).join("")}</div>` : `<div class="note">No devices picked for this room.</div>`}
+      ${el.full ? (rm.path ? `<button class="wb" data-act="go">Open the room's page</button>` : "") : devs.length > 6 || rm.path ? `<button class="more" data-act="grow">Swipe up for more</button>` : ""}
+    </div>`;
+    this.wire({ entity_id: "room.x", attributes: {} }, g);
+    el.root.querySelector('[data-act="go"]')?.addEventListener("click", () => { const path = rm.path; this.close(); history.pushState(null, "", path); window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } })); });
+  },
+  iconFor(d) { return { light: "mdi:lightbulb", switch: "mdi:power-socket-uk", fan: "mdi:fan", climate: "mdi:snowflake", cover: "mdi:curtains", media_player: "mdi:television", humidifier: "mdi:air-humidifier", input_boolean: "mdi:toggle-switch", lock: "mdi:lock", vacuum: "mdi:robot-vacuum" }[d] || "mdi:circle-outline"; },
+  css(p, g, dark, el) {
     const sheetBg = dark ? "#141831" : "#FFFFFF";
-    const attrs = Object.entries(a).filter(([k, v]) => !["friendly_name", "icon", "entity_picture", "supported_features", "supported_color_modes", "color_mode", "hvac_modes", "fan_modes", "preset_modes", "swing_modes", "effect_list", "source_list", "sound_mode_list", "entity_id", "attribution", "device_class", "state_class", "unit_of_measurement", "restored", "editable", "id", "min_mireds", "max_mireds", "min_color_temp_kelvin", "max_color_temp_kelvin", "xy_color", "hs_color", "rgb_color", "rgbw_color", "rgbww_color"].includes(k) && v != null && (typeof v !== "object")).slice(0, 6);
-    el.root.innerHTML = `<style>
+    return `
       :host{font-family:Inter,var(--paper-font-body1_-_font-family,system-ui),sans-serif;color:${p.text}}
       .dim{position:absolute;inset:0;background:${dark ? "rgba(5,6,16,.55)" : "rgba(22,25,54,.28)"}}
       .sh{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;box-sizing:border-box;border-radius:32px 32px 0 0;background:${sheetBg};padding:10px 20px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:18px;max-height:${el.full ? "88vh" : "60vh"};overflow-y:auto;box-shadow:0 -24px 60px -20px ${dark ? "rgba(109,75,255,.35)" : "rgba(40,30,90,.18)"};touch-action:pan-y}
+      .sh > *{flex-shrink:0}
       .hd{align-self:center;width:40px;height:5px;border-radius:3px;background:${p.track};border:0;padding:0;cursor:grab}
       .hdr{display:flex;align-items:center;gap:12px}
       .ic{width:48px;height:48px;border-radius:16px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,${g[0]},${g[1]});color:#FFFFFF;box-shadow:0 10px 22px -10px ${g[0]};--mdc-icon-size:24px}
@@ -9453,8 +9541,29 @@ const RoostSheet = {
       .more{border:0;background:none;color:${p.muted};font-size:12px;padding:0;align-self:center}
       .sec{font-size:12px;font-weight:600;letter-spacing:.6px;color:${p.muted}}
       .tl{display:flex;flex-direction:column;gap:10px}.tl div{display:flex;gap:12px;align-items:center;font-size:14px}.tl i{width:10px;height:10px;border-radius:50%;flex:none}.tl span:last-child{margin-left:auto;font-size:12px;color:${p.muted}}
+      .cam{border-radius:22px;overflow:hidden;background:${p.inset};aspect-ratio:16/9}.cam img{width:100%;height:100%;object-fit:cover;display:block}
+      .pp{display:flex;align-items:center;gap:16px}.av{width:72px;height:72px;border-radius:50%;flex:none;overflow:hidden;display:flex;align-items:center;justify-content:center;background:${p.inset};color:#FFFFFF;font-size:24px;font-weight:700}.av img{width:100%;height:100%;object-fit:cover}
+      .chips{display:flex;flex-wrap:wrap;gap:8px}.chips button{height:40px;padding:0 14px;border-radius:999px;border:0;background:${p.inset};color:${p.text};font-size:14px;font-weight:600}.chips button.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:#FFFFFF}
+      .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.tiles button{min-height:72px;border-radius:18px;border:0;padding:12px;background:${p.inset};color:${p.text};display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:6px;text-align:left;--mdc-icon-size:20px}
+      .tiles button span{font-size:14px;font-weight:600}.tiles button small{font-size:12px;opacity:.8}.tiles button.on{color:#FFFFFF}
       .kv{border-radius:16px;background:${p.inset};padding:4px 14px}.kv div{display:flex;justify-content:space-between;gap:12px;padding:10px 0;font-size:14px;border-top:1px solid ${p.border}}.kv div:first-child{border-top:0}.kv span:first-child{color:${p.muted}}
-    </style>
+    `;
+  },
+  draw() {
+    const el = this.el, h = this.hass(); if (!el || !h) return;
+    el.drawn = Date.now();
+    if (el.room) { this.drawRoom(); return; }
+    const s = h.states[el.id]; if (!s) { this.close(); return; }
+    el.last = s;
+    if (el.hist === null) { el.hist = []; this.history(el.id); }
+    const dark = !!h.themes?.darkMode, p = PALETTE[dark ? "dark" : "light"], dom = el.id.split(".")[0];
+    const { g } = this.look(dom, s), a = s.attributes;
+    const name = a.friendly_name || el.id;
+    const icon = a.icon || { light: "mdi:lightbulb", switch: "mdi:power-socket-uk", climate: "mdi:snowflake", cover: "mdi:curtains", lock: "mdi:lock", media_player: "mdi:television", fan: "mdi:fan", sensor: "mdi:thermometer", binary_sensor: "mdi:door", scene: "mdi:palette", script: "mdi:script-text-play", automation: "mdi:robot",
+      camera: "mdi:cctv", alarm_control_panel: "mdi:shield-home", vacuum: "mdi:robot-vacuum", water_heater: "mdi:water-boiler", person: "mdi:account", device_tracker: "mdi:cellphone-marker", weather: "mdi:weather-partly-cloudy",
+      select: "mdi:format-list-bulleted", input_select: "mdi:format-list-bulleted", number: "mdi:ray-vertex", input_number: "mdi:ray-vertex", update: "mdi:package-up", humidifier: "mdi:air-humidifier", siren: "mdi:bullhorn" }[dom] || "mdi:information-outline";
+    const attrs = Object.entries(a).filter(([k, v]) => !["friendly_name", "icon", "entity_picture", "supported_features", "supported_color_modes", "color_mode", "hvac_modes", "fan_modes", "preset_modes", "swing_modes", "effect_list", "source_list", "sound_mode_list", "entity_id", "attribution", "device_class", "state_class", "unit_of_measurement", "restored", "editable", "id", "min_mireds", "max_mireds", "min_color_temp_kelvin", "max_color_temp_kelvin", "xy_color", "hs_color", "rgb_color", "rgbw_color", "rgbww_color"].includes(k) && v != null && (typeof v !== "object")).slice(0, 6);
+    el.root.innerHTML = `<style>${this.css(p, g, dark, el)}</style>
     <div class="dim" data-act="close"></div>
     <div class="sh" role="dialog" aria-modal="true" aria-label="${esc(name)}">
       <button class="hd" data-act="grow" aria-label="${el.full ? "Show less" : "Show more"}"></button>
@@ -9489,6 +9598,19 @@ const RoostSheet = {
       if (act === "run") return this.call(dom, "turn_on", { entity_id: id });
       if (act === "trigger") return this.call("automation", "trigger", { entity_id: id });
       if (act === "press") return this.call(dom, "press", { entity_id: id });
+      if (act === "stop") return this.call("cover", "stop_cover", { entity_id: id });
+      if (act.startsWith("alarm:")) {
+        const m = act.slice(6);
+        if (a.code_format && (m === "disarm" || a.code_arm_required !== false)) { this.close(); this.ha()?.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true })); return undefined; }
+        return this.call("alarm_control_panel", m === "disarm" ? "alarm_disarm" : `alarm_${m}`, { entity_id: id });
+      }
+      if (act.startsWith("vac:")) return this.call("vacuum", act.slice(4), { entity_id: id });
+      if (act.startsWith("wt:")) return this.call("water_heater", "set_temperature", { entity_id: id, temperature: (a.temperature ?? 50) + Number(act.slice(3)) });
+      if (act.startsWith("op:")) return this.call("water_heater", "set_operation_mode", { entity_id: id, operation_mode: act.slice(3) });
+      if (act.startsWith("sel:")) return this.call(dom, "select_option", { entity_id: id, option: act.slice(4) });
+      if (act === "install") return this.call("update", "install", { entity_id: id });
+      if (act.startsWith("dev:")) { const d = act.slice(4); return this.call(d.startsWith("cover.") ? "cover" : "homeassistant", d.startsWith("cover.") ? "toggle" : "toggle", { entity_id: d }); }
+      if (act.startsWith("open:")) { this.open(act.slice(5)); return undefined; }
       return undefined;
     }));
     // "Close" on a curtain uses its own name so it does not shut the sheet
@@ -9499,14 +9621,17 @@ const RoostSheet = {
       const fill = bar.querySelector("i"), label = bar.querySelector("b");
       const at = (e) => Math.max(0, Math.min(100, Math.round(((e.clientX - bar.getBoundingClientRect().left) / bar.clientWidth) * 100)));
       let v = null;
-      bar.addEventListener("pointerdown", (e) => { el.busy = true; bar.setPointerCapture(e.pointerId); v = at(e); fill.style.width = `${v}%`; label.textContent = `${v}%`; });
-      bar.addEventListener("pointermove", (e) => { if (v == null) return; v = at(e); fill.style.width = `${v}%`; label.textContent = `${v}%`; });
+      const word = (x) => (bar.dataset.bar === "num" ? `${fmt(Number(a.min ?? 0) + (Number(a.max ?? 100) - Number(a.min ?? 0)) * x / 100, 0)}${unitGap(a.unit_of_measurement || "")}` : `${x}%`);
+      bar.addEventListener("pointerdown", (e) => { el.busy = true; bar.setPointerCapture(e.pointerId); v = at(e); fill.style.width = `${v}%`; label.textContent = word(v); });
+      bar.addEventListener("pointermove", (e) => { if (v == null) return; v = at(e); fill.style.width = `${v}%`; label.textContent = word(v); });
       bar.addEventListener("pointerup", () => {
         if (v == null) return; const k = bar.dataset.bar; el.busy = false;
         if (k === "light") this.call("light", v ? "turn_on" : "turn_off", v ? { entity_id: id, brightness_pct: v } : { entity_id: id });
         if (k === "cover") this.call("cover", "set_cover_position", { entity_id: id, position: v });
         if (k === "vol") this.call("media_player", "volume_set", { entity_id: id, volume_level: v / 100 });
         if (k === "fan") this.call("fan", v ? "set_percentage" : "turn_off", v ? { entity_id: id, percentage: v } : { entity_id: id });
+        if (k === "num") { const mn = Number(a.min ?? 0), mx = Number(a.max ?? 100), st = Number(a.step || 1); this.call(dom, "set_value", { entity_id: id, value: Math.round((mn + (mx - mn) * v / 100) / st) * st }); }
+        if (k === "rlights") this.call("light", v ? "turn_on" : "turn_off", v ? { entity_id: el.room.lights, brightness_pct: v } : { entity_id: el.room.lights });
         v = null;
       });
     });

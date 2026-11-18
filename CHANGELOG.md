@@ -2,6 +2,16 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.15.0
+
+- Details sheet for every kind of device, in the same "only what matters, swipe up for more" style:
+  - Camera: the live picture. Alarm: Home, Away and Off (the code keypad opens when the alarm asks for one).
+  - Robot vacuum: start or pause, back to dock, find it. Water heater: − and + and its modes.
+  - Garage doors and gates: Close, Stop and Open. Door, window, motion, leak and smoke sensors: the state in plain words and since when.
+  - People: their picture, home or away, battery. Weather: the temperature, sky, humidity and wind.
+  - Lists (select): the choices as buttons. Numbers: a drag bar. Updates: Install.
+- Holding a room card opens the room's sheet: one bar for all its lights and its devices as small tiles (tap to switch). Swipe up for every device and a link to the room's page.
+
 ## 1.14.1
 
 - Rooms Selector: the glow under the chosen room is soft all round (it was cut off with sharp edges at the bottom and sides).
