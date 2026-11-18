@@ -21,7 +21,7 @@ Ready in one tap from your own rooms and devices · real controls you drag and s
 
 ## Why Roost
 
-Built-in cards and Mushroom give you clean building blocks, and you assemble the dashboard yourself. Roost gives you the finished thing:
+Built-in cards and other card sets give you clean building blocks, and you assemble the dashboard yourself. Roost gives you the finished thing:
 
 ### 1 · A whole dashboard in one tap
 Install, open Home Assistant, tap **Make them**: Roost builds a phone dashboard and a tablet dashboard from your own areas and devices, and keeps them up to date as you add things. Change anything later in the visual editor. [How it works](docs/tutorials/12-ready-dashboards.md)
