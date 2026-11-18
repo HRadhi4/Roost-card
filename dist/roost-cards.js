@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.11.0";
+const ROOST_VERSION = "1.12.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1125,7 +1125,9 @@ class RoostTile extends RoostBase {
 class RoostChips extends RoostBase {
   static get defaults() { return { entities: [], theme: "auto", align: "stretch", size: "medium", chip_shape: "pill", background: "solid" }; }
 
-  validate(c) { if (!Array.isArray(c.entities) || !c.entities.length) throw new Error("Choose at least one device"); }
+  validate(c) { if ((!Array.isArray(c.entities) || !c.entities.length) && !c.show_fullscreen && !c.show_theme) throw new Error("Choose at least one device"); }
+
+  extraSignature() { return `${RoostFull.isOn() ? 1 : 0}|${this._hass?.themes?.darkMode ? 1 : 0}`; }
 
   watched() { return this.ids(); }
 
@@ -1134,7 +1136,8 @@ class RoostChips extends RoostBase {
   static getConfigForm() {
     return {
       schema: [
-        { name: "entities", required: true, selector: { entity: { multiple: true } } },
+        { name: "entities", selector: { entity: { multiple: true } } },
+        { type: "grid", name: "", schema: [{ name: "show_fullscreen", label: "A full screen chip", selector: { boolean: {} } }, { name: "show_theme", label: "A light and dark mode chip", selector: { boolean: {} } }] },
         { type: "grid", name: "", schema: [
           { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "compact", label: "Compact (for wall panels)" }, { value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
           { name: "show_words", label: "Words next to door icons (“Closed”)", selector: { boolean: {} } },
@@ -1218,6 +1221,8 @@ class RoostChips extends RoostBase {
       chips.push({ key: "__climates", icon: "mdi:snowflake", colour: on ? "#38BDF8" : p.muted, text: on ? String(on) : "", group: "climates", label: "Air conditioners" });
     }
     if (people.length) chips.push({ key: "__people", people: true, group: "people" });
+    if (c.show_theme) chips.push({ key: "__theme", icon: RoostMode.icon(), colour: this.dark ? "#FCD34D" : "#6D4BFF", text: "", special: "theme" });
+    if (c.show_fullscreen) chips.push({ key: "__full", icon: specialIcon("fullscreen"), colour: RoostFull.isOn() ? "#8B6CFF" : p.text, text: "", special: "fullscreen" });
     const open = this._open;
     const initials = (id) => (this.sx(id)?.attributes.friendly_name || id.split(".")[1]).split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
     const AVG = ["linear-gradient(135deg,#38BDF8,#6D4BFF)", "linear-gradient(135deg,#FF5577,#FF9F6B)", "linear-gradient(135deg,#10B981,#6EE7B7)", "linear-gradient(135deg,#F59E0B,#FDE68A)", "linear-gradient(135deg,#8B6CFF,#D6C4FF)"];
@@ -1259,7 +1264,7 @@ class RoostChips extends RoostBase {
     </style>
     <div class="row">${chips.map((ch) => ch.people
       ? `<button class="chip ${open === "people" ? "on" : ""}" data-g="people" aria-label="People">${people.map(avatar).join("")}</button>`
-      : `<button class="chip ${open && open === ch.group ? "on" : ""}" data-pop="${esc(`${ch.text || ""}${ch.colour || ""}${ch.icon || ""}`)}" data-popkey="${esc(ch.key || ch.entity || ch.group || "")}" ${ch.group ? `data-g="${ch.group}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(ch.entity ? this.name(ch.entity) : ch.label || "Lights")}">
+      : `<button class="chip ${open && open === ch.group ? "on" : ""}" data-pop="${esc(`${ch.text || ""}${ch.colour || ""}${ch.icon || ""}`)}" data-popkey="${esc(ch.key || ch.entity || ch.group || "")}" ${ch.special ? `data-sp="${ch.special}" aria-label="${esc(specialLabel(ch.special))}"` : ch.group ? `data-g="${ch.group}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(ch.entity ? this.name(ch.entity) : ch.label || "Lights")}">
           ${ch.icon ? `<ha-icon icon="${ch.icon}" style="color:${ch.colour}"></ha-icon>` : `<span class="ent" data-icon="${esc(ch.entity)}" style="color:${ch.colour};display:flex"></span>`}
           ${ch.text ? `<span class="${ch.word ? "word" : "cnt"}"${ch.word ? "" : ` style="color:${ch.colour}"`}>${esc(ch.text)}</span>` : ""}</button>`).join("")}</div>
     ${list.length ? `<div class="list">${list.map((id) => {
@@ -1269,8 +1274,8 @@ class RoostChips extends RoostBase {
     }).join("")}</div>` : ""}`;
     this.shadowRoot.querySelectorAll("[data-icon]").forEach((el) => this.icon(el, null, el.dataset.icon));
     this.shadowRoot.querySelectorAll(".chip").forEach((el) => this.press(el,
-      () => { if (el.dataset.g) { this._open = this._open === el.dataset.g ? null : el.dataset.g; this.vibrate(); this.render(); } else this.moreInfo(el.dataset.e); },
-      () => this.moreInfo(el.dataset.e)));
+      () => { if (el.dataset.sp) { this.vibrate(); specialRun(el.dataset.sp); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 120); } else if (el.dataset.g) { this._open = this._open === el.dataset.g ? null : el.dataset.g; this.vibrate(); this.render(); } else this.moreInfo(el.dataset.e); },
+      () => el.dataset.e && this.moreInfo(el.dataset.e)));
     this.shadowRoot.querySelectorAll("[data-m]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.m)));
     this.shadowRoot.querySelectorAll("[data-t]").forEach((el) => el.addEventListener("click", () => { this.vibrate(); this.call("light", "toggle", { entity_id: el.dataset.t }); }));
   }
@@ -1780,7 +1785,7 @@ class RoostNav extends RoostBase {
 
   watched() { return []; }
 
-  extraSignature() { return `${location.pathname}${location.hash}|${RoostFull.isOn() ? 1 : 0}|${window.innerWidth >= 768}|${this.editing()}|${RoostNav.sideEdge()}|${RoostNav.topEdge()}`; }
+  extraSignature() { return `${location.pathname}${location.hash}|${RoostFull.isOn() ? 1 : 0}|${this._hass?.themes?.darkMode ? 1 : 0}|${window.innerWidth >= 768}|${this.editing()}|${RoostNav.sideEdge()}|${RoostNav.topEdge()}`; }
 
   logoHtml() {
     const l = String(this._config.logo || "").trim();
@@ -1868,7 +1873,7 @@ class RoostNav extends RoostBase {
           name: { label: "Name", selector: { text: {} } },
           icon: { label: "Icon", required: true, selector: { icon: {} } },
           path: { label: "Opens (for example /dashboard-home/0 or #rooms)", selector: { text: {} } },
-          action: { label: "Or does", selector: { select: { mode: "dropdown", options: [{ value: "navigate", label: "Open the page above" }, { value: "fullscreen", label: "Full screen on and off (its icon follows)" }] } } },
+          action: { label: "Or does", selector: { select: { mode: "dropdown", options: [{ value: "navigate", label: "Open the page above" }, ...SPECIAL_DOES] } } },
           match: { label: "Also lights up on these pages", selector: { select: { multiple: true, custom_value: true, options: [] } } },
           users: { label: "Only for these people (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
           bottom: { label: "At the far end of the side rail (for example Settings)", selector: { boolean: {} } },
@@ -1980,8 +1985,8 @@ class RoostNav extends RoostBase {
         background:linear-gradient(135deg,${g[0]},#38BDF8);color:#fff;font-weight:700;font-size:20px;box-shadow:0 8px 24px -6px ${g[2]}}
       .logo img{width:100%;height:100%;object-fit:cover}
     </style>
-    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${rail ? this.logoHtml() : ""}${shown.map(({ it, i }, k) => `${rail && it.bottom && !shown.slice(0, k).some((x) => x.it.bottom) ? '<span class="grow"></span>' : ""}<a href="${esc(it.path || "#")}" data-i="${i}" class="${this.active(it.path, it) ? "on" : ""}" aria-label="${esc(it.action === "fullscreen" ? (RoostFull.isOn() ? "Leave full screen" : "Full screen") : it.name || it.path)}">
-      <ha-icon icon="${esc(it.action === "fullscreen" ? (RoostFull.isOn() ? "mdi:fullscreen-exit" : "mdi:fullscreen") : it.icon || "mdi:circle")}"></ha-icon>${c.show_labels && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</a>`).join("")}</nav>`;
+    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${rail ? this.logoHtml() : ""}${shown.map(({ it, i }, k) => `${rail && it.bottom && !shown.slice(0, k).some((x) => x.it.bottom) ? '<span class="grow"></span>' : ""}<a href="${esc(it.path || "#")}" data-i="${i}" class="${this.active(it.path, it) ? "on" : ""}" aria-label="${esc(specialLabel(it.action) || it.name || it.path)}">
+      <ha-icon icon="${esc(specialIcon(it.action) || it.icon || "mdi:circle")}"></ha-icon>${c.show_labels && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</a>`).join("")}</nav>`;
     const pillCss = { filled: `background:linear-gradient(135deg,${g[0]},${g[1]});box-shadow:0 10px 24px -8px color-mix(in srgb, ${g[0]} 95%, transparent), inset 0 1px 0 rgba(255,255,255,.35)`,
       pill: `background:linear-gradient(135deg,${g[0]},${g[1]});box-shadow:0 10px 22px -8px ${g[2]}`, soft: `background:${g[0]}2E` }[c.active_style];
     if (pillCss) {
@@ -2012,7 +2017,7 @@ class RoostNav extends RoostBase {
       ev.preventDefault();
       const mk = (c.items || []).map((x) => x.path).join("|"); ((RoostNav.memo = RoostNav.memo || {})[mk] = RoostNav.memo[mk] || {}).go = Date.now();
       this.vibrate();
-      if (it.action === "fullscreen") { RoostFull.toggle({}); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 80); return; }
+      if (it.action === "fullscreen" || it.action === "theme") { specialRun(it.action); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 120); return; }
       if (!it.path) return;
       if (it.path.startsWith("#")) { if (location.hash === it.path) RoostNav.jump(it.path, it.path === c.items[0]?.path); else location.hash = it.path; }
       else { history.pushState(null, "", it.path); this.fire("location-changed", { replace: false }); }
@@ -4405,7 +4410,8 @@ class RoostAlarm extends RoostBase {
       schema: [
         { name: "entity", required: true, selector: { entity: { domain: "alarm_control_panel" } } },
         { name: "name", selector: { text: {} } },
-        { name: "style", selector: pick([["card", "Big shield with buttons"], ["pills", "A row of pills (Disarm, Arm home, Arm away)"]]) },
+        { name: "style", selector: pick([["card", "Compact: the state and a slim switch"], ["big", "Big shield with large buttons"], ["pills", "A row of pills (Disarm, Arm home, Arm away)"]]) },
+        { name: "show_doors", label: "List the doors under it (compact)", selector: { boolean: {} } },
         { name: "modes", label: "Buttons", selector: { select: { multiple: true, mode: "list", options: [
           { value: "arm_away", label: "Away" }, { value: "arm_home", label: "Home" }, { value: "arm_night", label: "Night" }, { value: "arm_vacation", label: "Holiday" }] } } },
         { name: "doors", label: "Doors and windows to show", selector: { entity: { multiple: true, domain: "binary_sensor" } } },
@@ -4428,27 +4434,9 @@ class RoostAlarm extends RoostBase {
     }[state] || [state ? state.charAt(0).toUpperCase() + state.slice(1) : "Not found", "mdi:shield-outline", COLORS.slate];
   }
 
-  render() {
-    if (!this._hass || !this._config) return;
-    const c = this._config, p = this.p, s = this.st();
-    const [word, icon, g] = this.look(s?.state);
-    const armed = s && s.state !== "disarmed" && !UNAVAILABLE.includes(s.state);
-    const busy = ["arming", "pending", "triggered"].includes(s?.state);
-    const needCode = !!s?.attributes.code_format && s?.attributes.code_arm_required !== false;
-    const label = { arm_away: ["Away", "mdi:shield-lock"], arm_home: ["Home", "mdi:shield-home"], arm_night: ["Night", "mdi:shield-moon"], arm_vacation: ["Holiday", "mdi:shield-airplane"] };
-    const doors = (c.doors || []).map((id) => this.sx(id)).filter(Boolean);
-    const open = doors.filter((d) => d.state === "on");
-    if (c.style === "pills" && !this._pending) {
-      const PILLS = [["disarm", "Disarm", "linear-gradient(135deg,#10B981,#34D399)", "disarmed"], ["arm_home", "Arm home", "linear-gradient(135deg,#2F6BFF,#38BDF8)", "armed_home"], ["arm_away", "Arm away", "linear-gradient(135deg,#F43F6B,#FF8F6B)", "armed_away"], ["arm_night", "Arm night", "linear-gradient(135deg,#6D4BFF,#B794FF)", "armed_night"]]
-        .filter(([m]) => m === "disarm" || (c.modes || []).includes(m));
-      this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-        :host{padding:0 ${Number(c.inset ?? 8)}px}
-        .tt{font-size:17px;font-weight:700;letter-spacing:-.2px;padding:10px 6px 4px;color:${p.text}}
-        .ps{display:grid;grid-template-columns:repeat(${PILLS.length},minmax(0,1fr));gap:8px;margin-top:8px}
-        .pl{padding:10px 0;border-radius:14px;border:0;font:inherit;font-size:13px;font-weight:600;cursor:pointer;background:${p.inset};color:${p.text};-webkit-tap-highlight-color:transparent;transition:transform .12s}
-        .pl:active{transform:scale(.96)}
-      </style>${c.name !== "" ? `<div class="tt t">${esc(c.name || "Alarm")}</div>` : ""}<div class="ps">${PILLS.map(([m, w, bg, st]) => `<button class="pl" data-m="${m}" style="${s?.state === st ? `background:${bg};color:#fff` : ""}">${w}</button>`).join("")}</div>`;
-    } else this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+  // the original big shield with large buttons (style: big)
+  bigHtml(c, p, s, word, icon, g, armed, busy, label, doors, open) {
+    return `<style>${this.baseCss()}
       .card{${panelCss(p, c.radius)};padding:18px;display:flex;flex-direction:column;gap:16px}
       .top{display:flex;align-items:center;gap:16px}
       .sh{position:relative;width:72px;height:72px;border-radius:24px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 14px 30px -12px ${g[2]}}
@@ -4481,12 +4469,69 @@ class RoostAlarm extends RoostBase {
         <button class="b ${s?.state === "disarmed" ? "on" : ""}" data-m="disarm"><ha-icon icon="mdi:shield-off-outline"></ha-icon>Off</button></div>`}
       ${doors.length ? `<div class="doors">${doors.map((d) => `<span class="dr" data-e="${esc(d.entity_id)}"><ha-icon icon="${d.state === "on" ? "mdi:door-open" : "mdi:door-closed"}" style="color:${d.state === "on" ? "#FF9F6B" : "#3DD68C"}"></ha-icon>${esc(d.attributes.friendly_name || d.entity_id)}</span>`).join("")}</div>` : ""}
     </div>`;
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, s = this.st();
+    const [word, icon, g] = this.look(s?.state);
+    const armed = s && s.state !== "disarmed" && !UNAVAILABLE.includes(s.state);
+    const busy = ["arming", "pending", "triggered"].includes(s?.state);
+    const needCode = !!s?.attributes.code_format && s?.attributes.code_arm_required !== false;
+    const label = { arm_away: ["Away", "mdi:shield-lock"], arm_home: ["Home", "mdi:shield-home"], arm_night: ["Night", "mdi:shield-moon"], arm_vacation: ["Holiday", "mdi:shield-airplane"] };
+    const doors = (c.doors || []).map((id) => this.sx(id)).filter(Boolean);
+    const open = doors.filter((d) => d.state === "on");
+    if (c.style === "pills" && !this._pending) {
+      const PILLS = [["disarm", "Disarm", "linear-gradient(135deg,#10B981,#34D399)", "disarmed"], ["arm_home", "Arm home", "linear-gradient(135deg,#2F6BFF,#38BDF8)", "armed_home"], ["arm_away", "Arm away", "linear-gradient(135deg,#F43F6B,#FF8F6B)", "armed_away"], ["arm_night", "Arm night", "linear-gradient(135deg,#6D4BFF,#B794FF)", "armed_night"]]
+        .filter(([m]) => m === "disarm" || (c.modes || []).includes(m));
+      this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+        :host{padding:0 ${Number(c.inset ?? 8)}px}
+        .tt{font-size:17px;font-weight:700;letter-spacing:-.2px;padding:10px 6px 4px;color:${p.text}}
+        .ps{display:grid;grid-template-columns:repeat(${PILLS.length},minmax(0,1fr));gap:8px;margin-top:8px}
+        .pl{padding:10px 0;border-radius:14px;border:0;font:inherit;font-size:13px;font-weight:600;cursor:pointer;background:${p.inset};color:${p.text};-webkit-tap-highlight-color:transparent;transition:transform .12s}
+        .pl:active{transform:scale(.96)}
+      </style>${c.name !== "" ? `<div class="tt t">${esc(c.name || "Alarm")}</div>` : ""}<div class="ps">${PILLS.map(([m, w, bg, st]) => `<button class="pl" data-m="${m}" style="${s?.state === st ? `background:${bg};color:#fff` : ""}">${w}</button>`).join("")}</div>`;
+    } else if (c.style === "big") this.shadowRoot.innerHTML = this.bigHtml(c, p, s, word, icon, g, armed, busy, label, doors, open);
+    else {
+      // The compact alarm: one row with the state, then a slim segmented switch, the same size as the other cards.
+      const modes = [...(c.modes || []), "disarm"];
+      this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px}
+      .top{display:flex;align-items:center;gap:12px;min-width:0}
+      .sh{position:relative;width:44px;height:44px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,${g[0]},${g[1]});color:#FFFFFF;box-shadow:0 10px 22px -12px ${g[2]}}
+      .sh ha-icon{--mdc-icon-size:22px;${s?.state === "triggered" ? "animation:roost-wiggle .5s ease-in-out infinite" : busy ? "animation:roost-pulse 1.2s ease-in-out infinite" : ""}}
+      .sh::after{content:"";position:absolute;inset:0;border-radius:inherit;border:2px solid ${g[1]};${armed ? "animation:roost-halo 2.4s ease-out infinite" : "display:none"}}
+      @keyframes roost-halo{0%{transform:scale(1);opacity:.8}100%{transform:scale(1.3);opacity:0}}
+      .tx{flex:1;min-width:0}
+      .w{font-size:15px;font-weight:600;line-height:1.25}
+      .d{font-size:12px;color:${open.length ? "#FF9F6B" : p.muted};margin-top:2px}
+      .seg{display:grid;grid-template-columns:repeat(${modes.length},minmax(0,1fr));gap:4px;padding:4px;border-radius:16px;background:${p.inset}}
+      .b{height:40px;border-radius:12px;border:0;background:transparent;color:${p.muted};font:inherit;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 6px;-webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s,color .12s}
+      .b:active{transform:scale(.95)}
+      .b ha-icon{--mdc-icon-size:18px;flex:none}
+      .b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:#FFFFFF;box-shadow:0 8px 18px -10px ${g[2]}}
+      @container (max-width: 300px){:host .b span{display:none}}
+      .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+      .pad button{height:44px;border-radius:14px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:17px;font-weight:600;cursor:pointer}
+      .code{text-align:center;font-size:20px;letter-spacing:8px;min-height:24px;color:${p.text}}
+      .doors{display:flex;flex-wrap:wrap;gap:6px}
+      .dr{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12px;background:${p.inset};color:${p.text};cursor:pointer}
+      .dr ha-icon{--mdc-icon-size:16px}
+    </style>
+    <div class="card">
+      <div class="top"><span class="sh" data-pop="${esc(s?.state || "")}" data-popkey="sh"><ha-icon icon="${icon}"></ha-icon></span>
+        <span class="tx"><div class="w t">${esc(c.name || this.name(c.entity, "Alarm"))} · ${esc(word.replace("Armed · ", "armed ").replace(/^Disarmed$/, "off"))}</div>${doors.length ? `<div class="d t">${open.length ? `${open.length} open: ${esc(open.map((d) => d.attributes.friendly_name).join(", "))}` : "All doors closed"}</div>` : ""}</span></div>
+      ${this._pending ? `<div class="code num">${"•".repeat(this._code.length) || "&nbsp;"}</div><div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, "×", 0, "✓"].map((k) => `<button data-k="${k}">${k}</button>`).join("")}</div>`
+    : `<div class="seg" role="radiogroup">${modes.map((m) => { const on = m === "disarm" ? s?.state === "disarmed" : s?.state === m.replace("arm_", "armed_"); const [w, ic] = m === "disarm" ? ["Off", "mdi:shield-off-outline"] : label[m] || [m, "mdi:shield"]; return `<button class="b ${on ? "on" : ""}" data-m="${m}" role="radio" aria-checked="${on}" aria-label="${esc(w)}"><ha-icon icon="${ic}"></ha-icon><span>${esc(w)}</span></button>`; }).join("")}</div>`}
+      ${c.show_doors && doors.length ? `<div class="doors">${doors.map((d) => `<span class="dr" data-e="${esc(d.entity_id)}"><ha-icon icon="${d.state === "on" ? "mdi:door-open" : "mdi:door-closed"}" style="color:${d.state === "on" ? "#FF9F6B" : "#3DD68C"}"></ha-icon>${esc(d.attributes.friendly_name || d.entity_id)}</span>`).join("")}</div>` : ""}
+    </div>`;
+    }
     const root = this.shadowRoot;
     root.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
-    root.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => {
+    root.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", async () => {
       const m = b.dataset.m;
       const text = m === "disarm" ? "Turn the alarm off?" : `Arm the alarm (${label[m]?.[0] || m})?${open.length ? ` ${open.length} door${open.length > 1 ? "s are" : " is"} open.` : ""}`;
-      if (c.confirm && !window.confirm(text)) return;
+      if (c.confirm && !(await RoostPop.confirm(text))) return;
       this.vibrate();
       if (needCode || (m === "disarm" && s?.attributes.code_format)) { this._pending = m; this._code = ""; this._sig = null; this.render(); return; }
       this.call("alarm_control_panel", m === "disarm" ? "alarm_disarm" : `alarm_${m}`, { entity_id: c.entity });
@@ -9853,9 +9898,10 @@ class RoostButtons extends RoostBase {
       schema: [
         { name: "items", label: "Buttons", selector: { object: { multiple: true, label_field: "name", fields: {
           name: { label: "Name", selector: { text: {} } },
-          icon: { label: "Icon", required: true, selector: { icon: {} } },
+          icon: { label: "Icon", selector: { icon: {} } },
           entity: { label: "Device (lights the button when on; tap switches it)", selector: { entity: {} } },
           tap_action: { label: "Tap does (instead)", selector: { ui_action: {} } },
+          does: { label: "Or does", selector: { select: { mode: "dropdown", options: SPECIAL_DOES } } },
         } } } },
         { type: "grid", name: "", schema: [{ name: "show_names", label: "Names under the icons", selector: { boolean: {} } }, { name: "radius", selector: slider(0, 40, 2) }] },
         ...colourFields("color", "Colour when on"),
@@ -9898,13 +9944,15 @@ class RoostButtons extends RoostBase {
     </style>
     <div class="bar">${c.items.map((it, i) => {
       const s = this.sx(it.entity), on = s && !UNAVAILABLE.includes(s.state) && !OFF_STATES.includes(s.state);
-      return `<button class="b ${on ? "on" : ""}" data-i="${i}" data-pop="${on ? 1 : 0}" data-popkey="${i}" aria-label="${esc(it.name || it.icon)}"><ha-icon icon="${esc(it.icon)}"></ha-icon>${c.show_names && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</button>`;
+      const sp = specialIcon(it.does), spOn = it.does === "fullscreen" ? RoostFull.isOn() : false;
+      return `<button class="b ${on || spOn ? "on" : ""}" data-i="${i}" data-pop="${on ? 1 : 0}" data-popkey="${i}" aria-label="${esc(specialLabel(it.does) || it.name || it.icon)}"><ha-icon icon="${esc(sp || it.icon)}"></ha-icon>${c.show_names && (it.name || it.does) ? `<span class="t">${esc(it.name || specialLabel(it.does))}</span>` : ""}</button>`;
     }).join("")}</div>`;
     this.shadowRoot.querySelectorAll(".b").forEach((b) => {
       const it = c.items[+b.dataset.i];
       this.press(b, () => {
         b.classList.remove("done"); void b.offsetWidth; b.classList.add("done");
-        if (it.tap_action && it.tap_action.action && it.tap_action.action !== "none") this.run(it.tap_action, it.entity);
+        if (it.does) { this.vibrate(); specialRun(it.does); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 120); }
+        else if (it.tap_action && it.tap_action.action && it.tap_action.action !== "none") this.run(it.tap_action, it.entity);
         else if (it.entity) this.run({ action: "toggle" }, it.entity);
       }, () => it.entity && this.moreInfo(it.entity));
     });
@@ -10104,6 +10152,25 @@ window.addEventListener("ll-custom", (ev) => {
   else if (want === "off") RoostFull.set(false, opts, "toggle");
   else RoostFull.toggle(opts);
 });
+
+// Light and dark mode from any button, chip or bar: { action: fire-dom-event, roost_theme: toggle | light | dark }.
+const RoostMode = {
+  dark() { return !!document.querySelector("home-assistant")?.hass?.themes?.darkMode; },
+  set(dark) { (document.querySelector("home-assistant") || window).dispatchEvent(new CustomEvent("settheme", { detail: { dark }, bubbles: true, composed: true })); },
+  toggle() { this.set(!this.dark()); },
+  icon() { return this.dark() ? "mdi:white-balance-sunny" : "mdi:weather-night"; },
+  label() { return this.dark() ? "Light mode" : "Dark mode"; },
+};
+window.addEventListener("ll-custom", (ev) => {
+  const want = (ev.detail || {}).roost_theme;
+  if (!want) return;
+  if (want === "dark") RoostMode.set(true); else if (want === "light") RoostMode.set(false); else RoostMode.toggle();
+});
+// The special things a button can do instead of a page or a device.
+const SPECIAL_DOES = [{ value: "fullscreen", label: "Full screen on and off (its icon follows)" }, { value: "theme", label: "Light and dark mode (its icon follows)" }];
+const specialIcon = (kind) => (kind === "fullscreen" ? (RoostFull.isOn() ? "mdi:fullscreen-exit" : "mdi:fullscreen") : kind === "theme" ? RoostMode.icon() : null);
+const specialLabel = (kind) => (kind === "fullscreen" ? (RoostFull.isOn() ? "Leave full screen" : "Full screen") : kind === "theme" ? RoostMode.label() : null);
+const specialRun = (kind) => { if (kind === "fullscreen") RoostFull.toggle({}); else if (kind === "theme") RoostMode.toggle(); };
 
 class RoostFullscreen extends RoostBase {
   static get defaults() {

@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.12.0
+
+- Alarm: a new compact look (the default): the state in one line and a slim switch for Home, Away and Off, the same size as the other cards. The old big shield is `style: big`. Asking before arming now uses Roost's own question box.
+- Light and dark mode everywhere a button can "do" something: the bar or rail (Or does), Roost Buttons (Or does), and chips (`show_theme: true`). Any card can also use `{ action: fire-dom-event, roost_theme: toggle }`.
+- Chips: a full screen chip (`show_fullscreen: true`).
+
 ## 1.11.0
 
 - Room tile: a new **halo** layout (name and readings on top, a big room icon in a soft circle at the bottom left, quick buttons down the right).

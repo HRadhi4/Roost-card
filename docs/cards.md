@@ -75,6 +75,8 @@ size: medium             # small, medium or large
 align: stretch           # stretch (one row, equal sizes; default), center or start
 chip_shape: pill      # pill, rounded or square
 background: solid     # solid, glass or none
+show_theme: true        # a light and dark mode chip
+show_fullscreen: true   # a full screen chip
 ```
 
 ### Roost Thermostat
@@ -417,6 +419,8 @@ entity: alarm_control_panel.alarmo
 modes: [arm_away, arm_home, arm_night]
 doors: [binary_sensor.front_door]
 confirm: true
+style: card             # card (compact, default), big (large shield) or pills
+show_doors: false       # list the doors under the switch
 ```
 
 ### Roost People
