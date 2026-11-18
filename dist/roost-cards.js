@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.14.0";
+const ROOST_VERSION = "1.14.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -2361,7 +2361,7 @@ class RoostRooms extends RoostBase {
     const clim = sensorsOff ? `<div class="clim t"><span><ha-icon icon="mdi:access-point-network-off"></ha-icon>No room sensor online</span></div>` : t0 != null || h0 != null ? `<div class="clim t">${h0 != null ? `<span><ha-icon icon="mdi:water-outline" style="color:#38BDF8"></ha-icon>${esc(Math.round(h0))}%</span>` : ""}${t0 != null ? `<span><ha-icon icon="mdi:thermometer" style="color:#FF9F6B"></ha-icon>${esc(t0)}°C</span>` : ""}</div>` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .bar{border-radius:${c.pill_shape === "pill" ? 999 : rad + 4}px;border:1px solid ${c.background === "none" ? "transparent" : p.border};background:${c.background === "none" ? "transparent" : c.background === "glass" ? `color-mix(in srgb, ${p.panel} 60%, transparent);backdrop-filter:blur(14px)` : p.panel};padding:4px;margin-bottom:16px}
-      .pills{display:flex;gap:2px;justify-content:${c.pill_align === "start" ? "flex-start" : c.pill_align === "center" ? "center" : "space-between"};overflow-x:auto;scrollbar-width:none}
+      .pills{display:flex;gap:2px;justify-content:${c.pill_align === "start" ? "flex-start" : c.pill_align === "center" ? "center" : "space-between"};overflow-x:auto;scrollbar-width:none;padding:8px 12px 18px;margin:-8px -12px -18px}
       ${Number(c.pill_width) > 0 ? `.pill{flex:0 0 ${Number(c.pill_width)}px!important;padding:0 8px!important;white-space:normal!important;line-height:1.15;text-align:center}` : c.pill_align === "fill" ? ".pill{flex:1 1 0!important;padding:0 8px!important;min-width:0;white-space:normal!important;line-height:1.15;text-align:center}" : ""}
       .pills::-webkit-scrollbar{display:none}
       .head{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
@@ -9299,6 +9299,9 @@ class RoostCamera extends RoostBase {
     this.shadowRoot.querySelector(".view").addEventListener("click", () => this.moreInfo(c.entity));
   }
 }
+
+// The page keeps room for its scroll bar, so switching to a room with more cards never nudges the other cards sideways.
+try { if (!document.getElementById("roost-gutter")) { const st = document.createElement("style"); st.id = "roost-gutter"; st.textContent = "html{scrollbar-gutter:stable}"; document.head.appendChild(st); } } catch (e) { /* no page */ }
 
 // ------------------------------------------------------------------ Roost details sheet
 // Holding a Roost card opens this sheet instead of Home Assistant's window: half height, only what matters

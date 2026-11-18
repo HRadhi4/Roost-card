@@ -1,4 +1,4 @@
-// The design rules that can be checked by reading the code (see DESIGN_RULES.md).
+// Checks on the look that can be made by reading the code.
 import fs from "node:fs";
 
 const src = fs.readFileSync(new URL("../dist/roost-cards.js", import.meta.url), "utf8");

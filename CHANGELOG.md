@@ -2,10 +2,14 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.14.1
+
+- Rooms Selector: the glow under the chosen room is soft all round (it was cut off with sharp edges at the bottom and sides).
+- Switching to a room with more or fewer cards no longer nudges the cards above it sideways (the page keeps room for its scroll bar).
+
 ## 1.14.0
 
 - **Details sheet.** Holding any Roost card now opens Roost's own sheet from the bottom instead of Home Assistant's window. It shows only what matters: the name, the state and one main control (brightness for lights, − and + for ACs, a drag bar for curtains, a big power button for plugs, the reading and a small curve for sensors, one button for locks, play and volume for TVs). Swipe up for what happened lately, a few details and "More in Home Assistant". Light and dark both. A card can keep Home Assistant's window with `details: home-assistant`.
-- Design rules: the details sheet, square room tiles, one shape per stack and white icons are now written down.
 
 ## 1.13.0
 
@@ -483,7 +487,7 @@ Everything a hand-built wall tablet needed, so a whole tablet dashboard can be m
 - The design-rule check now blocks any card that asks for a fixed height.
 
 ## 0.3.0 — 2026-11-16
-**Follows the design rules (now in `DESIGN_RULES.md`)**
+**Follows the design rules**
 - Status chips share the width equally in one row that never wraps; on very narrow phones the door chip shows only its icon. A TV chip appears only while the TV is on, and light groups no longer count as lights.
 - The chosen room, page or button uses the selected purple (#6D4BFF → #8B6CFF).
 - Space Grotesk for headings and numbers, Inter for text (when installed).
