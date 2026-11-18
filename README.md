@@ -41,6 +41,16 @@ Hold any card and Roost's own details sheet slides up: the name, the state and o
 
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/details-sheet.png" width="720" alt="Roost details sheets, dark and light">
 
+### Right now, not just everything
+**Roost Now** shows only what matters at this moment, most urgent first: someone at the door, a leak, the next prayer or the iftar countdown, a door open in the heat, lights left on when everyone is out (one tap turns them off). When all is well, one calm line.
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/now.png" width="360" alt="Roost Now: a door open while nobody is home, lights left on, a low battery">
+
+### Arabic, right to left
+Every card follows your Home Assistant language. In Arabic the whole dashboard turns right to left, with Arabic words and, if you like, Arabic numbers. Switch between Arabic and English on any screen with one chip.
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/arabic.png" width="720" alt="Roost in Arabic, right to left: home, rooms and a details sheet">
+
 ### 3 · Rooms in one card
 Swipe between rooms and get each room's devices, temperature, “Someone here” and one slider for all its lights, instead of one long page per room.
 
@@ -168,6 +178,7 @@ Each GIF shows the card in use, then in the other colour mode, then as frosted g
 | **Roost Full Screen** | Hides Home Assistant's top bar and sidebar so your dashboard feels like an app: by itself (invisible), as a button that maximizes and minimizes, or as the tap action of any card. Comes back while editing. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fullscreen.gif" width="180" alt="Roost Full Screen"> |
 | **Roost Page** | A whole phone page laid out like the original: even spacing, the night-sky background and room for the bottom bar. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/page.gif" width="180" alt="Roost Page"> |
 | **Roost Panel** | A rounded box with a title that holds other cards, such as a list of rooms. It can fold open and closed. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/panel.gif" width="180" alt="Roost Panel"> |
+| **Roost Now** | What matters right now, most urgent first; one calm line when all is well. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/now.png" width="180" alt="Roost Now"> |
 | **Roost Rooms Selector** | A room switcher: tap a room pill and that room's cards appear below, instantly. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="180" alt="Roost Rooms"> |
 
 

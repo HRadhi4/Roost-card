@@ -102,6 +102,8 @@ const cases = [
   ["roost-room", { name: "Office", style: "tile", temperature: "sensor.cabinet", tile_color: "never", icon_shape: "circle", temp_bar: "side", buttons: [{ entity: "light.hall", icon: "mdi:lamp" }, { tap_action: { action: "navigate", navigation_path: "/x" }, icon: "mdi:arrow-right" }], buttons_position: "row", show_ago: false }],
   ["roost-room", { name: "Patio", style: "tile", icon_position: "bottom-left", temp_bar: "top", background_image: "/local/patio.jpg", image_dim: 30, buttons_entities: ["light.kitchen"] }],
   ["roost-tile", { entity: "light.kitchen", color: "lamp" }],
+  ["roost-now", {}],
+  ["roost-now", { max: 2, hide_calm: true, doorbell: "binary_sensor.back_door" }],
   ["roost-chips", { entities: ["light.kitchen"], show_fullscreen: true, fullscreen_users: ["person.nobody"], show_theme: true }],
   ["roost-buttons", { items: [{ name: "A", icon: "mdi:home" }, { does: "theme" }, { does: "fullscreen", users: ["person.nobody"] }] }],
   ["roost-tile", { entity: "light.kitchen", show_to: ["person.nobody"] }],

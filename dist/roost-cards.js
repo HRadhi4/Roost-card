@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.16.0";
+const ROOST_VERSION = "1.17.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -846,7 +846,8 @@ class RoostEditor extends HTMLElement {
     const noSurface = ["roost-page", "roost-fullscreen", "roost-title", "roost-theme"].includes(cls.tag);
     const noBroken = noSurface || ["roost-nav", "roost-page", "roost-panel", "roost-rooms"].includes(cls.tag);
     const WHO = { name: "show_to", label: "Only these people see this card (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } };
-    const schema = [...(noSurface ? form.schema : [...form.schema, ...(noBroken ? [] : [BROKEN_FIELDS]), SURFACE_FIELDS(cls.tag === "roost-nav")]), WHO];
+    const LANG = { name: "language", label: "Language of this card", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Like Home Assistant (or this screen's choice)" }, { value: "en", label: "English" }, { value: "ar", label: "العربية · Arabic, right to left" }] } } };
+    const schema = [...(noSurface ? form.schema : [...form.schema, ...(noBroken ? [] : [BROKEN_FIELDS]), SURFACE_FIELDS(cls.tag === "roost-nav")]), WHO, LANG];
     this._data = { ...cls.defaults, ...this._config };
     if (!this._form) {
       this._form = document.createElement("ha-form");
@@ -1133,7 +1134,7 @@ class RoostTile extends RoostBase {
 class RoostChips extends RoostBase {
   static get defaults() { return { entities: [], theme: "auto", align: "stretch", size: "medium", chip_shape: "pill", background: "solid" }; }
 
-  validate(c) { if ((!Array.isArray(c.entities) || !c.entities.length) && !c.show_fullscreen && !c.show_theme) throw new Error("Choose at least one device"); }
+  validate(c) { if ((!Array.isArray(c.entities) || !c.entities.length) && !c.show_fullscreen && !c.show_theme && !c.show_language) throw new Error("Choose at least one device"); }
 
   extraSignature() { return `${RoostFull.isOn() ? 1 : 0}|${this._hass?.themes?.darkMode ? 1 : 0}`; }
 
@@ -1148,6 +1149,7 @@ class RoostChips extends RoostBase {
         { type: "grid", name: "", schema: [{ name: "show_fullscreen", label: "A full screen chip", selector: { boolean: {} } }, { name: "show_theme", label: "A light and dark mode chip", selector: { boolean: {} } }] },
         { name: "fullscreen_users", label: "Full screen chip only for (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
         { name: "theme_users", label: "Light and dark chip only for (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
+        { name: "show_language", label: "An Arabic / English chip", selector: { boolean: {} } },
         { type: "grid", name: "", schema: [
           { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "compact", label: "Compact (for wall panels)" }, { value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
           { name: "show_words", label: "Words next to door icons (“Closed”)", selector: { boolean: {} } },
@@ -1232,6 +1234,7 @@ class RoostChips extends RoostBase {
     }
     if (people.length) chips.push({ key: "__people", people: true, group: "people" });
     if (c.show_theme && forPeople(this._hass, c.theme_users)) chips.push({ key: "__theme", icon: RoostMode.icon(), colour: this.dark ? "#FCD34D" : "#6D4BFF", text: "", special: "theme" });
+    if (c.show_language) chips.push({ key: "__lang", icon: "mdi:translate", colour: p.text, text: "", special: "language" });
     if (c.show_fullscreen && forPeople(this._hass, c.fullscreen_users)) chips.push({ key: "__full", icon: specialIcon("fullscreen"), colour: RoostFull.isOn() ? "#8B6CFF" : p.text, text: "", special: "fullscreen" });
     const open = this._open;
     const initials = (id) => (this.sx(id)?.attributes.friendly_name || id.split(".")[1]).split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -9311,6 +9314,97 @@ class RoostCamera extends RoostBase {
   }
 }
 
+// ------------------------------------------------------------------ Arabic and right to left
+// Every Roost card follows the person's Home Assistant language (Arabic turns the cards right to left),
+// or the choice made on this screen with the language button (Roost Theme), or the card's own "language".
+// Words are looked up in one list per language; your own device names stay as you wrote them.
+const AR_WORDS = {
+  "On": "يعمل", "Off": "مطفأ", "Open": "مفتوح", "Closed": "مغلق", "Opening": "يُفتح", "Closing": "يُغلق", "Locked": "مقفل", "Unlocked": "مفتوح القفل", "Lock": "قفل", "Unlock": "فتح القفل",
+  "Home": "الرئيسية", "At home": "في المنزل", "Away": "خارج المنزل", "Offline": "غير متصل", "Not found": "غير موجود", "Device not found": "الجهاز غير موجود", "Unavailable": "غير متاح", "Unknown": "غير معروف",
+  "Turn on": "تشغيل", "Turn off": "إطفاء", "Start": "ابدأ", "Stop": "إيقاف", "Pause": "إيقاف مؤقت", "Play": "تشغيل", "Close": "إغلاق", "Run now": "شغّل الآن", "Press": "اضغط", "Install": "تثبيت",
+  "Swipe up for more": "اسحب للأعلى للمزيد", "More in Home Assistant": "المزيد في Home Assistant", "LATELY": "مؤخراً", "DETAILS": "التفاصيل", "Show more": "عرض المزيد", "Show less": "عرض أقل",
+  "Cool": "تبريد", "Heat": "تدفئة", "Dry": "تجفيف", "Fan": "مروحة", "Auto": "تلقائي", "Heat & cool": "تبريد وتدفئة", "Cooling": "يبرّد", "Heating": "يدفّئ", "Idle": "خامل", "Fan only": "مروحة فقط",
+  "Set to": "مضبوط على", "Room": "الغرفة", "Low": "منخفض", "Medium": "متوسط", "High": "مرتفع", "Quiet": "هادئ", "Normal": "عادي", "Strong": "قوي", "Max": "أقصى",
+  "Lights off": "إطفاء الأنوار", "Good night": "تصبح على خير", "Arm away": "حماية", "Leave home": "مغادرة", "Cool house": "تبريد المنزل", "Movie time": "وقت الفيلم",
+  "All good": "كل شيء بخير", "All quiet": "هادئ", "All calm at home": "المنزل هادئ", "Nothing needs you right now": "لا شيء يحتاجك الآن", "Someone is at the door": "شخص عند الباب",
+  "Someone here": "يوجد شخص", "Someone there": "يوجد شخص", "Empty": "فارغة", "Nobody": "لا أحد", "Nobody here": "لا أحد هنا", "And nobody is home": "ولا أحد في المنزل",
+  "Movement": "حركة", "No movement": "لا حركة", "Wet": "مبلل", "Dry ": "جاف", "Clear": "صافٍ", "Smoke!": "دخان!", "Gas!": "غاز!", "Running": "يعمل", "Stopped": "متوقف", "Charging": "يشحن",
+  "Living": "المعيشة", "Living Room": "غرفة المعيشة", "Bedroom": "غرفة النوم", "Master Bedroom": "غرفة النوم الرئيسية", "Kitchen": "المطبخ", "Entrance": "المدخل", "Office": "المكتب", "Bathroom": "الحمام", "Hall": "الصالة", "Garden": "الحديقة",
+  "Rooms": "الغرف", "All rooms": "كل الغرف", "Security": "الأمان", "Auto ": "تلقائي", "Settings": "الإعدادات", "Devices": "الأجهزة", "Automations": "الأتمتة", "Automations & actions": "الأتمتة والإجراءات", "Modes": "الأوضاع",
+  "Never ran": "لم يعمل بعد", "Today": "اليوم", "Yesterday": "أمس", "Tomorrow": "غداً", "Now": "الآن", "just now": "الآن", "Last month": "الشهر الماضي", "This month so far": "هذا الشهر حتى الآن",
+  "Light mode": "الوضع الفاتح", "Dark mode": "الوضع الداكن", "Light": "فاتح", "Dark": "داكن", "Full screen": "ملء الشاشة", "Leave full screen": "الخروج من ملء الشاشة", "Exit full screen": "الخروج من ملء الشاشة",
+  "Alarm": "الإنذار", "Disarm": "إلغاء الإنذار", "Away ": "خارج", "Night": "ليل", "Holiday": "عطلة", "The alarm is going off": "الإنذار يعمل!", "Water leak": "تسرّب مياه", "Smoke detected": "تم اكتشاف دخان", "Gas detected": "تم اكتشاف غاز",
+  "Weather": "الطقس", "Sunny": "مشمس", "Clear night": "ليل صافٍ", "Cloudy": "غائم", "Partly cloudy": "غائم جزئياً", "Rainy": "ممطر", "Windy": "عاصف", "Fog": "ضباب",
+  "Battery": "البطارية", "Battery low": "البطارية منخفضة", "Power": "الطاقة", "Temperature": "الحرارة", "Humidity": "الرطوبة", "Air": "الهواء", "Using now": "الاستهلاك الآن",
+  "Curtain": "الستارة", "Curtains": "الستائر", "Blind": "الستارة", "Air conditioner": "المكيّف", "AC": "المكيّف", "TV": "التلفاز", "Speaker": "السماعة", "Ceiling light": "ضوء السقف", "Fan ": "المروحة", "Plug": "المقبس", "Smart plug": "مقبس ذكي",
+  "Good morning": "صباح الخير", "Good afternoon": "مساء الخير", "Good evening": "مساء الخير", "Ramadan Kareem": "رمضان كريم", "Eid Mubarak": "عيد مبارك",
+  "Fajr": "الفجر", "Sunrise": "الشروق", "Dhuhr": "الظهر", "Jumu'ah": "الجمعة", "Asr": "العصر", "Maghrib": "المغرب", "Isha": "العشاء", "Imsak": "الإمساك",
+  "Monday": "الاثنين", "Tuesday": "الثلاثاء", "Wednesday": "الأربعاء", "Thursday": "الخميس", "Friday": "الجمعة", "Saturday": "السبت", "Sunday": "الأحد",
+  "January": "يناير", "February": "فبراير", "March": "مارس", "April": "أبريل", "May": "مايو", "June": "يونيو", "July": "يوليو", "August": "أغسطس", "September": "سبتمبر", "October": "أكتوبر", "November": "نوفمبر", "December": "ديسمبر",
+  "Doors are closed and the alarm is off.": "الأبواب مغلقة والإنذار مطفأ.", "Doors are closed and the alarm is on (away).": "الأبواب مغلقة والإنذار يعمل (خارج المنزل).", "Doors are closed and the alarm is on (home).": "الأبواب مغلقة والإنذار يعمل (في المنزل).",
+  "All doors closed": "كل الأبواب مغلقة", "Doors closed": "الأبواب مغلقة", "Door closed": "الباب مغلق", "Door open": "الباب مفتوح", "Location off": "الموقع مطفأ", "Work": "العمل", "School": "المدرسة",
+  "Feed now": "أطعمه الآن", "Back to dock": "العودة للقاعدة", "Find it": "ابحث عنه", "Start cleaning": "ابدأ التنظيف", "Docked": "في القاعدة", "Cleaning": "ينظّف", "Returning": "يعود",
+  "No reading": "لا توجد قراءة", "Not working right now": "لا يعمل حالياً", "Loading": "جارٍ التحميل", "Nothing planned": "لا شيء مخطط", "The shopping list is empty": "قائمة التسوق فارغة",
+  "Volume": "الصوت", "Source": "المصدر", "Speed": "السرعة", "Swing": "تأرجح", "Mute": "كتم", "Previous": "السابق", "Next": "التالي",
+  "Language": "اللغة", "English": "English", "Arabic": "العربية", "Ready": "جاهز", "Done": "تم", "Upload": "رفع", "Download": "تنزيل", "Live": "مباشر", "Camera offline": "الكاميرا غير متصلة",
+};
+const AR_PATTERNS = [
+  [/^for (\d+) min$/, "منذ $1 د"], [/^for (\d+)h(?: (\d+)m)?$/, (m, h, mi) => `منذ ${h} س${mi ? ` ${mi} د` : ""}`], [/^for (\d+) days?$/, "منذ $1 يوم"],
+  [/^(\d+) min ago$/, "قبل $1 د"], [/^(\d+) h ago$/, "قبل $1 س"], [/^(\d+) days? ago$/, "قبل $1 يوم"], [/^Since (.+) ago$/, (m, x) => `منذ ${arWord(x)}`], [/^Since (.+)$/, (m, x) => `منذ ${arWord(x)}`],
+  [/^(\d+) lights? on$/, "$1 أضواء تعمل"], [/^(\d+) lights? are on$/, "$1 أضواء تعمل"], [/^(\d+) on$/, "$1 يعمل"], [/^(\d+) of (\d+) on$/, "$1 من $2 يعمل"],
+  [/^(\d+)% open$/, "مفتوح $1٪"], [/^(\d+)% open · drag$/, "مفتوح $1٪ · اسحب"], [/^Lights (\d+)%$/, "الأضواء $1٪"], [/^Lights off$/, "الأضواء مطفأة"], [/^Volume (\d+)%$/, "الصوت $1٪"], [/^Speed (\d+)%$/, "السرعة $1٪"],
+  [/^Room (.+)$/, "الغرفة $1"], [/^AC (cool|heat|dry|fan|auto|off)(.*)$/, (m, a, r) => `المكيّف ${arWord(a.charAt(0).toUpperCase() + a.slice(1))}${r}`], [/^(Curtain|Blind) (open|closed|opening|closing)$/, (m, a, b) => `${arWord(a)} ${arWord(b.charAt(0).toUpperCase() + b.slice(1))}`],
+  [/^Good (morning|afternoon|evening|night), (.+)$/, (m, a, n) => `${a === "morning" ? "صباح الخير" : a === "night" ? "تصبح على خير" : "مساء الخير"}، ${n}`],
+  [/^(.+) in (\d+) h (\d+) min$/, (m, p, h, mi) => `${arWord(p)} بعد ${h} س ${mi} د`], [/^(.+) in (\d+) min$/, (m, p, mi) => `${arWord(p)} بعد ${mi} دقيقة`], [/^Iftar in (.+)$/, (m, x) => `الإفطار بعد ${x}`],
+  [/^Time for (.+)$/, (m, p) => `حان وقت ${arWord(p)}`], [/^At (.+)$/, "الساعة $1"], [/^Maghrib at (.+)$/, "المغرب الساعة $1"], [/^Rang (.+)$/, (m, x) => `رنّ ${arWord(x)}`],
+  [/^(.+) is open$/, "$1 مفتوح"], [/^(.+) is on$/, "$1 يعمل"], [/^(\d+) doors or windows are open$/, "$1 أبواب أو نوافذ مفتوحة"], [/^(\d+) batteries are low$/, "$1 بطاريات منخفضة"], [/^(.+): battery low$/, "$1: البطارية منخفضة"],
+  [/^Last ran (.+)$/, (m, x) => `آخر تشغيل ${arWord(x)}`], [/^(\d+(?:\.\d+)?)° outside$/, "$1° في الخارج"], [/^And it is (.+) outside$/, "والحرارة $1 في الخارج"], [/^At night$/, "في الليل"],
+  [/(\d+(?:[.,]\d+)?) ?(AM|PM)$/, (m, t, ap) => `${t} ${ap === "AM" ? "ص" : "م"}`],
+];
+function arWord(x) {
+  const s = String(x).trim(); if (!s) return x;
+  if (AR_WORDS[s]) return AR_WORDS[s];
+  const cap = s.charAt(0).toUpperCase() + s.slice(1); if (AR_WORDS[cap]) return AR_WORDS[cap];
+  const deg = s.match(/^(-?\d+(?:\.\d+)?)\s?°C?$/); if (deg) return null;
+  for (const [re, to] of AR_PATTERNS) if (re.test(s)) return s.replace(re, to);
+  return null;
+}
+const RoostLang = {
+  pick(hass, cfg) {
+    let v = cfg && cfg.language && cfg.language !== "auto" ? cfg.language : null;
+    if (!v) { try { v = localStorage.getItem("roost-language"); } catch (e) { /* no storage */ } }
+    if (!v || v === "auto") v = hass?.locale?.language || hass?.language || "en";
+    return /^(ar|fa|ur|he)/.test(v) ? "ar" : "en";
+  },
+  eastern(cfg) { if (cfg && cfg.numerals) return cfg.numerals === "eastern"; try { return localStorage.getItem("roost-numerals") === "eastern"; } catch (e) { return false; } },
+  line(t) {
+    if (!/[A-Za-z]/.test(t)) return t;
+    const lead = t.match(/^\s*/)[0], tail = t.match(/\s*$/)[0], core = t.trim();
+    const whole = arWord(core); if (whole) return lead + whole + tail;
+    if (core.includes(" · ")) { const parts = core.split(" · ").map((x) => arWord(x) || x); return lead + parts.join(" · ") + tail; }
+    return t;
+  },
+  apply(el, root, cfg) {
+    const lang = this.pick(el._hass || RoostSheet.hass?.(), cfg || el._config);
+    if (lang !== "ar") { if (el.style.direction === "rtl") { el.style.direction = ""; el.removeAttribute("dir"); } return; }
+    el.style.direction = "rtl"; el.setAttribute("dir", "rtl"); el.setAttribute("lang", "ar");
+    const r = root || el.shadowRoot; if (!r) return;
+    const east = this.eastern(cfg || el._config), digits = (s) => (east ? s.replace(/[0-9]/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]).replace(/%/g, "٪") : s);
+    const walk = document.createTreeWalker(r, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentNode && /^(STYLE|SCRIPT)$/.test(n.parentNode.nodeName) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+    const nodes = []; while (walk.nextNode()) nodes.push(walk.currentNode);
+    for (const n of nodes) { const v = digits(this.line(n.nodeValue)); if (v !== n.nodeValue) n.nodeValue = v; }
+    r.querySelectorAll("[aria-label],[title],[placeholder]").forEach((x) => { for (const a of ["aria-label", "title", "placeholder"]) { const v = x.getAttribute(a); if (v) { const t = this.line(v); if (t !== v) x.setAttribute(a, t); } } });
+  },
+  cards: new Set(),
+  set(lang) {
+    try { localStorage.setItem("roost-language", lang); } catch (e) { /* no storage */ }
+    for (const el of [...this.cards]) { if (!el.isConnected) { this.cards.delete(el); continue; } el._sig = null; if (el._hass) el.hass = el._hass; }
+    window.dispatchEvent(new CustomEvent("roost-language-changed"));
+  },
+  toggle() { this.set(this.pick(document.querySelector("home-assistant")?.hass) === "ar" ? "en" : "ar"); },
+};
+window.RoostLang = RoostLang;
+
 // The page keeps room for its scroll bar, so switching to a room with more cards never nudges the other cards sideways.
 try { if (!document.getElementById("roost-gutter")) { const st = document.createElement("style"); st.id = "roost-gutter"; st.textContent = "html{scrollbar-gutter:stable;overflow-y:scroll}"; document.head.appendChild(st); } } catch (e) { /* no page */ }
 
@@ -9371,7 +9465,7 @@ const RoostSheet = {
     if (dom === "cover") { const v = coverView(s); return a.current_position != null ? `${v.position ?? a.current_position}% open` : v.state.replace(/^./, (m) => m.toUpperCase()); }
     if (dom === "sensor" && num(s.state) != null) return `${fmt(num(s.state), decOf(s.state))}${unitGap(a.unit_of_measurement || "")}`;
     if (dom === "binary_sensor") return this.binWord(s);
-    if (dom === "person" || dom === "device_tracker") return s.state === "home" ? "Home" : s.state === "not_home" ? "Away" : s.state;
+    if (dom === "person" || dom === "device_tracker") return s.state === "home" ? "At home" : s.state === "not_home" ? "Away" : s.state;
     if (dom === "alarm_control_panel") return { disarmed: "Off", armed_home: "On · home", armed_away: "On · away", armed_night: "On · night", armed_vacation: "On · holiday", arming: "Turning on", pending: "Pending", triggered: "Alarm!" }[s.state] || s.state;
     if (dom === "weather") return `${s.state.replace(/-/g, " ").replace(/^./, (m) => m.toUpperCase())}${a.temperature != null ? ` · ${a.temperature}°` : ""}`;
     if (dom === "water_heater") return `${s.state.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase())}${a.current_temperature != null ? ` · ${a.current_temperature}°` : ""}`;
@@ -9508,6 +9602,7 @@ const RoostSheet = {
       ${el.full ? (rm.path ? `<button class="wb" data-act="go">Open the room's page</button>` : "") : devs.length > 6 || rm.path ? `<button class="more" data-act="grow">Swipe up for more</button>` : ""}
     </div>`;
     this.wire({ entity_id: "room.x", attributes: {} }, g);
+    try { RoostLang.apply(el.host, el.root, {}); } catch (e) { /* words stay */ }
     el.root.querySelector('[data-act="go"]')?.addEventListener("click", () => { const path = rm.path; this.close(); history.pushState(null, "", path); window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } })); });
   },
   iconFor(d) { return { light: "mdi:lightbulb", switch: "mdi:power-socket-uk", fan: "mdi:fan", climate: "mdi:snowflake", cover: "mdi:curtains", media_player: "mdi:television", humidifier: "mdi:air-humidifier", input_boolean: "mdi:toggle-switch", lock: "mdi:lock", vacuum: "mdi:robot-vacuum" }[d] || "mdi:circle-outline"; },
@@ -9582,6 +9677,7 @@ const RoostSheet = {
     : `<button class="more" data-act="grow">Swipe up for more</button>`}
     </div>`;
     this.wire(s, g);
+    try { RoostLang.apply(el.host, el.root, {}); } catch (e) { /* words stay */ }
   },
   wire(s, g) {
     const el = this.el, root = el.root, id = s.entity_id, dom = id.split(".")[0], a = s.attributes;
@@ -10541,10 +10637,10 @@ window.addEventListener("ll-custom", (ev) => {
   if (want === "dark") RoostMode.set(true); else if (want === "light") RoostMode.set(false); else RoostMode.toggle();
 });
 // The special things a button can do instead of a page or a device.
-const SPECIAL_DOES = [{ value: "fullscreen", label: "Full screen on and off (its icon follows)" }, { value: "theme", label: "Light and dark mode (its icon follows)" }];
-const specialIcon = (kind) => (kind === "fullscreen" ? (RoostFull.isOn() ? "mdi:fullscreen-exit" : "mdi:fullscreen") : kind === "theme" ? RoostMode.icon() : null);
-const specialLabel = (kind) => (kind === "fullscreen" ? (RoostFull.isOn() ? "Leave full screen" : "Full screen") : kind === "theme" ? RoostMode.label() : null);
-const specialRun = (kind) => { if (kind === "fullscreen") RoostFull.toggle({}); else if (kind === "theme") RoostMode.toggle(); };
+const SPECIAL_DOES = [{ value: "fullscreen", label: "Full screen on and off (its icon follows)" }, { value: "theme", label: "Light and dark mode (its icon follows)" }, { value: "language", label: "Arabic and English" }];
+const specialIcon = (kind) => (kind === "fullscreen" ? (RoostFull.isOn() ? "mdi:fullscreen-exit" : "mdi:fullscreen") : kind === "theme" ? RoostMode.icon() : kind === "language" ? "mdi:translate" : null);
+const specialLabel = (kind) => (kind === "fullscreen" ? (RoostFull.isOn() ? "Leave full screen" : "Full screen") : kind === "theme" ? RoostMode.label() : kind === "language" ? (window.RoostLang?.pick(document.querySelector("home-assistant")?.hass) === "ar" ? "English" : "العربية") : null);
+const specialRun = (kind) => { if (kind === "fullscreen") RoostFull.toggle({}); else if (kind === "theme") RoostMode.toggle(); else if (kind === "language") window.RoostLang?.toggle(); };
 
 class RoostFullscreen extends RoostBase {
   static get defaults() {
@@ -10745,6 +10841,142 @@ class RoostPanel extends RoostPage {
 }
 
 // ------------------------------------------------------------------ register
+// ------------------------------------------------------------------ Roost Now
+// The home screen thinks about "now": only what matters at this moment, most urgent first.
+// An alarm, a leak, someone at the door, the next prayer or iftar, a door open in the heat,
+// lights left on when nobody is home, low batteries. When nothing needs you, one calm line.
+class RoostNow extends ticking(RoostBase, 30000) {
+  static get defaults() { return { max: 3, hot: 38, battery_low: 15, prayer: true, method: "makkah", prayer_minutes: 30, iftar_hours: 3, doors: [], lights: [], people: [], hide_calm: false, theme: "auto" }; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "max", label: "Most things shown at once", selector: slider(1, 5) },
+        { type: "expandable", name: "", title: "What it watches (empty = found by itself)", icon: "mdi:eye-outline", schema: [
+          { name: "doorbell", label: "Doorbell (button or sensor)", selector: { entity: {} } },
+          { name: "camera", label: "Door camera (its picture when someone rings)", selector: { entity: { domain: "camera" } } },
+          { name: "doors", label: "Doors and windows", selector: { entity: { multiple: true, domain: ["binary_sensor", "cover"] } } },
+          { name: "lights", label: "Lights to check when nobody is home", selector: { entity: { multiple: true, domain: ["light", "switch"] } } },
+          { name: "people", label: "People", selector: { entity: { multiple: true, domain: "person" } } },
+          { name: "weather", selector: { entity: { domain: "weather" } } },
+        ] },
+        { type: "expandable", name: "", title: "When to speak up", icon: "mdi:tune", schema: [
+          { type: "grid", name: "", schema: [{ name: "hot", label: "Hot outside from (°)", selector: { number: { mode: "box" } } }, { name: "battery_low", label: "Battery low below (%)", selector: { number: { mode: "box" } } }] },
+          { name: "prayer", label: "The next prayer and the iftar countdown", selector: { boolean: {} } },
+          { type: "grid", name: "", schema: [{ name: "prayer_minutes", label: "Prayer: show from (minutes before)", selector: { number: { mode: "box" } } }, { name: "iftar_hours", label: "Iftar: show from (hours before)", selector: { number: { mode: "box" } } }] },
+          { name: "method", label: "Prayer times", selector: pick([["makkah", "Umm al-Qura (Makkah)"], ["mwl", "Muslim World League"], ["egypt", "Egypt"], ["karachi", "Karachi"], ["isna", "North America"], ["dubai", "Dubai"], ["jafari", "Shia Ithna Ashari"]]) },
+          { name: "hide_calm", label: "Hide the card when all is calm", selector: { boolean: {} } },
+        ] },
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return {}; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  all(dom) { return Object.keys(this._hass?.states || {}).filter((id) => id.startsWith(`${dom}.`)); }
+
+  watched() {
+    const c = this._config, h = this._hass; if (!h) return [];
+    return [c.doorbell, c.camera, c.weather, ...this.doorIds(), ...this.lightIds(), ...this.peopleIds(), ...this.all("alarm_control_panel"), ...this.dangerIds(), ...this.batteryIds()].filter(Boolean);
+  }
+
+  extraSignature() { return Math.floor(Date.now() / 60000); }
+
+  doorIds() { const c = this._config; return c.doors?.length ? c.doors : Object.keys(this._hass.states).filter((id) => { const s = this._hass.states[id]; return (id.startsWith("binary_sensor.") && ["door", "window", "garage_door", "opening"].includes(s.attributes.device_class)) || (id.startsWith("cover.") && ["garage", "gate"].includes(s.attributes.device_class)); }); }
+  lightIds() { const c = this._config; return c.lights?.length ? c.lights : this.all("light").filter((id) => !Array.isArray(this._hass.states[id].attributes.entity_id)); }
+  peopleIds() { const c = this._config; return c.people?.length ? c.people : this.all("person"); }
+  dangerIds() { return Object.keys(this._hass.states).filter((id) => id.startsWith("binary_sensor.") && ["moisture", "smoke", "gas", "carbon_monoxide", "safety"].includes(this._hass.states[id].attributes.device_class)); }
+  batteryIds() { return Object.keys(this._hass.states).filter((id) => id.startsWith("sensor.") && this._hass.states[id].attributes.device_class === "battery" && this._hass.states[id].attributes.unit_of_measurement === "%"); }
+
+  // the next prayer (or iftar in Ramadan), from the same calculation as Roost Prayer
+  prayerMoment() {
+    const c = this._config, h = this._hass; if (!c.prayer || typeof PrayerCalc === "undefined") return null;
+    const now = new Date(), lat = Number(h.config?.latitude ?? 26.2), lng = Number(h.config?.longitude ?? 50.6);
+    const tz = -now.getTimezoneOffset() / 60, t = PrayerCalc.times(now, lat, lng, tz, c.method, 1, Number(h.config?.elevation ?? 0));
+    const at = (v) => { const d = new Date(now); d.setHours(0, 0, 0, 0); d.setMinutes(Math.round(v * 60)); return d; };
+    let ramadan = false;
+    try { ramadan = +new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", { month: "numeric" }).formatToParts(now).find((p) => p.type === "month").value === 9; } catch (e) { /* no Hijri calendar */ }
+    const names = { fajr: "Fajr", dhuhr: now.getDay() === 5 ? "Jumu'ah" : "Dhuhr", asr: "Asr", maghrib: "Maghrib", isha: "Isha" };
+    const left = (d) => { const m = Math.max(0, Math.round((d - now) / 60000)); return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`; };
+    if (ramadan && isFinite(t.maghrib)) {
+      const m = at(t.maghrib), ms = m - now;
+      if (ms > 0 && ms <= Number(c.iftar_hours) * 3600e3) return { key: "iftar", rank: 40, icon: "mdi:weather-sunset-down", g: COLORS.amber, title: `Iftar in ${left(m)}`, sub: `Maghrib at ${m.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` };
+    }
+    if (now.getHours() >= 18 && isFinite(t.isha) && now > at(t.isha) && isFinite(t.fajr)) {
+      const f = at(t.fajr); f.setDate(f.getDate() + 1);
+      if (f - now <= Number(c.prayer_minutes) * 60000) return { key: "p-fajr", rank: 45, icon: "mdi:mosque", g: COLORS.purple, title: `Fajr in ${left(f)}`, sub: `At ${f.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` };
+    }
+    for (const k of ["fajr", "dhuhr", "asr", "maghrib", "isha"]) {
+      if (!isFinite(t[k])) continue;
+      const d = at(t[k]), ms = d - now;
+      if (ms > 0 && ms <= Number(c.prayer_minutes) * 60000) return { key: `p-${k}`, rank: 45, icon: "mdi:mosque", g: COLORS.purple, title: `${names[k]} in ${left(d)}`, sub: `At ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` };
+      if (ms <= 0 && ms > -10 * 60000) return { key: `p-${k}`, rank: 45, icon: "mdi:mosque", g: COLORS.purple, title: `Time for ${names[k]}`, sub: `It was at ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` };
+    }
+    return null;
+  }
+
+  moments() {
+    const c = this._config, h = this._hass, S = h.states, out = [], name = (id) => S[id]?.attributes.friendly_name || id;
+    const now = Date.now(), isOn = (s) => s && !UNAVAILABLE.includes(s.state) && !OFF_STATES.includes(s.state);
+    for (const id of this.all("alarm_control_panel")) if (S[id].state === "triggered") out.push({ key: id, rank: 100, icon: "mdi:bell-ring", g: COLORS.coral, title: "The alarm is going off", sub: name(id), entity: id, act: ["Open", () => this.moreInfo(id)] });
+    for (const id of this.dangerIds()) if (S[id].state === "on") { const dc = S[id].attributes.device_class; out.push({ key: id, rank: 95, icon: dc === "moisture" ? "mdi:water-alert" : "mdi:smoke-detector-alert", g: COLORS.coral, title: dc === "moisture" ? "Water leak" : dc === "gas" ? "Gas detected" : "Smoke detected", sub: name(id), entity: id }); }
+    const bell = S[c.doorbell];
+    if (bell && !UNAVAILABLE.includes(bell.state) && (bell.state === "on" || (now - new Date(bell.last_changed).getTime() < 120000 && /^(event|button|input_button)\./.test(c.doorbell)))) {
+      out.push({ key: "bell", rank: 90, icon: "mdi:doorbell-video", g: COLORS.amber, title: "Someone is at the door", sub: `Rang ${ago(bell.last_changed)}`, entity: c.camera || c.doorbell, pic: S[c.camera]?.attributes.entity_picture });
+    }
+    const pr = this.prayerMoment(); if (pr) out.push(pr);
+    const people = this.peopleIds(), home = people.filter((id) => S[id]?.state === "home"), away = people.length && !home.length;
+    const night = new Date().getHours() >= 22 || new Date().getHours() < 6;
+    const wx = S[c.weather] || S[this.all("weather")[0]], hotNow = wx && Number(wx.attributes.temperature) >= Number(c.hot);
+    const open = this.doorIds().filter((id) => { const s = S[id]; if (!s) return false; return id.startsWith("cover.") ? ["open", "opening"].includes(s.state) : s.state === "on"; });
+    if (open.length && (away || night || hotNow)) {
+      const why = away ? "and nobody is home" : night ? "at night" : `and it is ${Math.round(wx.attributes.temperature)}° outside`;
+      out.push({ key: "doors", rank: away ? 80 : 60, icon: "mdi:door-open", g: COLORS.amber, title: open.length > 1 ? `${open.length} doors or windows are open` : `${name(open[0])} is open`, sub: why.charAt(0).toUpperCase() + why.slice(1), entity: open[0] });
+    }
+    const lit = this.lightIds().filter((id) => S[id]?.state === "on");
+    if (away && lit.length) out.push({ key: "lights", rank: 70, icon: "mdi:lightbulb-alert", g: COLORS.amber, title: lit.length > 1 ? `${lit.length} lights are on` : `${name(lit[0])} is on`, sub: "And nobody is home", act: ["Turn off", () => this.call("light", "turn_off", { entity_id: lit.filter((x) => x.startsWith("light.")) })] });
+    const low = this.batteryIds().filter((id) => { const v = num(S[id].state); return v != null && v <= Number(c.battery_low); });
+    if (low.length) out.push({ key: "bat", rank: 20, icon: "mdi:battery-alert-variant-outline", g: COLORS.coral, title: low.length > 1 ? `${low.length} batteries are low` : `${name(low[0]).replace(/ battery$/i, "")}: battery low`, sub: low.slice(0, 2).map((id) => `${name(id).replace(/ battery$/i, "")} ${Math.round(num(S[id].state))}%`).join(" · "), entity: low[0] });
+    return out.sort((a, b) => b.rank - a.rank).slice(0, Number(c.max) || 3);
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, list = this.moments();
+    if (!list.length && c.hide_calm && !this.editMode) { this.shadowRoot.innerHTML = ""; this.style.display = "none"; return; }
+    this.style.display = "";
+    const calm = !list.length, top = list[0];
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, 22)};padding:12px;display:flex;flex-direction:column;gap:8px}
+      .m{display:flex;align-items:center;gap:12px;padding:8px;border-radius:16px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s}
+      .m:active{transform:scale(.98)}
+      .m.top{background:${p.inset}}
+      .ic{width:44px;height:44px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;color:#FFFFFF;--mdc-icon-size:22px;position:relative}
+      .ic.ring::after{content:"";position:absolute;inset:0;border-radius:inherit;animation:roost-ping 2s ease-out infinite;background:inherit}
+      .tx{flex:1;min-width:0}.tt{font-size:15px;font-weight:600;line-height:1.25}.sb{font-size:12px;color:${p.muted};margin-top:2px}
+      .act{flex:none;height:36px;padding:0 14px;border-radius:999px;border:0;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:#FFFFFF}
+      .pic{width:64px;height:44px;border-radius:12px;object-fit:cover;flex:none}
+      .calm{display:flex;align-items:center;gap:12px;padding:6px 8px}.calm .ic{background:linear-gradient(135deg,${COLORS.green[0]},${COLORS.green[1]})}
+    </style>
+    <div class="card" role="list" aria-label="Right now">
+      ${calm ? `<div class="calm"><span class="ic"><ha-icon icon="mdi:home-heart"></ha-icon></span><span class="tx"><div class="tt">All calm at home</div><div class="sb">Nothing needs you right now</div></span></div>`
+    : list.map((m, i) => `<div class="m ${i === 0 ? "top" : ""}" role="listitem" data-i="${i}">
+        <span class="ic ${m.rank >= 90 ? "ring" : ""}" style="background:linear-gradient(135deg,${m.g[0]},${m.g[1]});box-shadow:0 10px 22px -12px ${m.g[0]}"><ha-icon icon="${m.icon}"></ha-icon></span>
+        <span class="tx"><div class="tt">${esc(m.title)}</div>${m.sub ? `<div class="sb">${esc(m.sub)}</div>` : ""}</span>
+        ${m.pic ? `<img class="pic" src="${esc(m.pic)}" alt="">` : ""}
+        ${m.act ? `<button class="act" data-a="${i}" style="background:linear-gradient(135deg,${m.g[0]},${m.g[1]})">${esc(m.act[0])}</button>` : ""}
+      </div>`).join("")}
+    </div>`;
+    void top;
+    this.shadowRoot.querySelectorAll("[data-a]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); this.vibrate(); list[+b.dataset.a].act[1](); }));
+    this.shadowRoot.querySelectorAll(".m").forEach((el) => el.addEventListener("click", () => { const m = list[+el.dataset.i]; if (m.entity) this.moreInfo(m.entity); }));
+  }
+}
+
 const CARDS = [
   ["roost-tile", RoostTile, "Roost Tile", "A big tile with a switch, colour, icon and how long it has been on."],
   ["roost-chips", RoostChips, "Roost Chips", "Status chips in one row: doors, alarm, lights (with count), AC and people bubbles."],
@@ -10809,6 +11041,7 @@ const CARDS = [
   ["roost-buttons", RoostButtons, "Roost Buttons", "Several small actions in one rounded bar."],
   ["roost-page", RoostPage, "Roost Page", "A phone page laid out like the original dashboard: even spacing, the night-sky background and room for the bottom bar."],
   ["roost-panel", RoostPanel, "Roost Panel", "A rounded panel with a title that holds other cards, such as a list of rooms."],
+  ["roost-now", RoostNow, "Roost Now", "What matters right now, most urgent first: the alarm, a leak, the doorbell, the next prayer or iftar, a door open in the heat, lights left on. One calm line when all is well."],
   ["roost-fullscreen", RoostFullscreen, "Roost Full Screen", "Full screen without Home Assistant's top bar and sidebar: by itself, or as a button that maximizes and minimizes."],
 ];
 window.customCards = window.customCards || [];
@@ -10837,6 +11070,19 @@ for (const [tag, cls] of CARDS) {
       set.call(this, h);
     } });
     cls.prototype.__roostWho = true;
+  }
+  // words in the person's language, right to left for Arabic
+  let rp = cls.prototype, rdesc;
+  while (rp && !(rdesc = Object.getOwnPropertyDescriptor(rp, "render"))) rp = Object.getPrototypeOf(rp);
+  if (rdesc && typeof rdesc.value === "function" && !Object.prototype.hasOwnProperty.call(cls.prototype, "__roostLang")) {
+    const orig = rdesc.value;
+    cls.prototype.render = function renderInLanguage(...args) {
+      const out = orig.apply(this, args);
+      RoostLang.cards.add(this);
+      try { RoostLang.apply(this); } catch (e) { /* words stay as they are */ }
+      return out;
+    };
+    cls.prototype.__roostLang = true;
   }
   cls.getConfigElement = function getConfigElement() { const el = document.createElement("roost-editor"); el.cardClass = cls; return el; };
 }

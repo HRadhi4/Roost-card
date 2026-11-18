@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.17.0
+
+- **Roost Now (new card).** What matters right now, most urgent first: the alarm going off, a water leak or smoke, someone at the door (with the camera picture), the next prayer or the iftar countdown in Ramadan, a door or window open while it is hot, at night or when nobody is home, lights left on when everyone is out (one tap turns them off), low batteries. When nothing needs you: one calm line, or the card hides.
+- **Arabic, right to left.** Every Roost card follows the person's Home Assistant language: in Arabic the cards turn right to left and their words are in Arabic (your own device names stay as you wrote them). Choose Arabic or English on one screen with the Arabic / English chip, a bar or Roost Buttons button ("Or does: Arabic and English"), or per card ("Language of this card"). Arabic numbers (٢١) with `numerals: eastern`.
+
 ## 1.16.0
 
 - **Who sees what.** Every Roost card has "Only these people see this card": pick people and everyone else does not see it (it stays visible while you edit the dashboard).

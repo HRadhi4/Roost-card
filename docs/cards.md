@@ -1,4 +1,28 @@
 
+## Roost Now
+
+What matters right now, most urgent first: the alarm, a leak or smoke, someone at the door, the next prayer or iftar, a door open in the heat or when nobody is home, lights left on, low batteries. One calm line when all is well.
+
+```yaml
+type: custom:roost-now
+max: 3                 # most things at once
+doorbell: binary_sensor.front_doorbell
+camera: camera.front_door
+hot: 38                # "it is hot outside" from this temperature
+prayer: true           # the next prayer, and iftar in Ramadan
+method: makkah
+hide_calm: false       # hide the card when nothing needs you
+```
+Doors, windows, lights, people, weather and batteries are found by themselves; pick them yourself under **What it watches**.
+
+## Arabic, right to left
+
+Every Roost card follows the person's Home Assistant language. In Arabic the cards turn right to left and their words are in Arabic; your own device names stay as you wrote them.
+
+- On one screen only: the Arabic / English chip (`show_language: true` on Roost Chips), or a bar or Roost Buttons button with **Or does: Arabic and English**.
+- One card only: `language: ar` (or `en`).
+- Arabic numbers (٢١): `numerals: eastern`.
+
 ## Who sees what
 
 Every Roost card can be shown only to some people: `show_to: [person.saeed]` (in the editor: **Only these people see this card**). Everyone else does not see it; while you edit the dashboard it stays visible.
