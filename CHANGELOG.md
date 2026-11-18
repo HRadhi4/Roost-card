@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.10.3
+
+- Hero: the moon or sun no longer sits on top of the greeting when the house picture is on, or on narrow screens.
+- New README pictures: the phone dashboard (home, rooms, a room page) and the tablet dashboard, built from the same layout used in the demo.
+
 ## 1.10.2
 - **Rooms:** the highlight behind the chosen room could end up narrower than its name, leaving the text outside it. It now follows its pill whenever the bar changes size.
 - **Same icon style everywhere (like Homey):** icons on a switched-on tile are always white on a see-through background, and amber and green tiles now use white text too.

@@ -17,7 +17,9 @@ Ready in one tap from your own rooms and devices · real controls you drag and s
 
 <p align="center"><img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/tour.webp" width="300" alt="A tour of every Roost card on a phone"></p>
 
-![Roost home screen in dark and light mode](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/home.png)
+![Roost phone dashboard: home, rooms and a room page](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/home.png)
+
+![Roost tablet dashboard](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/tablet.png)
 
 ## Why Roost
 

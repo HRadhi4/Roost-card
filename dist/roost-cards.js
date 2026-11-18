@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.10.2";
+const ROOST_VERSION = "1.10.3";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1711,7 +1711,8 @@ class RoostHero extends RoostBase {
       .house{position:absolute;right:-6px;bottom:-4px;pointer-events:none}
       .house .win{animation:roost-breathe 3.2s ease-in-out infinite}
       @keyframes roost-breathe{0%,100%{opacity:.55}50%{opacity:1}}
-      @container (max-width: 520px){:host .house{display:none}}
+      .orb.wh{right:210px}
+      @container (max-width: 520px){:host .house{display:none}:host .orb.wh{right:24px}}
       .say{font-size:15px;line-height:1.5;opacity:.9;max-width:470px}
       .whos{display:flex;flex-wrap:wrap;gap:8px}
       .who{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border-radius:999px;padding:4px 12px 4px 4px;font-size:13px;cursor:pointer}
@@ -1720,7 +1721,7 @@ class RoostHero extends RoostBase {
       .dot{position:relative;width:10px;height:10px;border-radius:50%;background:#E9E2FF;flex:none}
       .dot span{position:absolute;inset:0;border-radius:50%;background:#E9E2FF;animation:roost-ping 1.8s ease-out infinite}
     </style>
-    <div class="card">${stars}${c.show_sheen ? '<span class="sheen"></span>' : ""}${c.show_orb ? `<span class="orb"${c.house ? ' style="right:210px"' : ""}></span>` : ""}${house}
+    <div class="card">${stars}${c.show_sheen ? '<span class="sheen"></span>' : ""}${c.show_orb ? `<span class="orb${c.house ? " wh" : ""}"></span>` : ""}${house}
       <div class="body">
         ${top ? `<span class="top t">${esc(top)}</span>` : ""}
         ${c.show_greeting ? `<span class="hi t">${esc(part)}${who ? `, ${esc(who)}` : ""}</span>` : ""}
