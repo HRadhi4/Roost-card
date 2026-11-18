@@ -2,6 +2,13 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.16.0
+
+- **Who sees what.** Every Roost card has "Only these people see this card": pick people and everyone else does not see it (it stays visible while you edit the dashboard).
+- Chips: the full screen chip and the light and dark chip can each be shown only to the people you pick.
+- Roost Buttons: each button can be shown only to the people you pick.
+- The bar and side rail already let each button be shown to chosen people; the whole bar can now be hidden from others too.
+
 ## 1.15.2
 
 - Tablets and computers: the page keeps the same width whether it scrolls or not, so switching to a room with more cards (like the kitchen) never moves the greeting or the other cards.

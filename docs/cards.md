@@ -1,4 +1,10 @@
 
+## Who sees what
+
+Every Roost card can be shown only to some people: `show_to: [person.saeed]` (in the editor: **Only these people see this card**). Everyone else does not see it; while you edit the dashboard it stays visible.
+
+Single buttons too: a chip (`fullscreen_users`, `theme_users`), a Roost Buttons button (`users`) and a bar or rail button (`users`).
+
 ## Details sheet (hold any card)
 
 Holding a Roost card opens Roost's own details sheet: the name, the state and one main control. Swipe up for what happened lately, a few details and **More in Home Assistant**.

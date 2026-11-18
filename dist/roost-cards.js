@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.15.2";
+const ROOST_VERSION = "1.16.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -845,7 +845,8 @@ class RoostEditor extends HTMLElement {
     const label = form.computeLabel;
     const noSurface = ["roost-page", "roost-fullscreen", "roost-title", "roost-theme"].includes(cls.tag);
     const noBroken = noSurface || ["roost-nav", "roost-page", "roost-panel", "roost-rooms"].includes(cls.tag);
-    const schema = noSurface ? form.schema : [...form.schema, ...(noBroken ? [] : [BROKEN_FIELDS]), SURFACE_FIELDS(cls.tag === "roost-nav")];
+    const WHO = { name: "show_to", label: "Only these people see this card (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } };
+    const schema = [...(noSurface ? form.schema : [...form.schema, ...(noBroken ? [] : [BROKEN_FIELDS]), SURFACE_FIELDS(cls.tag === "roost-nav")]), WHO];
     this._data = { ...cls.defaults, ...this._config };
     if (!this._form) {
       this._form = document.createElement("ha-form");
@@ -1145,6 +1146,8 @@ class RoostChips extends RoostBase {
       schema: [
         { name: "entities", selector: { entity: { multiple: true } } },
         { type: "grid", name: "", schema: [{ name: "show_fullscreen", label: "A full screen chip", selector: { boolean: {} } }, { name: "show_theme", label: "A light and dark mode chip", selector: { boolean: {} } }] },
+        { name: "fullscreen_users", label: "Full screen chip only for (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
+        { name: "theme_users", label: "Light and dark chip only for (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
         { type: "grid", name: "", schema: [
           { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "compact", label: "Compact (for wall panels)" }, { value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
           { name: "show_words", label: "Words next to door icons (“Closed”)", selector: { boolean: {} } },
@@ -1228,8 +1231,8 @@ class RoostChips extends RoostBase {
       chips.push({ key: "__climates", icon: "mdi:snowflake", colour: on ? "#38BDF8" : p.muted, text: on ? String(on) : "", group: "climates", label: "Air conditioners" });
     }
     if (people.length) chips.push({ key: "__people", people: true, group: "people" });
-    if (c.show_theme) chips.push({ key: "__theme", icon: RoostMode.icon(), colour: this.dark ? "#FCD34D" : "#6D4BFF", text: "", special: "theme" });
-    if (c.show_fullscreen) chips.push({ key: "__full", icon: specialIcon("fullscreen"), colour: RoostFull.isOn() ? "#8B6CFF" : p.text, text: "", special: "fullscreen" });
+    if (c.show_theme && forPeople(this._hass, c.theme_users)) chips.push({ key: "__theme", icon: RoostMode.icon(), colour: this.dark ? "#FCD34D" : "#6D4BFF", text: "", special: "theme" });
+    if (c.show_fullscreen && forPeople(this._hass, c.fullscreen_users)) chips.push({ key: "__full", icon: specialIcon("fullscreen"), colour: RoostFull.isOn() ? "#8B6CFF" : p.text, text: "", special: "fullscreen" });
     const open = this._open;
     const initials = (id) => (this.sx(id)?.attributes.friendly_name || id.split(".")[1]).split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
     const AVG = ["linear-gradient(135deg,#38BDF8,#6D4BFF)", "linear-gradient(135deg,#FF5577,#FF9F6B)", "linear-gradient(135deg,#10B981,#6EE7B7)", "linear-gradient(135deg,#F59E0B,#FDE68A)", "linear-gradient(135deg,#8B6CFF,#D6C4FF)"];
@@ -10271,6 +10274,7 @@ class RoostButtons extends RoostBase {
           entity: { label: "Device (lights the button when on; tap switches it)", selector: { entity: {} } },
           tap_action: { label: "Tap does (instead)", selector: { ui_action: {} } },
           does: { label: "Or does", selector: { select: { mode: "dropdown", options: SPECIAL_DOES } } },
+          users: { label: "Only for these people (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
         } } } },
         { type: "grid", name: "", schema: [{ name: "show_names", label: "Names under the icons", selector: { boolean: {} } }, { name: "radius", selector: slider(0, 40, 2) }] },
         ...colourFields("color", "Colour when on"),
@@ -10292,10 +10296,10 @@ class RoostButtons extends RoostBase {
     if (!this._hass || !this._config) return;
     const c = this._config, p = this.p, g = this.colour();
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .bar{border-radius:${c.radius}px;color:${p.text};padding:6px;display:grid;grid-template-columns:repeat(${c.items.length},minmax(0,1fr));gap:4px;
+      .bar{border-radius:${c.radius}px;color:${p.text};padding:6px;display:grid;grid-template-columns:repeat(${Math.max(1, c.items.filter((it) => forPeople(this._hass, it.users)).length)},minmax(0,1fr));gap:4px;
         ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};`
     : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);-webkit-backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);box-shadow:0 18px 40px -16px ${this.dark ? "rgba(0,0,0,.45)" : "rgba(40,30,90,.16)"}, 0 0 0 1px rgba(255,255,255,.04) inset;`}}
-      @container (max-width: ${c.items.length * 66}px){:host .b span{display:none}:host .b{min-height:48px}}
+      @container (max-width: ${Math.max(1, c.items.filter((it) => forPeople(this._hass, it.users)).length) * 66}px){:host .b span{display:none}:host .b{min-height:48px}}
       .b{min-height:${c.show_names ? 62 : 48}px;border-radius:${Math.max(8, c.radius - 6)}px;border:0;background:transparent;color:${p.muted};font:inherit;font-size:11px;font-weight:600;cursor:pointer;
         display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 2px;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .b:active{transform:scale(.92)}
@@ -10312,6 +10316,7 @@ class RoostButtons extends RoostBase {
       .b.done ha-icon{animation:roost-pulse .5s ease-out 1}
     </style>
     <div class="bar">${c.items.map((it, i) => {
+      if (!forPeople(this._hass, it.users)) return "";
       const s = this.sx(it.entity), on = s && !UNAVAILABLE.includes(s.state) && !OFF_STATES.includes(s.state);
       const sp = specialIcon(it.does), spOn = it.does === "fullscreen" ? RoostFull.isOn() : false;
       return `<button class="b ${on || spOn ? "on" : ""}" data-i="${i}" data-pop="${on ? 1 : 0}" data-popkey="${i}" aria-label="${esc(specialLabel(it.does) || it.name || it.icon)}"><ha-icon icon="${esc(sp || it.icon)}"></ha-icon>${c.show_names && (it.name || it.does) ? `<span class="t">${esc(it.name || specialLabel(it.does))}</span>` : ""}</button>`;
@@ -10807,8 +10812,32 @@ const CARDS = [
   ["roost-fullscreen", RoostFullscreen, "Roost Full Screen", "Full screen without Home Assistant's top bar and sidebar: by itself, or as a button that maximizes and minimizes."],
 ];
 window.customCards = window.customCards || [];
+// "Only these people see this card": every Roost card can be hidden from everyone but the people chosen (show_to).
+// While the dashboard is being edited it stays visible, so it can still be found and changed.
+const forPeople = (hass, list) => {
+  if (!Array.isArray(list) || !list.length) return true;
+  const me = hass?.user?.id;
+  return list.some((p) => p === me || hass?.states?.[p]?.attributes?.user_id === me);
+};
+window.RoostForPeople = forPeople;
 for (const [tag, cls] of CARDS) {
   cls.tag = tag;
+  let proto = cls.prototype, desc;
+  while (proto && !(desc = Object.getOwnPropertyDescriptor(proto, "hass"))) proto = Object.getPrototypeOf(proto);
+  if (desc && desc.set && !Object.prototype.hasOwnProperty.call(cls.prototype, "__roostWho")) {
+    const set = desc.set, get = desc.get || function getHass() { return this._hass; };
+    Object.defineProperty(cls.prototype, "hass", { configurable: true, get, set(h) {
+      const editing = this.editMode || this.preview || /[?&]edit=1/.test(location.search) || this.closest?.("hui-card-preview, hui-dialog-edit-card");
+      if (!editing && !forPeople(h, this._config?.show_to)) {
+        this._hass = h;
+        if (!this._roostHid) { this._roostHid = true; this.style.display = "none"; this.makeRoom?.(0); }
+        return;
+      }
+      if (this._roostHid) { this._roostHid = false; this.style.display = ""; this._sig = null; }
+      set.call(this, h);
+    } });
+    cls.prototype.__roostWho = true;
+  }
   cls.getConfigElement = function getConfigElement() { const el = document.createElement("roost-editor"); el.cardClass = cls; return el; };
 }
 for (const [tag, cls, name, description] of CARDS) {
