@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.10.3";
+const ROOST_VERSION = "1.11.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -49,7 +49,7 @@ try {
   }
 } catch (e) { /* fonts fall back to the system font */ }
 const FONT_NUM = "'Space Grotesk', Inter, -apple-system, 'Segoe UI', Roboto, sans-serif";
-const COLOR_OPTIONS = [{ value: "active", label: "Selected purple" }, ...Object.keys(COLORS).map((k) => ({ value: k, label: k[0].toUpperCase() + k.slice(1) })), { value: "custom", label: "My own colours" }];
+const COLOR_OPTIONS = [{ value: "active", label: "Selected purple" }, ...Object.keys(COLORS).map((k) => ({ value: k, label: k[0].toUpperCase() + k.slice(1) })), { value: "custom", label: "My own colours" }, { value: "lamp", label: "The light's own colour (lights)" }];
 const SIZES = { compact: 100, small: 128, medium: 152, large: 176 };
 // Ready-made skies for the hero card: [gradient, name in the editor]
 const SKIES = {
@@ -643,6 +643,18 @@ class RoostBase extends HTMLElement {
       const b = rgb(c[`${key}_end`]) || a;
       return [a, b, "rgba(0,0,0,.35)", rgb(c[`${key}_text`]) || "#FFFFFF"];
     }
+    if (c[key] === "lamp") {
+      // the light's own colour while it is on, like the glow of the real lamp
+      const s = this.st(), a = s?.attributes || {};
+      let col = Array.isArray(a.rgb_color) ? a.rgb_color : null;
+      const k = a.color_temp_kelvin || (a.color_temp ? 1000000 / a.color_temp : null);
+      if ((!col || a.color_mode === "color_temp") && k) col = k < 3000 ? [255, 168, 80] : k < 4200 ? [255, 206, 140] : k < 5500 ? [255, 236, 210] : [200, 220, 255];
+      if (s && s.state === "on" && col) {
+        const [r, g, b] = col.map(Number), sh = (f) => `rgb(${Math.round(r * f)},${Math.round(g * f)},${Math.round(b * f)})`;
+        return [sh(0.62), sh(0.88), `rgba(${r},${g},${b},.55)`, "#FFFFFF"];
+      }
+      return COLORS.purple;
+    }
     return COLORS[c[key]] || COLORS.purple;
   }
 
@@ -808,6 +820,18 @@ class RoostEditor extends HTMLElement {
 
   set hass(hass) { this._hass = hass; this.draw(); }
 
+  // Home Assistant hands the dashboard to card editors; the card picker under "Cards on it" needs it to list cards.
+  set lovelace(v) { this._lovelace = v; if (this._stack && "lovelace" in this._stack) this._stack.lovelace = v; }
+
+  get lovelace() {
+    if (this._lovelace) return this._lovelace;
+    try {
+      const panel = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main")?.shadowRoot?.querySelector("ha-panel-lovelace");
+      const ll = panel?.lovelace || panel?.shadowRoot?.querySelector("hui-root")?.lovelace;
+      return ll?.config || undefined;
+    } catch (e) { return undefined; }
+  }
+
   draw() {
     const cls = this.cardClass;
     if (!cls || !this._hass || !this._config) return;
@@ -857,7 +881,7 @@ class RoostEditor extends HTMLElement {
       b.type = "button"; b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(i === on));
       b.textContent = `${r.name || `Room ${i + 1}`}${n ? ` · ${n}` : ""}`;
       b.style.cssText = `font:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:999px;cursor:pointer;border:1px solid ${i === on ? "transparent" : "var(--divider-color,#8884)"};background:${i === on ? "var(--primary-color,#6D4BFF)" : "transparent"};color:${i === on ? "var(--text-primary-color,#fff)" : "var(--primary-text-color)"}`;
-      b.addEventListener("click", () => { this._roomIdx = i; this._stackCards = null; this.draw(); });
+      b.addEventListener("click", () => { this._roomIdx = i; this._stackCards = null; this._stackJson = null; this.draw(); });
       this._roomChips.appendChild(b);
     });
   }
@@ -882,7 +906,8 @@ class RoostEditor extends HTMLElement {
             const rooms = (this._config.rooms || []).map((r, i) => (i === this.roomIdx() ? { ...r, cards } : r));
             this._config = { ...this._config, rooms };
             this._stackCards = cards;
-          } else this._config = { ...this._config, cards };
+          } else { this._config = { ...this._config, cards }; this._stackCards = cards; }
+          this._stackJson = JSON.stringify(cards);
           this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this._config }, bubbles: true, composed: true }));
         });
         if (this.cardClass.roomCards) {
@@ -908,8 +933,10 @@ class RoostEditor extends HTMLElement {
     if (this._roomChips) this.drawRoomChips();
     if (this._stack?.setConfig) {
       this._stack.hass = this._hass;
+      const ll = this.lovelace;
+      if (ll && this._stack.lovelace !== ll) this._stack.lovelace = ll;
       const cards = (this.cardClass.roomCards ? (this._config.rooms || [])[this.roomIdx()]?.cards : this._config.cards) || [];
-      if (this._stackCards !== cards) { this._stackCards = cards; try { this._stack.setConfig({ type: "vertical-stack", cards }); } catch (e) { /* shown as code */ } }
+      if (this._stackCards !== cards && JSON.stringify(cards) !== this._stackJson) { this._stackCards = cards; this._stackJson = JSON.stringify(cards); try { this._stack.setConfig({ type: "vertical-stack", cards }); } catch (e) { /* shown as code */ } }
       // the stack's own "Title" box means nothing here, so it is hidden
       Promise.resolve(this._stack.updateComplete).then(() => {
         const sr = this._stack.shadowRoot;
@@ -1779,7 +1806,7 @@ class RoostNav extends RoostBase {
   }
 
   // Keeps the page's cards out from under a pinned side rail.
-  makeRoom(px) {
+  makeRoom(px, side) {
     try {
       const root = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main")?.shadowRoot
         ?.querySelector("ha-panel-lovelace")?.shadowRoot?.querySelector("hui-root")?.shadowRoot;
@@ -1787,7 +1814,7 @@ class RoostNav extends RoostBase {
       let el = root.getElementById("roost-nav-room");
       if (!px) { if (el) el.remove(); return; }
       if (!el) { el = document.createElement("style"); el.id = "roost-nav-room"; root.appendChild(el); }
-      el.textContent = `#view{padding-left:${px}px!important;box-sizing:border-box}`;
+      el.textContent = side === "bottom" ? `#view{padding-bottom:calc(${px}px + env(safe-area-inset-bottom))!important;box-sizing:border-box}` : `#view{padding-left:${px}px!important;box-sizing:border-box}`;
     } catch (e) { /* nothing to move */ }
   }
 
@@ -1854,7 +1881,7 @@ class RoostNav extends RoostBase {
         { type: "expandable", name: "", title: "Side rail (tablets and wall panels)", icon: "mdi:tablet", schema: [
           { name: "rail_style", label: "Rail shape", selector: pick([["floating", "Floating in the middle of the side"], ["full", "Full height, from top to bottom"]]) },
           { name: "logo", label: "At the top of the rail: a letter or word, or a person (their picture)", selector: { text: {} } },
-          { name: "push_content", label: "Move the page over so the rail never covers cards", selector: { boolean: {} } },
+          { name: "push_content", label: "Leave room so the bar or rail never covers cards", selector: { boolean: {} } },
         ] },
         { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
           ...colourFields("color", "Colour of the chosen button"),
@@ -1924,7 +1951,7 @@ class RoostNav extends RoostBase {
     const top = full && fixed ? RoostNav.topEdge() : 0;
     const pos = fixed ? (rail ? (full ? `position:fixed;left:${edge + 24}px;top:${top + 24}px;bottom:24px;z-index:4` : `position:fixed;left:${edge + 16}px;top:50%;transform:translateY(-50%);z-index:4`) : `position:fixed;left:calc(${edge}px + (100% - ${edge}px) / 2);bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4`) : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      :host{${fixed ? (rail ? "height:0;" : "height:calc(76px + env(safe-area-inset-bottom));") : ""}display:block}
+      :host{${fixed ? (rail || c.push_content !== false ? "height:0;" : "height:calc(76px + env(safe-area-inset-bottom));") : ""}display:block}
       .edit{font-size:12px;color:${p.muted};text-align:center;margin:0 0 6px}
       nav{${pos};display:${rail ? "flex" : "grid"};${rail ? "flex-direction:column" : `grid-template-columns:repeat(${shown.length},minmax(0,1fr))`};gap:${rail ? 12 : 7}px;padding:${rail ? "14px 10px" : "8px"};border-radius:${Number(c.radius) + (rail ? 2 : 0)}px;
         ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};box-shadow:0 18px 40px -16px ${this.dark ? "rgba(0,0,0,.5)" : "rgba(40,30,90,.16)"};`
@@ -1970,6 +1997,14 @@ class RoostNav extends RoostBase {
         const r = nv.getBoundingClientRect();
         this._room = Math.max(0, Math.round(r.right - RoostNav.sideEdge() + 4));
         this.makeRoom(this._room);
+      });
+    } else if (!rail && fixed && c.push_content !== false) {
+      // A pinned bottom bar: leave room under the last card so the bar never covers it.
+      (window.requestAnimationFrame || setTimeout)(() => {
+        const nv = this.shadowRoot.querySelector("nav");
+        if (!nv) return;
+        this._room = Math.max(0, Math.round(nv.getBoundingClientRect().height + 28));
+        this.makeRoom(this._room, "bottom");
       });
     } else if (this._room) { this._room = 0; this.makeRoom(0); }
     this.shadowRoot.querySelectorAll("a").forEach((a) => a.addEventListener("click", (ev) => {
@@ -2751,6 +2786,7 @@ const fmt = (v, dec) => (v == null ? "" : Number(v).toFixed(dec == null ? (Math.
 const decOf = (state, unit) => (/^(W|Wh|lx|ppm|rpm|mA)$/.test(String(unit || "")) ? 0 : Math.min(2, (String(state).split(".")[1] || "").length));
 // "26°" and "52%" sit next to the number; "1460 W" and "612 ppm" get a space
 const unitGap = (u) => (!u ? "" : /^(°|°C|°F|%)$/.test(u) ? u : ` ${u}`);
+const CORNERS = [["top-left", "Top left"], ["top-right", "Top right"], ["bottom-left", "Bottom left"], ["bottom-right", "Bottom right"]];
 const panelCss = (p, radius = 22) => `background:${p.panel};${p.fx || ""};border:1px solid ${p.border};border-radius:${radius}px;color:${p.text}`;
 // a ring: the track and the coloured part, in a 0..1 fraction
 function ringSvg({ size = 210, r = 80, width = 14, f = 0, track, id = "g", from, to, inner, innerFill }) {
@@ -2894,6 +2930,7 @@ class RoostAutomations extends ticking(RoostBase, 60000) {
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}${switchCss(p, g)}
       .ttl{font-size:17px;font-weight:700;color:${p.text};margin:2px 4px 10px}
       .list{display:grid;grid-template-columns:repeat(${Math.max(1, c.columns)},minmax(0,1fr));gap:8px}
+      @container (max-width: 560px){:host .list{grid-template-columns:minmax(0,1fr)}}
       .row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:${c.radius}px;background:${p.off};${p.fx || ""};border:1px solid ${p.border};color:${p.text};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .row:active{transform:scale(.98)}
       .ic{width:38px;height:38px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;background:${p.inset};color:${p.muted}}
@@ -2902,7 +2939,7 @@ class RoostAutomations extends ticking(RoostBase, 60000) {
       @container (max-width: 240px){:host .run{display:none}}
       .ic ha-icon{--mdc-icon-size:20px}
       .tx{flex:1;min-width:0}
-      .n{font-size:14px;font-weight:600;line-height:1.25}
+      .n{font-size:14px;font-weight:600;line-height:1.25;overflow-wrap:normal;word-break:normal;hyphens:none}
       .l{font-size:12px;color:${p.muted};margin-top:2px}
       .run{flex:none;width:34px;height:34px;border-radius:50%;border:1px solid ${p.border};background:${p.panel};${p.fx || ""};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer}
       .run ha-icon{--mdc-icon-size:18px}
@@ -3926,7 +3963,7 @@ class RoostMedia extends RoostBase {
 // One room at a glance: its temperature (with a bar), humidity, and what is on, open or running. Tap to open the room.
 class RoostRoom extends RoostBase {
   static get hasCards() { return true; }
-  static get defaults() { return { color: "active", min: 18, max: 36, warn: 32, style: "row", radius: 16, entities: [], tap_action: { action: "none" }, cards: [], cards_look: "inside", cards_columns: 1, cards_fold: false, theme: "auto" }; }
+  static get defaults() { return { color: "active", min: 18, max: 36, warn: 32, style: "row", bar: "temperature", radius: 16, entities: [], tap_action: { action: "none" }, cards: [], cards_look: "inside", cards_columns: 1, cards_fold: false, theme: "auto" }; }
 
   // Any cards under the room (Roost cards or Home Assistant's own), made once and kept, so they do not start again on every change.
   setConfig(config) {
@@ -4026,12 +4063,33 @@ class RoostRoom extends RoostBase {
           { name: "style", selector: pick([["row", "Slim row with a bar"], ["card", "Card with an icon"], ["tile", "Big coloured tile (like the Rooms page)"]]) },
           { name: "subtitle", label: "Your own line under the name (leave empty for an automatic one)", selector: { text: {} } },
           { name: "summary", label: "Automatic line", selector: pick([["on", "Only what is on"], ["all", "Every device with its state"]]) },
+          { name: "bar", label: "Under the name (slim row)", selector: pick([["temperature", "A bar for the temperature"], ["devices", "Small icons of the devices, lit when on"], ["none", "Nothing"]]) },
           ...colourFields("color", "Bar colour"),
           { type: "grid", name: "", schema: [{ name: "min", label: "Bar starts at (°)", selector: { number: { mode: "box" } } }, { name: "max", label: "Bar is full at (°)", selector: { number: { mode: "box" } } }] },
           { type: "grid", name: "", schema: [{ name: "warn", label: "Too hot from (°)", selector: { number: { mode: "box" } } }, { name: "radius", selector: slider(0, 32, 2) }] },
           { name: "plain", label: "No box around it (inside a Roost Panel)", selector: { boolean: {} } },
           { name: "light_slider", label: "One slider for all the room's lights (slim row and card)", selector: { boolean: {} } },
           THEME_FIELD,
+        ] },
+        { type: "expandable", name: "", title: "Big tile: layout and colour", icon: "mdi:view-grid-outline", schema: [
+          { name: "layout", label: "Layout", selector: pick([["corners", "Corners: put the icon, temperature and buttons where you like"], ["halo", "Halo: name on top, big icon bottom left, buttons down the right"]]) },
+          { name: "tile_color", label: "Colour the tile", selector: pick([["always", "Always"], ["active", "Only when something is on"], ["never", "Never (dark, calm)"]]) },
+          { type: "grid", name: "", schema: [{ name: "fill", label: "Colour fill", selector: pick([["gradient", "Gradient"], ["solid", "Solid"], ["glass", "Tinted glass"], ["outline", "Outline"]]) }, { name: "glow", selector: pick([["soft", "Soft glow"], ["strong", "Strong glow"], ["none", "No glow"]]) }] },
+          { type: "grid", name: "", schema: [{ name: "icon_position", label: "Icon corner", selector: pick(CORNERS) }, { name: "temp_position", label: "Temperature corner", selector: pick([...CORNERS, ["hidden", "Hidden"]]) }] },
+          { type: "grid", name: "", schema: [{ name: "icon_shape", label: "Icon background", selector: pick([["rounded", "Rounded square"], ["circle", "Circle"], ["none", "No background"]]) }, { name: "icon_size", label: "Icon size", selector: slider(28, 64, 2) }] },
+          { name: "badge", label: "Small badge on the icon", selector: pick([["activity", "Green dot when someone is there"], ["count", "How many devices are on"], ["none", "None"]]) },
+          { name: "temp_bar", label: "Temperature bar inside the tile", selector: pick([["none", "None"], ["bottom", "Along the bottom"], ["top", "Along the top"], ["side", "Up the right side"]]) },
+          { type: "grid", name: "", schema: [{ name: "show_humidity", label: "Humidity next to the temperature", selector: { boolean: {} } }, { name: "show_summary", label: "What is on (line under the name)", selector: { boolean: {} } }] },
+          { type: "grid", name: "", schema: [{ name: "show_ago", label: "Since when (for 3 min)", selector: { boolean: {} } }, { name: "height", label: "Height", selector: slider(110, 260, 10) }] },
+          { type: "grid", name: "", schema: [{ name: "name_size", label: "Name size", selector: slider(13, 24) }, { name: "temp_size", label: "Temperature size", selector: slider(13, 28) }] },
+          { type: "grid", name: "", schema: [{ name: "background_image", label: "Photo behind the tile (link)", selector: { text: {} } }, { name: "image_dim", label: "Darken the photo (%)", selector: slider(0, 90, 5) }] },
+          ACTION_FIELD("hold_action", "Long press opens"),
+        ] },
+        { type: "expandable", name: "", title: "Big tile: quick buttons", icon: "mdi:gesture-tap-button", schema: [
+          { name: "buttons_entities", label: "Buttons: tap starts it, hold shows details (devices, scenes, scripts, automations)", selector: { entity: { multiple: true } } },
+          { name: "buttons_auto", label: "Or use the room's own devices as buttons", selector: { boolean: {} } },
+          { name: "buttons_position", label: "Where the buttons sit", selector: pick([...CORNERS, ["row", "In a row under the name"]]) },
+          { type: "grid", name: "", schema: [{ name: "button_size", label: "Button size", selector: slider(26, 48, 2) }, { name: "buttons_max", label: "Most buttons (automatic)", selector: slider(1, 6) }] },
         ] },
         { type: "expandable", name: "", title: "How the cards under the room sit (add them below)", icon: "mdi:card-plus-outline", schema: [
           { name: "cards_look", label: "How they sit", selector: pick([["inside", "In one box with the room"], ["below", "Just below the room"]]) },
@@ -4075,31 +4133,198 @@ class RoostRoom extends RoostBase {
     return out.join(" · ") || "All quiet";
   }
 
-  // The big coloured room tile of the original Rooms page: icon, temperature in the corner, name, what is going on, and since when.
-  renderTile(t, ts, hot, g) {
+  // Is anything in the room on right now (lights, AC, TV, fans, open curtains)?
+  roomOn() {
+    return this.ids().some((id) => {
+      const s = this.sx(id); if (!s || UNAVAILABLE.includes(s.state)) return false;
+      const d = id.split(".")[0];
+      if (["sensor", "binary_sensor", "automation", "script", "scene", "button", "input_button", "lock", "alarm_control_panel", "person", "device_tracker"].includes(d)) return false;
+      return !OFF_STATES.includes(s.state) && s.state !== "unavailable";
+    });
+  }
+
+  // The small round buttons on a room tile: each one starts a device, a scene, a script or an automation.
+  quickItems() {
+    const c = this._config;
+    if (c.buttons === "auto" || (c.buttons == null && c.buttons_auto)) return this.ids().filter((id) => this.sx(id) && !/^(sensor|binary_sensor|person|device_tracker)\./.test(id)).slice(0, Number(c.buttons_max) || 4).map((entity) => ({ entity }));
+    if (!Array.isArray(c.buttons) && Array.isArray(c.buttons_entities)) return c.buttons_entities.filter(Boolean).slice(0, 6).map((entity) => ({ entity }));
+    return Array.isArray(c.buttons) ? c.buttons.filter((b) => b && (b.entity || b.tap_action)).slice(0, 6) : [];
+  }
+
+  quickOn(b) {
+    const s = this.sx(b.entity);
+    if (!s || UNAVAILABLE.includes(s.state)) return false;
+    const d = s.entity_id.split(".")[0];
+    if (["automation", "script"].includes(d)) return s.state === "on" && d === "script";
+    if (["scene", "button", "input_button"].includes(d)) return false;
+    return !OFF_STATES.includes(s.state);
+  }
+
+  quickTap(b) {
+    if (b.tap_action && b.tap_action.action !== "none") return this.run(b.tap_action, b.entity);
+    const id = b.entity; if (!id) return undefined;
+    const d = id.split(".")[0], s = this.sx(id);
+    this.vibrate();
+    if (d === "automation") return this.call("automation", "trigger", { entity_id: id });
+    if (d === "script") return this.call("script", "turn_on", { entity_id: id });
+    if (d === "scene") return this.call("scene", "turn_on", { entity_id: id });
+    if (d === "button" || d === "input_button") return this.call(d, "press", { entity_id: id });
+    if (d === "lock") return this.call("lock", s?.state === "locked" ? "unlock" : "lock", { entity_id: id });
+    if (d === "cover") return this.call("cover", "toggle", { entity_id: id });
+    return this.call("homeassistant", "toggle", { entity_id: id });
+  }
+
+  // The "halo" room tile: name and readings at the top, a big room icon in a soft circle at the bottom left,
+  // and the quick buttons stacked down the right edge (the calm layout most room cards settle on).
+  renderHalo(t, ts, hot, g) {
     const c = this._config, p = this.p;
-    const look = fillLook(c.fill || "gradient", c.glow || "soft", g, p);
+    const lit = c.tile_color === "never" ? false : c.tile_color === "active" ? this.roomOn() : true;
+    const look = lit ? fillLook(c.fill || "gradient", c.glow || "soft", g, p) : { bg: p.panel, fg: p.text, border: p.border, shadow: "none", light: false };
+    const img = String(c.background_image || "").trim();
+    const light = look.light || !!img;
+    const items = this.quickItems().slice(0, Number(c.buttons_max) || 3);
+    const hs = this.sx(c.humidity), h = hs ? num(hs.state) : null;
+    const reads = [t != null && c.temp_position !== "hidden" ? `<span data-tw="t">${fmt(t, 1)}°</span>` : "", c.show_humidity !== false && h != null ? `${Math.round(h)}%` : ""].filter(Boolean).join('<i class="sep"></i>');
+    const onCount = this.ids().filter((id) => { const s = this.sx(id); return s && !UNAVAILABLE.includes(s.state) && !OFF_STATES.includes(s.state) && /^(light|switch|fan|climate|media_player|cover|humidifier|input_boolean|vacuum)\./.test(id); }).length;
+    const act = this.activity();
+    const badge = c.badge === "count" ? (onCount ? `<i class="bd">${onCount}</i>` : "") : c.badge !== "none" && act?.on ? '<i class="ad"></i>' : "";
+    const f = t == null ? 0 : Math.max(0.04, Math.min(1, (t - c.min) / ((c.max - c.min) || 1)));
+    const bsz = Number(c.button_size) || 36, hsz = Number(c.icon_size) || 84;
+    const sub = c.show_summary ? `<div class="l t">${esc(c.subtitle || (c.summary === "all" ? this.summaryAll() : this.summary()))}</div>` : "";
+    const dim = Number(c.image_dim ?? 45) / 100;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .r{position:relative;min-height:${Number(c.height) || 170}px;height:100%;border-radius:${Number(c.radius) === 16 ? 22 : c.radius}px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden;
-        background:${look.bg};color:${look.light ? look.fg : p.text};border:1px solid ${look.border};box-shadow:${look.shadow};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
-      .r:active{transform:scale(.96)}
-      .ic{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:${look.light ? "rgba(255,255,255,.24)" : `color-mix(in srgb, ${g[0]} 30%, transparent)`};color:${look.light ? "inherit" : g[this.dark ? 1 : 0]}}
-      .ic ha-icon{--mdc-icon-size:22px}
-      .tp{position:absolute;top:18px;right:16px;font-size:16px;font-weight:700;${hot ? "color:#fff;text-shadow:0 0 12px rgba(255,159,107,.9)" : ""}}
-      .n{font-size:15px;font-weight:600;line-height:1.2;margin-top:8px}
-      .l{font-size:12px;line-height:1.3;opacity:.85}
-      .ago{font-size:11px;margin-top:4px;opacity:.65}
+      .r{position:relative;min-height:${Number(c.height) || 160}px;height:100%;box-sizing:border-box;border-radius:${Number(c.radius) === 16 ? 24 : c.radius}px;padding:16px;overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s;
+        display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;
+        background:${img ? `linear-gradient(180deg,rgba(0,0,0,${dim * 0.5}),rgba(0,0,0,${dim})),url("${esc(img)}") center/cover` : look.bg};color:${light ? "#FFFFFF" : p.text};border:1px solid ${img ? "transparent" : look.border};box-shadow:${look.shadow}}
+      .r:active{transform:scale(.97)}
+      .tx{min-width:0;position:relative;z-index:1}
+      .n{font-size:${Number(c.name_size) || 17}px;font-weight:700;line-height:1.2}
+      .rd{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:${Number(c.temp_size) || 13}px;font-weight:600;opacity:.9;${hot ? "color:#FFE1D1" : ""}}
+      .rd .sep{width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.6}
+      .l{font-size:12px;line-height:1.35;opacity:.75;margin-top:4px}
+      .halo{position:absolute;left:-${Math.round(hsz * 0.16)}px;bottom:-${Math.round(hsz * 0.16)}px;width:${hsz}px;height:${hsz}px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        background:${light ? "rgba(255,255,255,.18)" : `color-mix(in srgb, ${g[0]} 22%, transparent)`};color:${light || this.dark ? "#FFFFFF" : g[0]};box-shadow:0 0 0 ${Math.round(hsz * 0.12)}px ${light ? "rgba(255,255,255,.07)" : `color-mix(in srgb, ${g[0]} 9%, transparent)`}}
+      .halo ha-icon{--mdc-icon-size:${Math.round(hsz * 0.42)}px;transform:translate(${Math.round(hsz * 0.05)}px,-${Math.round(hsz * 0.05)}px)}
+      .halo .ad{position:absolute;top:${Math.round(hsz * 0.14)}px;right:${Math.round(hsz * 0.14)}px;width:12px;height:12px;border-radius:50%;background:#10B981;border:2px solid ${light ? "rgba(255,255,255,.9)" : p.panel}}
+      .halo .bd{position:absolute;top:${Math.round(hsz * 0.1)}px;right:${Math.round(hsz * 0.1)}px;min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#FFFFFF;color:${g[0]};font-style:normal;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+      .qs{display:flex;flex-direction:column;gap:8px;position:relative;z-index:1}
+      .qb{width:${bsz}px;height:${bsz}px;border-radius:${Math.round(bsz * 0.36)}px;border:0;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;--mdc-icon-size:${Math.round(bsz * 0.5)}px;transition:transform .12s,background .12s,color .12s;
+        background:${light ? "rgba(255,255,255,.16)" : p.track};color:${light ? "rgba(255,255,255,.85)" : this.dark ? "rgba(255,255,255,.75)" : p.muted}}
+      .qb.on{background:${light ? "#FFFFFF" : `linear-gradient(135deg,${g[0]},${g[1]})`};color:${light ? g[0] : "#FFFFFF"};box-shadow:0 6px 14px -6px ${light ? "rgba(0,0,0,.35)" : g[2]}}
+      .qb:active{transform:scale(.88)}
+      .bar{position:absolute;left:${Math.round(hsz * 0.9)}px;right:16px;bottom:14px;height:4px;border-radius:999px;background:${light ? "rgba(255,255,255,.25)" : p.track};overflow:hidden}
+      .bar i{display:block;height:100%;border-radius:999px;background:${hot ? "linear-gradient(90deg,#FF9F6B,#F43F6B)" : light ? "#FFFFFF" : `linear-gradient(90deg,${g[0]},${g[1]})`}}
     </style>
     <div class="r" role="button" tabindex="0" aria-label="${esc(c.name)}">
-      <span class="ic"><ha-icon icon="${esc(c.icon || "mdi:home-outline")}"></ha-icon></span>
-      ${t != null ? `<span class="tp num" data-tw="t">${fmt(t, 1)}°</span>` : ""}
-      <div><div class="n t">${esc(c.name)}</div><div class="l t">${esc(c.subtitle || (c.summary === "all" ? this.summaryAll() : this.summary()))}</div>
-        ${ts && !UNAVAILABLE.includes(ts.state) ? `<div class="ago t">${esc(since(ts.last_changed))}</div>` : ""}</div>
+      <div class="tx"><div class="n t">${esc(c.name)}</div>${reads ? `<div class="rd num">${reads}</div>` : ""}${sub}</div>
+      ${items.length ? `<div class="qs">${items.map((b, i) => `<button class="qb${this.quickOn(b) ? " on" : ""}" data-qb="${i}" aria-label="${esc(b.name || this.name(b.entity) || "Button")}"></button>`).join("")}</div>` : ""}
+      ${c.icon_shape === "none" ? "" : `<span class="halo"><ha-icon icon="${esc(c.icon || "mdi:home-outline")}"></ha-icon>${badge}</span>`}
+      ${c.temp_bar && c.temp_bar !== "none" && t != null ? `<span class="bar"><i data-bar="t" style="width:${(f * 100).toFixed(0)}%"></i></span>` : ""}
     </div>`;
+    this.shadowRoot.querySelectorAll("[data-qb]").forEach((btn) => {
+      const b = items[+btn.dataset.qb];
+      this.icon(btn, b.icon, b.entity);
+      ["pointerdown", "pointerup", "mousedown", "mouseup", "touchstart", "touchend", "click", "keydown"].forEach((ev) => btn.addEventListener(ev, (e) => e.stopPropagation()));
+      this.press(btn, () => this.quickTap(b), () => (b.hold_action ? this.run(b.hold_action, b.entity) : this.moreInfo(b.entity)));
+    });
     this.press(this.shadowRoot.querySelector(".r"), () => {
       if ((c.tap_action || {}).action && c.tap_action.action !== "none") this.run(c.tap_action);
       else if (c.temperature) this.moreInfo(c.temperature);
-    }, () => c.temperature && this.moreInfo(c.temperature));
+    }, () => (c.hold_action && c.hold_action.action !== "none" ? this.run(c.hold_action) : c.temperature && this.moreInfo(c.temperature)));
+    this.placeKids();
+  }
+
+  // The big room tile, laid out by the card's options: where the icon, the temperature and the buttons sit,
+  // a temperature bar inside, a photo behind, and a colour that can follow whether anything is on.
+  renderTile(t, ts, hot, g) {
+    const c = this._config, p = this.p;
+    const lit = c.tile_color === "never" ? false : c.tile_color === "active" ? this.roomOn() : true;
+    const look = lit ? fillLook(c.fill || "gradient", c.glow || "soft", g, p) : { bg: p.panel, fg: p.text, border: p.border, shadow: "none", light: false };
+    const img = String(c.background_image || "").trim();
+    const light = look.light || !!img;
+    const fg = light ? "#FFFFFF" : p.text;
+    const pos = (v, d) => (["top-left", "top-right", "bottom-left", "bottom-right"].includes(v) ? v : d);
+    const iconAt = c.icon_shape === "none" && !c.icon ? "" : pos(c.icon_position, "top-left");
+    const tempAt = c.temp_position === "hidden" ? "" : pos(c.temp_position, "top-right");
+    const textAt = iconAt === "bottom-left" ? "top-left" : "bottom-left";
+    const items = this.quickItems();
+    const btnAt = c.buttons_position === "row" ? "row" : pos(c.buttons_position, "bottom-right");
+    const hs = this.sx(c.humidity), h = hs ? num(hs.state) : null;
+    const f = t == null ? 0 : Math.max(0.04, Math.min(1, (t - c.min) / ((c.max - c.min) || 1)));
+    const isz = Number(c.icon_size) || 42, bsz = Number(c.button_size) || 34;
+    const shape = c.icon_shape === "circle" ? "50%" : c.icon_shape === "none" ? "0" : `${Math.round(isz / 3)}px`;
+    const act = this.activity();
+    const onCount = this.ids().filter((id) => { const s = this.sx(id); return s && !UNAVAILABLE.includes(s.state) && !OFF_STATES.includes(s.state) && /^(light|switch|fan|climate|media_player|cover|humidifier|input_boolean|vacuum)\./.test(id); }).length;
+    const badge = c.badge === "count" ? (onCount ? `<i class="bd">${onCount}</i>` : "") : c.badge === "activity" || (c.badge == null && act?.on) ? (act?.on ? '<i class="ad"></i>' : "") : "";
+    const parts = { "top-left": [], "top-right": [], "bottom-left": [], "bottom-right": [] };
+    if (iconAt) parts[iconAt].push(`<span class="ic"><ha-icon icon="${esc(c.icon || "mdi:home-outline")}"></ha-icon>${badge}</span>`);
+    if (tempAt && t != null) parts[tempAt].push(`<span class="tp num"><span data-tw="t">${fmt(t, 1)}°</span>${c.show_humidity && h != null ? `<small> · ${Math.round(h)}%</small>` : ""}</span>`);
+    const quick = items.length ? `<span class="qs">${items.map((b, i) => `<button class="qb${this.quickOn(b) ? " on" : ""}" data-qb="${i}" aria-label="${esc(b.name || this.name(b.entity) || "Button")}"></button>`).join("")}</span>` : "";
+    const sub = c.show_summary === false ? "" : `<div class="l t">${esc(c.subtitle || (c.summary === "all" ? this.summaryAll() : this.summary()))}</div>`;
+    const ago = c.show_ago !== false && ts && !UNAVAILABLE.includes(ts.state) ? `<div class="ago t">${esc(since(ts.last_changed))}</div>` : "";
+    parts[textAt].push(`<div class="tx"><div class="n t">${esc(c.name)}</div>${sub}${ago}${btnAt === "row" ? quick : ""}</div>`);
+    // Buttons asked for on the same line as the name get a line of their own on that side, so the name keeps its room.
+    const clash = quick && btnAt !== "row" && btnAt.split("-")[0] === textAt.split("-")[0];
+    if (quick && btnAt !== "row" && !clash) parts[btnAt].push(quick);
+    const qline = clash ? `<div class="ql ${btnAt.endsWith("left") ? "lf" : ""}">${quick}</div>` : "";
+    const tb = c.temp_bar && c.temp_bar !== "none" && t != null;
+    const trackBg = light ? "rgba(255,255,255,.28)" : p.track;
+    const barFill = hot ? "linear-gradient(90deg,#FF9F6B,#F43F6B)" : light ? "#FFFFFF" : `linear-gradient(90deg,${g[0]},${g[1]})`;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .r{position:relative;min-height:${Number(c.height) || 170}px;height:100%;border-radius:${Number(c.radius) === 16 ? 22 : c.radius}px;padding:16px ${tb && c.temp_bar === "side" ? 26 : 16}px 16px 16px;display:grid;grid-template-rows:auto 1fr auto${tb && c.temp_bar === "bottom" ? " auto" : ""};gap:8px;overflow:hidden;box-sizing:border-box;
+        background:${img ? `linear-gradient(180deg,rgba(0,0,0,${(Number(c.image_dim ?? 45) / 100) * 0.6}) 0%,rgba(0,0,0,${Number(c.image_dim ?? 45) / 100}) 100%),url("${esc(img)}") center/cover` : look.bg};color:${fg};border:1px solid ${img ? "transparent" : look.border};box-shadow:${look.shadow};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s}
+      .r:active{transform:scale(.97)}
+      .row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;min-width:0}
+      .row.b{align-items:flex-end;grid-row:3}
+      .ql{grid-row:2;align-self:end;display:flex}.ql.q2{align-self:start}.ql .qs{width:100%}.ql.lf .qs{justify-content:flex-start}
+      .row.t{grid-row:1}
+      .c{display:flex;flex-direction:column;gap:6px;min-width:0}
+      .c.l1{flex:1 0 auto;align-items:flex-start}.c.r1{align-items:flex-end;flex:0 1 auto;min-width:0;text-align:right}
+      .row.b .c.l1:has(.ic:only-child){flex:none}
+      .ic{position:relative;width:${isz}px;height:${isz}px;border-radius:${shape};display:flex;align-items:center;justify-content:center;flex:none;
+        background:${c.icon_shape === "none" ? "transparent" : light ? "rgba(255,255,255,.22)" : `color-mix(in srgb, ${g[0]} 26%, transparent)`};color:${light ? "#FFFFFF" : g[this.dark ? 1 : 0]}}
+      .ic ha-icon{--mdc-icon-size:${Math.round(isz * 0.54)}px}
+      .ic .ad{position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#10B981;border:2px solid ${light ? "rgba(255,255,255,.9)" : p.panel}}
+      .ic .ad::after{content:"";position:absolute;inset:-2px;border-radius:50%;background:#10B981;animation:roost-ping 2s ease-out infinite}
+      .ic .bd{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 6px;box-sizing:border-box;border-radius:9px;background:#FFFFFF;color:${g[0]};font-style:normal;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+      .tp{font-size:${Number(c.temp_size) || 17}px;font-weight:700;white-space:nowrap;${hot ? "color:#FFFFFF;text-shadow:0 0 12px rgba(255,159,107,.9)" : ""}}
+      .tp small{font-size:.75em;font-weight:500;opacity:.8}
+      .n{font-size:${Number(c.name_size) || 15}px;font-weight:600;line-height:1.2}
+      .l{font-size:12px;line-height:1.3;opacity:.85;margin-top:2px}
+      .ago{font-size:11px;margin-top:3px;opacity:.65}
+      .qs{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+      .tx .qs{justify-content:flex-start;margin-top:8px}
+      .qb{width:${bsz}px;height:${bsz}px;border-radius:50%;border:0;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;--mdc-icon-size:${Math.round(bsz * 0.5)}px;transition:transform .12s,background .12s,color .12s;
+        background:${light ? "rgba(255,255,255,.2)" : p.track};color:${light ? "#FFFFFF" : p.muted}}
+      .qb.on{background:${light ? "#FFFFFF" : `linear-gradient(135deg,${g[0]},${g[1]})`};color:${light ? g[0] : "#FFFFFF"};box-shadow:0 6px 14px -6px ${light ? "rgba(0,0,0,.35)" : g[2]}}
+      .qb:active{transform:scale(.88)}
+      .bar{grid-row:4;height:5px;border-radius:999px;background:${trackBg};overflow:hidden}
+      .bar i,.sbar i{display:block;border-radius:999px;background:${barFill}}
+      .bar i{height:100%}
+      .sbar{position:absolute;right:10px;top:18px;bottom:18px;width:5px;border-radius:999px;background:${trackBg};display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
+      .sbar i{width:100%;background:${hot ? "linear-gradient(0deg,#FF9F6B,#F43F6B)" : light ? "#FFFFFF" : `linear-gradient(0deg,${g[0]},${g[1]})`}}
+      .tbar{position:absolute;left:16px;right:16px;top:8px;height:4px;border-radius:999px;background:${trackBg};overflow:hidden}
+      .tbar i{display:block;height:100%;border-radius:999px;background:${barFill}}
+    </style>
+    <div class="r" role="button" tabindex="0" aria-label="${esc(c.name)}">
+      <div class="row t"><div class="c l1">${parts["top-left"].join("")}</div><div class="c r1">${parts["top-right"].join("")}</div></div>
+      ${qline && textAt.startsWith("top") ? qline.replace('class="ql', 'class="ql q2') : ""}
+      ${qline && textAt.startsWith("bottom") ? qline : ""}
+      <div class="row b"><div class="c l1">${parts["bottom-left"].join("")}</div><div class="c r1">${parts["bottom-right"].join("")}</div></div>
+      ${tb && c.temp_bar === "bottom" ? `<span class="bar"><i data-bar="t" style="width:${(f * 100).toFixed(0)}%"></i></span>` : ""}
+      ${tb && c.temp_bar === "side" ? `<span class="sbar"><i style="height:${(f * 100).toFixed(0)}%"></i></span>` : ""}
+      ${tb && c.temp_bar === "top" ? `<span class="tbar"><i style="width:${(f * 100).toFixed(0)}%"></i></span>` : ""}
+    </div>`;
+    this.shadowRoot.querySelectorAll("[data-qb]").forEach((btn) => {
+      const b = items[+btn.dataset.qb];
+      this.icon(btn, b.icon, b.entity);
+      ["pointerdown", "pointerup", "mousedown", "mouseup", "touchstart", "touchend", "click", "keydown"].forEach((ev) => btn.addEventListener(ev, (e) => e.stopPropagation()));
+      this.press(btn, () => this.quickTap(b), () => (b.hold_action ? this.run(b.hold_action, b.entity) : this.moreInfo(b.entity)));
+    });
+    this.press(this.shadowRoot.querySelector(".r"), () => {
+      if ((c.tap_action || {}).action && c.tap_action.action !== "none") this.run(c.tap_action);
+      else if (c.temperature) this.moreInfo(c.temperature);
+    }, () => (c.hold_action && c.hold_action.action !== "none" ? this.run(c.hold_action) : c.temperature && this.moreInfo(c.temperature)));
     this.placeKids();
   }
 
@@ -4111,7 +4336,7 @@ class RoostRoom extends RoostBase {
     const f = t == null ? 0 : Math.max(0.06, Math.min(1, (t - c.min) / ((c.max - c.min) || 1)));
     const bar = hot ? "linear-gradient(90deg,#FF9F6B,#F43F6B)" : `linear-gradient(90deg,${g[0]},${g[1]})`;
     const card = c.style === "card";
-    if (c.style === "tile") { this.renderTile(t, ts, hot, g); return; }
+    if (c.style === "tile") { if (c.layout === "halo") this.renderHalo(t, ts, hot, g); else this.renderTile(t, ts, hot, g); return; }
     // one slider for every light in the room, like Homey's zone lights
     const lights = this.ids().filter((id) => id.startsWith("light.")).map((id) => this.sx(id)).filter((x) => x && !UNAVAILABLE.includes(x.state));
     const lon = lights.filter((x) => x.state === "on");
@@ -4125,10 +4350,13 @@ class RoostRoom extends RoostBase {
       .ic ha-icon{--mdc-icon-size:24px}
       .n{font-size:${card ? 16 : 14}px;font-weight:600;text-align:left}
       .tp{font-size:${card ? 16 : 14}px;font-weight:600;text-align:right;color:${hot ? "#FF9F6B" : p.text}}
-      @container (max-width: 260px){:host .r{grid-template-columns:minmax(0,1fr)}:host .dot,:host .ic{display:none}:host .bar,:host .l,:host .n,:host .tp{grid-column:1/-1}:host .tp{text-align:left}}
+      @container (max-width: 260px){:host .r{grid-template-columns:minmax(0,1fr)}:host .dot,:host .ic{display:none}:host .bar,:host .dv,:host .l,:host .n,:host .tp{grid-column:1/-1}:host .tp{text-align:left}}
       .bar{grid-column:2/4;height:4px;border-radius:999px;background:${p.track};overflow:hidden}
       .bar i{display:block;height:100%;border-radius:999px;background:${bar}}
       .l{grid-column:2/4;font-size:12px;color:${p.muted};line-height:1.35}
+      .dv{grid-column:2/4;display:flex;flex-wrap:wrap;gap:6px}
+      .dv .d{width:26px;height:26px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:${p.track};color:${p.muted};--mdc-icon-size:15px;transition:background .12s,color .12s}
+      .dv .d.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:#FFFFFF;box-shadow:0 4px 12px -4px ${g[2]}}
       .ic{position:relative}.ic .ad{position:absolute;top:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#10B981;border:2px solid ${this.dark ? "#141831" : "#fff"}}
       .ic .ad::after{content:"";position:absolute;inset:-2px;border-radius:50%;background:#10B981;animation:roost-ping 2s ease-out infinite}
       .lt{grid-column:2/4;display:flex;align-items:center;gap:10px;color:${lt.on ? (this.dark ? "#F5B94A" : "#B45309") : p.muted};--mdc-icon-size:18px}
@@ -4143,10 +4371,11 @@ class RoostRoom extends RoostBase {
     <div class="r" role="button" tabindex="0" aria-label="${esc(c.name)}">
       ${card ? `<span class="ic"><ha-icon icon="${esc(c.icon || "mdi:home-outline")}"></ha-icon>${this.activity()?.on ? '<i class="ad" aria-label="Someone here"></i>' : ""}</span>` : `<span class="dot ${this.activity()?.on ? "act" : ""}"></span>`}
       <span class="n t">${esc(c.name)}</span><span class="tp num">${t != null ? `<span data-tw="t">${fmt(t, 1)}°</span>` : c.temperature ? "No reading" : ""}${h != null ? `<span style="color:${p.muted};font-weight:500"> · ${Math.round(h)}%</span>` : ""}</span>
-      ${c.temperature ? `<span class="bar"><i data-bar="t" style="width:${(f * 100).toFixed(0)}%"></i></span>` : ""}
+      ${c.bar === "devices" ? `<span class="dv">${this.ids().filter((id) => this.sx(id)).map((id) => { const x = this.sx(id), on = !UNAVAILABLE.includes(x.state) && !OFF_STATES.includes(x.state); return `<span class="d${on ? " on" : ""}" data-dv="${esc(id)}" title="${esc(this.name(id))}"></span>`; }).join("")}</span>` : c.temperature && c.bar !== "none" ? `<span class="bar"><i data-bar="t" style="width:${(f * 100).toFixed(0)}%"></i></span>` : ""}
       <span class="l t">${esc(c.subtitle || (c.summary === "all" ? this.summaryAll() : this.summary()))}</span>
       ${lt.show ? `<span class="lt" data-lt="1"><ha-icon icon="${lt.on ? "mdi:lightbulb-group" : "mdi:lightbulb-group-outline"}" data-pop="${lt.on ? 1 : 0}" data-popkey="lt"></ha-icon><input type="range" min="0" max="100" step="5" value="${lt.pct}" style="--f:${lt.pct}%" aria-label="All lights in ${esc(c.name)}"><b data-tw="lt">${lt.on ? `${lt.pct}%` : "Off"}</b></span>` : ""}
     </div>`;
+    this.shadowRoot.querySelectorAll("[data-dv]").forEach((d) => this.icon(d, null, d.dataset.dv));
     const lr = this.shadowRoot.querySelector("[data-lt] input");
     if (lr) {
       const box = lr.parentElement;

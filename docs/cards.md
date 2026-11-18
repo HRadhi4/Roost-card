@@ -352,6 +352,41 @@ cards:
 ```
 In the visual editor the cards are added under **Cards on it**, the same way as in a Roost Panel.
 
+**The big room tile** (`style: tile`) can be laid out your way:
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/room-tiles.png" width="420" alt="Four Roost room tiles laid out four different ways">
+
+```yaml
+style: tile
+tile_color: active        # always, active (only when something is on) or never
+fill: gradient            # gradient, solid, glass or outline
+glow: soft                # soft, strong or none
+icon_position: bottom-right   # top-left, top-right, bottom-left or bottom-right
+icon_shape: circle        # rounded, circle or none
+icon_size: 42
+badge: count              # activity (green dot), count (devices on) or none
+temp_position: top-left   # any corner, or hidden
+show_humidity: true
+temp_bar: bottom          # none, bottom, top or side
+show_summary: true
+show_ago: false           # hide “for 3 min”
+name_size: 15
+temp_size: 17
+height: 170
+background_image: /local/rooms/living.jpg
+image_dim: 45
+hold_action: { action: more-info, entity: climate.living_ac }
+# Quick buttons: tap starts it, hold shows its details
+buttons_entities: [light.living, scene.movie_time, automation.cool_down, script.bedtime]
+buttons_auto: true        # or use the room's own devices
+buttons_max: 3
+buttons_position: top-right   # any corner, or row (under the name)
+button_size: 34
+```
+Each quick button can also have its own actions: `buttons: [{ entity: light.living, icon: mdi:lamp, hold_action: { action: more-info } }]`. Automations are run, scripts and scenes started, buttons pressed, locks locked or unlocked, and everything else switched on or off.
+
+The slim row can show small device icons instead of the temperature bar: `bar: devices` (or `bar: none`).
+
 ### Roost Light
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/light.gif" width="320" alt="Roost light card in action">
 

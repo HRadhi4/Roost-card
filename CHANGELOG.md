@@ -2,6 +2,17 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.11.0
+
+- Room tile: a new **halo** layout (name and readings on top, a big room icon in a soft circle at the bottom left, quick buttons down the right).
+- Room tile: put the icon, the temperature and the buttons in any corner; colour the tile always, only when something is on, or never; icon shape, size and badge (someone here, or how many devices are on); a temperature bar along the bottom, top or side; humidity next to the temperature; hide the summary or "for 3 min"; name and temperature sizes; a photo behind the tile; a long-press action.
+- Room tile: quick buttons. Tap starts a device, scene, script or automation; hold shows its details. Pick them, or use the room's own devices.
+- Room slim row: small device icons instead of the temperature bar (`bar: devices`).
+- Tile: `color: lamp` glows in the light's own colour while it is on.
+- "Cards on it" in the editor: the card picker was empty when adding a card. Fixed.
+- Automations: on phones the list is always one column, so long names never break mid-word.
+- Bottom bar: leaves room under the last card so it is never covered.
+
 ## 1.10.3
 
 - Hero: the moon or sun no longer sits on top of the greeting when the house picture is on, or on narrow screens.
