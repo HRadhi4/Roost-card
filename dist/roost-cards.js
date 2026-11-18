@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.10.0";
+const ROOST_VERSION = "1.10.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -2482,7 +2482,7 @@ class RoostCurtain extends RoostBase {
       .flash{inset:0;background:#fff;animation:roost-flash 5s linear infinite}
       .fog{left:-10%;right:-10%;height:18px;border-radius:999px;background:rgba(255,255,255,.35);filter:blur(6px);animation:roost-drift linear infinite}
       .rays{width:70px;height:70px;right:calc(18% - 20px);top:calc(18% - 20px);border-radius:50%;background:repeating-conic-gradient(rgba(253,224,71,.35) 0 8deg,transparent 8deg 24deg);animation:roost-rays 14s linear infinite}
-      .temp{position:absolute;left:calc(${c.style === "pair" || c.style === "left" ? 12 : 0}% + 8px);bottom:10px;padding:4px 8px;border-radius:999px;background:rgba(10,8,40,.35);color:#fff;font-size:12px;font-weight:600}
+      .temp{position:absolute;z-index:3;left:calc(${c.style === "pair" || c.style === "left" ? 12 : 0}% + 8px);bottom:10px;padding:4px 8px;border-radius:999px;background:rgba(10,8,40,.35);color:#fff;font-size:12px;font-weight:600}
       .win.shut .wx *,.win.shut .star,.win.shut .orb{animation-play-state:paused}
       .card{${c.frame ? `${panelCss(p, c.radius + 6)};padding:14px` : ""}}
       .head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 2px 10px}
@@ -6789,8 +6789,10 @@ class RoostPlant extends RoostBase {
   renderLook({ c, p, g, m, lo, hi, li, t, co, needs, thirsty, line, wet }) {
     const R = PLANT_RANGES, health = m == null ? 1 : Math.max(0, Math.min(1, (m - 5) / Math.max(10, lo + 10)));
     const soil = `rgb(${Math.round(186 - wet * 112)},${Math.round(160 - wet * 108)},${Math.round(130 - wet * 94)})`;
-    const tooWet = m != null && m > hi, word = thirsty ? "Thirsty" : tooWet ? "Too wet" : needs.length ? "Needs care" : "Happy";
-    const chipBg = thirsty || needs.length ? (this.dark ? "#3A2A0A" : "#FEF3C7") : this.dark ? "#12352C" : "#D1FAE5", chipFg = thirsty || needs.length ? (this.dark ? "#FCD34D" : "#92400E") : this.dark ? "#6EE7B7" : "#065F46";
+    const noData = m == null && li == null && t == null && co == null;
+    const tooWet = m != null && m > hi, word = noData ? "No reading" : thirsty ? "Thirsty" : tooWet ? "Too wet" : needs.length ? "Needs care" : "Happy";
+    let chipBg = thirsty || needs.length ? (this.dark ? "#3A2A0A" : "#FEF3C7") : this.dark ? "#12352C" : "#D1FAE5", chipFg = thirsty || needs.length ? (this.dark ? "#FCD34D" : "#92400E") : this.dark ? "#6EE7B7" : "#065F46";
+    if (noData) { chipBg = this.dark ? "#1B2045" : "#EEF1FB"; chipFg = this.dark ? "#A9B0D6" : "#4B5280"; }
     const nameTxt = c.name || this.name(c.entity || c.moisture, "Plant");
     // a reading against its good range: the green part is good, the dot is now
     const rows = [["Water", m, lo, hi, 0, 100, m != null ? `${Math.round(m)}%` : ""], ["Light", li, R.light[0], R.light[1], 0, R.light[1] * 1.2, li != null ? `${fmt(li, 0)} lx` : ""],
@@ -6816,11 +6818,11 @@ class RoostPlant extends RoostBase {
       body = `<svg class="cut" viewBox="0 0 320 230" role="img" aria-label="${esc(`Inside the pot: ${m != null ? Math.round(m) : "?"}% wet`)}"><defs>${pl.defs}<clipPath id="soilcut"><path d="M88 118 L232 118 L216 216 L104 216 Z"/></clipPath></defs>
         <g transform="translate(85 -40) scale(.98)"><g class="sway">${monsteraSvg({ w: 150, h: 220, health, soil, id: "mpot", pot: false }).body}</g></g>
         <path d="M80 112 L240 112 L222 222 L98 222 Z" fill="#7E3D24"/><path d="M88 118 L232 118 L216 216 L104 216 Z" fill="#B99A7A"/>
-        <g clip-path="url(#soilcut)"><rect class="wet" x="80" y="${wetY.toFixed(0)}" width="170" height="130" fill="#4A3424"/><rect x="80" y="${wetY.toFixed(0)}" width="170" height="3" fill="#60A5FA" opacity=".75"/>
+        <g clip-path="url(#soilcut)">${m != null ? `<rect class="wet" x="80" y="${wetY.toFixed(0)}" width="170" height="130" fill="#4A3424"/><rect x="80" y="${wetY.toFixed(0)}" width="170" height="3" fill="#60A5FA" opacity=".75"/>` : ""}
           <path d="M160 118 C158 140 140 150 132 176 M160 118 C163 146 182 158 188 190 M160 118 C160 150 156 178 160 206 M140 150 C130 154 120 152 114 160 M178 150 C190 152 200 150 206 158" stroke="#E9D9B8" stroke-width="2" fill="none" opacity=".75"/></g>
         <rect x="74" y="104" width="172" height="14" rx="4" fill="#D98A5B"/>
-        <path d="M244 ${wetY.toFixed(0)} L262 ${wetY.toFixed(0)}" stroke="#60A5FA" stroke-width="2"/>
-        <text x="266" y="${(wetY + 4).toFixed(0)}" fill="${this.dark ? "#93C5FD" : "#1D4ED8"}" font-size="12" font-weight="600">${m != null ? Math.round(m) : "?"}% wet</text>
+        ${m != null ? `<path d="M244 ${wetY.toFixed(0)} L262 ${wetY.toFixed(0)}" stroke="#60A5FA" stroke-width="2"/>
+        <text x="266" y="${(wetY + 4).toFixed(0)}" fill="${this.dark ? "#93C5FD" : "#1D4ED8"}" font-size="12" font-weight="600">${Math.round(m)}% wet</text>` : `<text x="246" y="170" fill="${p.muted}" font-size="12">No soil reading</text>`}
         <text x="8" y="136" fill="${p.muted}" font-size="11">Top soil</text><text x="8" y="210" fill="${p.muted}" font-size="11">Roots</text></svg>
         <div class="stat">${stat("Light", li != null ? `${fmt(li, 0)} lx` : "")}${stat("Warmth", t != null ? `${fmt(t, decOf(String(t)))}°` : "")}${stat("Food", co != null ? (co < R.conductivity[0] ? "Low" : "Good") : "")}</div>`;
     }
@@ -7316,8 +7318,12 @@ class RoostPool extends RoostBase {
     const T = { blue: ["#2E7FD1", "#0E3E86"], turquoise: ["#22B8C4", "#0B6A80"], slate: ["#2F5F7A", "#0F2636"], white: ["#5EC8F2", "#1E86C4"] }[c.tiles] || ["#2E7FD1", "#0E3E86"];
     const ok = okPh && okCl, tt = t != null ? this.val(c.temperature) : "";
     const warmWord = t == null ? "" : t >= 26 ? "Warm enough to swim" : t >= 22 ? "Fresh, a little cool" : "Cold for swimming";
-    const word = ok ? "Ready to swim" : "Check the water";
-    const chipBg = ok ? (this.dark ? "#12352C" : "#D1FAE5") : this.dark ? "#3A2A0A" : "#FEF3C7", chipFg = ok ? (this.dark ? "#6EE7B7" : "#065F46") : this.dark ? "#FCD34D" : "#92400E";
+    // without pH or chlorine, only the water temperature can say anything
+    const tested = ph != null || cl != null, cold = t != null && t < 24;
+    const word = tested ? (!ok ? "Check the water" : cold ? "Water is cold" : "Ready to swim") : t == null ? "" : t >= 26 ? "Warm water" : t >= 22 ? "Fresh water" : "Cold water";
+    const good = tested ? ok && !cold : t != null && t >= 24;
+    const chipBg = good ? (this.dark ? "#12352C" : "#D1FAE5") : tested && !ok ? (this.dark ? "#3A2A0A" : "#FEF3C7") : this.dark ? "#1B2045" : "#EEF1FB";
+    const chipFg = good ? (this.dark ? "#6EE7B7" : "#065F46") : tested && !ok ? (this.dark ? "#FCD34D" : "#92400E") : this.dark ? "#A9B0D6" : "#4B5280";
     const caus = `background:radial-gradient(ellipse 30px 14px at 30% 40%,rgba(255,255,255,.35),rgba(255,255,255,0) 70%),radial-gradient(ellipse 22px 10px at 70% 60%,rgba(255,255,255,.30),rgba(255,255,255,0) 70%);background-size:90px 60px,70px 50px;animation:roost-cau 6s linear infinite alternate`;
     const tip = ph != null && ph > 7.6 ? "pH is high: add a little pH minus and run the pump for an hour." : ph != null && ph < 7.2 ? "pH is low: add a little pH plus and run the pump for an hour." : cl != null && cl < 1 ? "Chlorine is low: add chlorine and run the pump." : cl != null && cl > 3 ? "Chlorine is high: wait before swimming." : "All good.";
     const mini = [ph != null ? ["pH", fmt(ph, 1), !okPh] : null, cl != null ? ["Chlorine", `${fmt(cl, decOf(String(cl)))}`, !okCl] : null, c.pump ? ["Pump", pump ? "On" : "Off", false] : null].filter(Boolean);
@@ -7379,7 +7385,7 @@ class RoostPool extends RoostBase {
       .tip.bad{background:${this.dark ? "#3A2A0A" : "#FEF3C7"};color:${this.dark ? "#FDE68A" : "#92400E"}}
     </style>
     <div class="card">
-      <div class="hd">${head("mdi:pool", c.name || "Pool", line)}<span class="chip2">${word}</span></div>
+      <div class="hd">${head("mdi:pool", c.name || "Pool", line)}${word ? `<span class="chip2">${word}</span>` : ""}</div>
       ${body}${chips}
     </div>`;
     const r = this.shadowRoot;

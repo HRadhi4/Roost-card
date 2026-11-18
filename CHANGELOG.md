@@ -2,6 +2,13 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.10.1
+Bugs fixed:
+- **Pool:** said "Ready to swim" with no pH or chlorine sensor, even in cold water. Without them it now only describes the water ("Cold water", "Warm water"), and with them it warns when the water is cold.
+- **Plant:** with no readings at all it said "Happy"; it now says "No reading". The cut-open pot shows "No soil reading" instead of a made-up level.
+- **Curtain:** the live-weather temperature in the window was hidden behind the new fabrics.
+- **Checks:** a new automatic test for the curtain slide bar.
+
 ## 1.10.0
 Real-looking styles for six cards, chosen in each card's editor.
 - **Curtains:**

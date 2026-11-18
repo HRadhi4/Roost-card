@@ -334,6 +334,17 @@ const dp = await SP.generate({}, hass(false)), dtab = await STb.generate({}, has
 const allCards = (d) => d.views.flatMap((v) => v.sections.flatMap((x) => x.cards));
 if (!dp.views.length || !allCards(dp).length || !allCards(dtab).length || !allCards(dp).some((x) => x.type === "custom:roost-hero")) { fails++; console.error("FAIL strategy", JSON.stringify(dp).slice(0, 300)); }
 for (const k of allCards(dp).concat(allCards(dtab))) { const tag = (k.type || "").replace("custom:", ""); if (tag.startsWith("roost-") && !customElements.get(tag)) { fails++; console.error("FAIL strategy unknown card", tag); } }
+// Curtain slide bar: a tap at the left end closes it; the bar shows how far open.
+const sl = document.createElement("roost-curtain"); sl.setConfig({ entity: "cover.curtain", look: "pleat" });
+const hs = hass(true); hs.states["cover.curtain"] = { entity_id: "cover.curtain", state: "open", attributes: { current_position: 40, supported_features: 15, friendly_name: "Curtain" }, last_changed: new Date().toISOString() };
+const scalls = []; hs.callService = async (d, sv, data) => { scalls.push([`${d}.${sv}`, data]); };
+document.body.appendChild(sl); sl.hass = hs;
+const tk = sl.shadowRoot.querySelector(".trk");
+if (!tk || !/40% open/.test(tk.textContent)) { fails++; console.error("FAIL curtain slider label", tk?.textContent); }
+const pe = (type, x) => { const e = new window.MouseEvent(type, { clientX: x, bubbles: true }); e.pointerId = 1; return e; };
+tk.dispatchEvent(pe("pointerdown", -5)); tk.dispatchEvent(pe("pointerup", -5));
+await new Promise((r) => setTimeout(r, 5));
+if (!scalls.some((x) => x[0] === "cover.close_cover")) { fails++; console.error("FAIL curtain slider close", JSON.stringify(scalls)); }
 // Room: any cards under it, in one box, kept between redraws, and folded away when asked.
 const rk = document.createElement("roost-room");
 rk.setConfig({ name: "Living", temperature: "sensor.cabinet", cards: [{ type: "custom:roost-tile", entity: "light.kitchen" }, { type: "custom:roost-scene", entity: "scene.movie" }], cards_columns: 2 });
@@ -396,5 +407,5 @@ for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }],
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 37} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 39} checks passed`);
 process.exit(fails ? 1 : 0);
