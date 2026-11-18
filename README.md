@@ -1,7 +1,7 @@
 <h1 align="center">Roost Cards</h1>
 
-<p align="center"><b>Beautiful, animated dashboard cards for Home Assistant. Made for phones and tablets.</b><br>
-64 cards · a visual editor for every setting · light and dark · no code needed</p>
+<p align="center"><b>A finished, app-like Home Assistant dashboard for your phone and wall tablet, without building it card by card.</b><br>
+Ready in one tap from your own rooms and devices · real controls you drag and slide · no code</p>
 
 <p align="center">
 <a href="https://hacs.xyz"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS"></a>
@@ -19,21 +19,38 @@
 
 ![Roost home screen in dark and light mode](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/home.png)
 
-## Highlights
+## Why Roost
 
-- **Feels like an app.** Tiles glow, fans spin, curtains really slide, the TV shows moving sound bars, the alarm pulses while armed.
-- **Made for fingers.** Drag the thermostat dial and the light's brightness, slide to unlock, swipe between rooms.
-- **No code.** Every card has a visual editor: device, colours, looks, size, icon, shape, what a tap does.
-- **Never cut off.** Text never ends in "…"; long names wrap. Checked automatically before every release.
-- **Frosted glass.** Any card can be solid, frosted glass or fully clear, with sliders for how see-through and how blurred.
-- **Light and dark.** Follows your phone, or stays the way you choose. Stops moving when *Reduce motion* is on.
-- **Phone and tablet.** The bottom bar becomes a side rail on tablets, and every card rearranges itself when it sits in a narrow column.
-- **Full screen built in.** No top bar or sidebar, like an app, without a separate add-on.
+Built-in cards and Mushroom give you clean building blocks, and you assemble the dashboard yourself. Roost gives you the finished thing:
+
+### 1 · A whole dashboard in one tap
+Install, open Home Assistant, tap **Make them**: Roost builds a phone dashboard and a tablet dashboard from your own areas and devices, and keeps them up to date as you add things. Change anything later in the visual editor. [How it works](docs/tutorials/12-ready-dashboards.md)
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/auto-dashboard.gif" width="240" alt="Roost makes a dashboard from your own devices">
+
+### 2 · Controls you use, not just switches
+Drag the AC dial, dim with your finger, watch the curtains slide, slide to unlock, arm the alarm with a question first. Fewer taps into pop-up dialogs.
 
 | | | |
 |:-:|:-:|:-:|
-| ![Drag the dial](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/thermostat-drag.gif)<br>**Drag the dial** | ![Curtains slide](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/curtain-slide.gif)<br>**Curtains really slide** | ![Switch rooms](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/rooms-switch.gif)<br>**Switch rooms instantly** |
-| ![Dim with your finger](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/light-brightness.gif)<br>**Dim with your finger** | ![Slide to unlock](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/lock-slide.gif)<br>**Slide to unlock** | ![Arm the alarm](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/alarm-arm.gif)<br>**Arm with a question first** |
+| ![Drag the dial](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/thermostat-drag.gif)<br>**Drag the dial** | ![Curtains slide](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/curtain-slide.gif)<br>**Curtains really slide** | ![Slide to unlock](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/lock-slide.gif)<br>**Slide to unlock** |
+
+### 3 · Rooms in one card
+Swipe between rooms and get each room's devices, temperature, “Someone here” and one slider for all its lights, instead of one long page per room.
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/rooms-switch.gif" width="240" alt="Switch rooms instantly">
+
+### 4 · The home tells you, on its own
+A popup opens by itself when water is found, the doorbell rings or the alarm goes off, with a camera picture and buttons like **Turn the water off**. A timeline shows what happened, and a battery card warns before a sensor dies. No extra add-ons needed for popups.
+
+### 5 · Made for a wall tablet, too
+Full screen built in (no top bar or sidebar, no kiosk add-on), the bottom bar becomes a side rail, and every card rearranges itself for narrow columns. Light and dark follow your phone.
+
+### And everywhere
+- **No code:** every card has a visual editor: device, colours, look, size, what a tap does.
+- **Never cut off:** text wraps instead of ending in "…", checked automatically before every release.
+- **Calm motion:** things glow, spin and count, and all of it stops when *Reduce motion* is on.
+- **Cards for real homes:** water tank, pool, pet feeder, prayer times, medicine, Grocy, bins and more, for when you need them. [See them all](#all-64-cards).
 
 ## Install
 
@@ -46,8 +63,6 @@
 Step by step, and without HACS: **[Install guide](docs/tutorials/01-install.md)**.
 
 **No time to build?** The first time you open Home Assistant after installing, Roost offers to make two ready dashboards (phone and tablet) from your own rooms and devices. [How it works](docs/tutorials/12-ready-dashboards.md).
-
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/auto-dashboard.gif" width="260" alt="Roost makes a dashboard from your own devices">
 
 ## Tutorials
 
