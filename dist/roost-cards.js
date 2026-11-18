@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.10.1";
+const ROOST_VERSION = "1.10.2";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -30,8 +30,8 @@ const COLORS = {
   blue: ["#2F6BFF", "#38BDF8", "rgba(56,189,248,.5)", "#FFFFFF"],
   purple: ["#6D4BFF", "#B794FF", "rgba(139,92,246,.55)", "#FFFFFF"],
   coral: ["#F43F6B", "#FF8F6B", "rgba(255,107,107,.5)", "#FFFFFF"],
-  green: ["#10B981", "#6EE7B7", "rgba(52,211,153,.45)", "#03241B"],
-  amber: ["#F59E0B", "#FDE68A", "rgba(245,158,11,.5)", "#2A1800"],
+  green: ["#059669", "#34D399", "rgba(52,211,153,.45)", "#FFFFFF"],
+  amber: ["#E07B00", "#F5A623", "rgba(245,158,11,.5)", "#FFFFFF"],
   teal: ["#0E9F8A", "#2BC4A8", "rgba(52,211,153,.5)", "#FFFFFF"],
   pink: ["#DB2777", "#F9A8D4", "rgba(236,72,153,.5)", "#FFFFFF"],
   slate: ["#475569", "#94A3B8", "rgba(100,116,139,.5)", "#FFFFFF"],
@@ -586,6 +586,19 @@ class RoostBase extends HTMLElement {
       } catch (e) { /* jumps */ }
     }
     memo.go = 0;
+    // the bar can change size after drawing (fonts load, the column widens): keep the highlight on its pill
+    if (window.ResizeObserver && box._ro !== on) {
+      box._roObs?.disconnect();
+      box._ro = on;
+      box._roObs = new ResizeObserver(() => {
+        if (!on.isConnected) return box._roObs.disconnect();
+        const q = { left: on.offsetLeft, top: on.offsetTop, width: on.offsetWidth, height: on.offsetHeight };
+        Object.assign(ind.style, { left: `${q.left}px`, top: `${q.top}px`, width: `${q.width}px`, height: `${q.height}px` });
+        memo.rect = q;
+        return undefined;
+      });
+      box._roObs.observe(box); box._roObs.observe(on);
+    }
   }
 
   /** Entities whose changes redraw the card. */
@@ -1030,7 +1043,7 @@ class RoostTile extends RoostBase {
       .card:active{transform:scale(.96)}
       .ic{width:${box}px;height:${box}px;border-radius:${shapeRadius(c.icon_shape, box)};display:flex;align-items:center;justify-content:center;flex:none;
         background:${c.icon_shape === "none" ? "transparent" : on ? (look.light ? "rgba(255,255,255,.24)" : `color-mix(in srgb, ${g[0]} 30%, transparent)`) : c.off_tint ? `color-mix(in srgb, ${g[0]} 18%, ${p.inset})` : p.inset};
-        color:${on ? (look.light ? "inherit" : g[this.dark ? 1 : 0]) : un ? p.muted : c.off_tint ? g[this.dark ? 1 : 0] : p.muted}}
+        color:${on ? (look.light ? "#FFFFFF" : g[this.dark ? 1 : 0]) : un ? p.muted : c.off_tint ? g[this.dark ? 1 : 0] : p.muted}}
       .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:${isz}px;${anim}}
       .bars{position:absolute;right:18px;bottom:18px;display:flex;align-items:flex-end;gap:3px;height:22px}
       .bars i{display:block;width:4px;height:22px;border-radius:2px;background:currentColor;transform-origin:bottom;animation:roost-eq .9s ease-in-out infinite}

@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.10.2
+- **Rooms:** the highlight behind the chosen room could end up narrower than its name, leaving the text outside it. It now follows its pill whenever the bar changes size.
+- **Same icon style everywhere (like Homey):** icons on a switched-on tile are always white on a see-through background, and amber and green tiles now use white text too.
+
 ## 1.10.1
 Bugs fixed:
 - **Pool:** said "Ready to swim" with no pH or chlorine sensor, even in cold water. Without them it now only describes the water ("Cold water", "Warm water"), and with them it warns when the water is cold.
