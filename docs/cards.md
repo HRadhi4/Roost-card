@@ -186,7 +186,7 @@ icon_size: 22
 #  - { name: Full screen, icon: mdi:fullscreen, action: fullscreen, bottom: true, users: [person.me] }
 ```
 
-### Roost Rooms
+### Roost Rooms Selector
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="320" alt="Roost rooms card in action">
 
 **No code needed:** in the card's editor, under **Cards in each room**, tap a room, then use **+** to add any card (Roost or Home Assistant's own), the arrows to move it, and the bin to remove it. The number on each room button says how many cards it has.
@@ -1175,7 +1175,7 @@ face: times                    # big time and the line of prayer times
 prayer_method: makkah
 countdown_title: Next prayer
 ```
-In **Roost Rooms**, give each room a `temperature` and `humidity` sensor to show them next to the room buttons, and set `columns: 4` for one row of tiles.
+In **Roost Rooms Selector**, give each room a `temperature` and `humidity` sensor to show them next to the room buttons, and set `columns: 4` for one row of tiles.
 
 ### Roost Page
 A whole phone page laid out like the original dashboard: 14 px at the sides, 16 px between cards, the night-sky background and room for the bottom bar. Put it in a **Panel** view and list the page's cards in it. Cards that sit side by side go in a `grid` (8 px apart).

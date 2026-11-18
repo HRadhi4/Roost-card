@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.12.0";
+const ROOST_VERSION = "1.13.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -974,6 +974,7 @@ class RoostTile extends RoostBase {
             { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "compact", label: "Compact (for wall panels)" }, { value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
             { name: "radius", selector: { number: { min: 0, max: 40, step: 2, mode: "slider", unit_of_measurement: "px" } } },
           ] },
+          { type: "grid", name: "", schema: [{ name: "shape", label: "Shape", selector: pick([["auto", "By its size"], ...TILE_SHAPES]) }, { name: "height", label: "Height (my own height)", selector: slider(90, 320, 10) }] },
           { type: "grid", name: "", schema: [{ name: "fill", selector: FILL_OPTIONS }, { name: "glow", selector: GLOW_OPTIONS }] },
           { name: "off_tint", selector: { boolean: {} } },
           { name: "animation", selector: pick([["auto", "Automatic (lights glow, fans spin, TV shows sound bars)"], ["none", "None"], ["glow", "Glow"], ["spin", "Spin"],
@@ -1063,7 +1064,7 @@ class RoostTile extends RoostBase {
     const center = c.align === "center";
     const bars = on && kind === "bars" ? `<span class="bars">${[0, 0.2, 0.4, 0.1].map((d) => `<i style="animation-delay:${d}s"></i>`).join("")}</span>` : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .card{position:relative;min-height:${h}px;height:100%;border-radius:${c.radius}px;padding:${c.size === "compact" ? 12 : 16}px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
+      .card{position:relative;${c.shape && c.shape !== "auto" ? shapeCss(c.shape, c.height, h) : `min-height:${h}px;height:100%`};box-sizing:border-box;border-radius:${c.radius}px;padding:${c.size === "compact" ? 12 : 16}px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
         display:flex;flex-direction:column;justify-content:space-between;gap:8px;overflow:hidden;transition:transform .12s;${center ? "align-items:center;text-align:center;" : ""}
         background:${on ? look.bg : p.off};color:${on ? look.fg : p.text};${on && look.blur ? "backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);" : ""}
         border:${on && c.fill === "outline" ? 2 : 1}px solid ${on ? look.border : c.off_tint ? `color-mix(in srgb, ${g[0]} 35%, ${p.border})` : p.border};box-shadow:${on ? look.shadow : "none"};opacity:${un ? 0.55 : 1}}
@@ -2151,7 +2152,7 @@ class RoostRooms extends RoostBase {
   static get defaults() {
     return { rooms: [], columns: 2, gap: 8, color: "active", show_names: "active", active_style: "filled", background: "solid",
       pill_shape: "pill", pill_height: 40, pill_icon_size: 20, pill_align: "spread", show_count: false,
-      tile_size: "large", tile_fill: "gradient", tile_glow: "soft", tile_radius: 22, auto_colors: true,
+      tile_size: "large", tile_shape: "square", tile_fill: "gradient", tile_glow: "soft", tile_radius: 22, auto_colors: true,
       swipe: true, remember: true, start_room: "", theme: "auto" };
   }
 
@@ -2260,6 +2261,10 @@ class RoostRooms extends RoostBase {
             { name: "tile_size", label: "Tile size", selector: pick([["small", "Small"], ["medium", "Medium"], ["large", "Large"]]) },
             { name: "tile_radius", label: "Tile roundness", selector: slider(0, 40, 2) },
           ] },
+          { type: "grid", name: "", schema: [
+            { name: "tile_shape", label: "Tile shape (every tile in the rooms)", selector: pick([["square", "Square"], ["wide", "Wide (4:3)"], ["tall", "Tall (3:4)"], ["size", "By the tile size"], ["custom", "My own height"]]) },
+            { name: "tile_height", label: "Tile height (my own height)", selector: slider(90, 320, 10) },
+          ] },
           { type: "grid", name: "", schema: [{ name: "tile_fill", label: "Look when on", selector: FILL_OPTIONS }, { name: "tile_glow", label: "Glow", selector: GLOW_OPTIONS }] },
           { name: "auto_colors", label: "Colour tiles by type (lights amber, ACs blue, curtains coral, TVs purple, plugs green)", selector: { boolean: {} } },
         ] },
@@ -2310,7 +2315,10 @@ class RoostRooms extends RoostBase {
       if (this._hass) el.hass = this._hass;
       return el;
     };
-    this._cfgs = this._config.rooms.map((room) => [...(room.entities || []).map((id) => this.tileFor(id)), ...(Array.isArray(room.cards) ? room.cards : [])]);
+    // every Roost tile in the rooms takes the card's tile shape, unless the tile sets its own
+    const ts = this._config.tile_shape || "square";
+    const shaped = (x) => (x && x.type === "custom:roost-tile" && !x.shape && ts !== "size" ? { ...x, shape: ts, ...(ts === "custom" && !x.height ? { height: this._config.tile_height } : {}) } : x);
+    this._cfgs = this._config.rooms.map((room) => [...(room.entities || []).map((id) => this.tileFor(id)), ...(Array.isArray(room.cards) ? room.cards : [])].map(shaped));
     this._cards = this._cfgs.map((list) => list.map(make));
     this._built = true;
     this._sig = null;
@@ -2791,6 +2799,9 @@ const fmt = (v, dec) => (v == null ? "" : Number(v).toFixed(dec == null ? (Math.
 const decOf = (state, unit) => (/^(W|Wh|lx|ppm|rpm|mA)$/.test(String(unit || "")) ? 0 : Math.min(2, (String(state).split(".")[1] || "").length));
 // "26°" and "52%" sit next to the number; "1460 W" and "612 ppm" get a space
 const unitGap = (u) => (!u ? "" : /^(°|°C|°F|%)$/.test(u) ? u : ` ${u}`);
+// The shape of a tile: square by default in rooms, or 4:3, 3:4, or a height you choose.
+const TILE_SHAPES = [["square", "Square"], ["wide", "Wide (4:3)"], ["tall", "Tall (3:4)"], ["custom", "My own height"]];
+const shapeCss = (shape, h, fallback) => (shape === "square" ? "aspect-ratio:1/1;height:auto;min-height:0" : shape === "wide" ? "aspect-ratio:4/3;height:auto;min-height:0" : shape === "tall" ? "aspect-ratio:3/4;height:auto;min-height:0" : `min-height:${Number(h) || fallback}px;height:100%`);
 const CORNERS = [["top-left", "Top left"], ["top-right", "Top right"], ["bottom-left", "Bottom left"], ["bottom-right", "Bottom right"]];
 const panelCss = (p, radius = 22) => `background:${p.panel};${p.fx || ""};border:1px solid ${p.border};border-radius:${radius}px;color:${p.text}`;
 // a ring: the track and the coloured part, in a 0..1 fraction
@@ -4085,7 +4096,8 @@ class RoostRoom extends RoostBase {
           { name: "badge", label: "Small badge on the icon", selector: pick([["activity", "Green dot when someone is there"], ["count", "How many devices are on"], ["none", "None"]]) },
           { name: "temp_bar", label: "Temperature bar inside the tile", selector: pick([["none", "None"], ["bottom", "Along the bottom"], ["top", "Along the top"], ["side", "Up the right side"]]) },
           { type: "grid", name: "", schema: [{ name: "show_humidity", label: "Humidity next to the temperature", selector: { boolean: {} } }, { name: "show_summary", label: "What is on (line under the name)", selector: { boolean: {} } }] },
-          { type: "grid", name: "", schema: [{ name: "show_ago", label: "Since when (for 3 min)", selector: { boolean: {} } }, { name: "height", label: "Height", selector: slider(110, 260, 10) }] },
+          { type: "grid", name: "", schema: [{ name: "shape", label: "Shape", selector: pick(TILE_SHAPES) }, { name: "height", label: "Height (my own height)", selector: slider(110, 320, 10) }] },
+          { name: "show_ago", label: "Since when (for 3 min)", selector: { boolean: {} } },
           { type: "grid", name: "", schema: [{ name: "name_size", label: "Name size", selector: slider(13, 24) }, { name: "temp_size", label: "Temperature size", selector: slider(13, 28) }] },
           { type: "grid", name: "", schema: [{ name: "background_image", label: "Photo behind the tile (link)", selector: { text: {} } }, { name: "image_dim", label: "Darken the photo (%)", selector: slider(0, 90, 5) }] },
           ACTION_FIELD("hold_action", "Long press opens"),
@@ -4183,8 +4195,9 @@ class RoostRoom extends RoostBase {
   // and the quick buttons stacked down the right edge (the calm layout most room cards settle on).
   renderHalo(t, ts, hot, g) {
     const c = this._config, p = this.p;
+    if (!c.color || c.color === "active") g = COLORS.purple; // the same gradient as the device tiles
     const lit = c.tile_color === "never" ? false : c.tile_color === "active" ? this.roomOn() : true;
-    const look = lit ? fillLook(c.fill || "gradient", c.glow || "soft", g, p) : { bg: p.panel, fg: p.text, border: p.border, shadow: "none", light: false };
+    const look = lit ? fillLook(c.fill || "gradient", c.glow || "soft", g, p) : { bg: p.off, fg: p.text, border: p.border, shadow: "none", light: false };
     const img = String(c.background_image || "").trim();
     const light = look.light || !!img;
     const items = this.quickItems().slice(0, Number(c.buttons_max) || 3);
@@ -4198,9 +4211,9 @@ class RoostRoom extends RoostBase {
     const sub = c.show_summary ? `<div class="l t">${esc(c.subtitle || (c.summary === "all" ? this.summaryAll() : this.summary()))}</div>` : "";
     const dim = Number(c.image_dim ?? 45) / 100;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .r{position:relative;min-height:${Number(c.height) || 160}px;height:100%;box-sizing:border-box;border-radius:${Number(c.radius) === 16 ? 24 : c.radius}px;padding:16px;overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s;
+      .r{position:relative;${shapeCss(c.shape || "square", c.height, 160)};box-sizing:border-box;border-radius:${Number(c.radius) === 16 ? 24 : c.radius}px;padding:16px;overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s;
         display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:10px;
-        background:${img ? `linear-gradient(180deg,rgba(0,0,0,${dim * 0.5}),rgba(0,0,0,${dim})),url("${esc(img)}") center/cover` : look.bg};color:${light ? "#FFFFFF" : p.text};border:1px solid ${img ? "transparent" : look.border};box-shadow:${look.shadow}}
+        background:${img ? `linear-gradient(180deg,rgba(0,0,0,${dim * 0.5}),rgba(0,0,0,${dim})),url("${esc(img)}") center/cover` : look.bg};color:${light ? "#FFFFFF" : p.text};border:1px solid ${img ? "transparent" : look.border};box-shadow:${look.light ? `inset 0 1px 0 rgba(255,255,255,.22),${look.shadow === "none" ? "0 0 0 transparent" : look.shadow}` : look.shadow}}
       .r:active{transform:scale(.97)}
       .tx{min-width:0;position:relative;z-index:1}
       .n{font-size:${Number(c.name_size) || 17}px;font-weight:700;line-height:1.2}
@@ -4243,8 +4256,9 @@ class RoostRoom extends RoostBase {
   // a temperature bar inside, a photo behind, and a colour that can follow whether anything is on.
   renderTile(t, ts, hot, g) {
     const c = this._config, p = this.p;
+    if (!c.color || c.color === "active") g = COLORS.purple; // the same gradient as the device tiles
     const lit = c.tile_color === "never" ? false : c.tile_color === "active" ? this.roomOn() : true;
-    const look = lit ? fillLook(c.fill || "gradient", c.glow || "soft", g, p) : { bg: p.panel, fg: p.text, border: p.border, shadow: "none", light: false };
+    const look = lit ? fillLook(c.fill || "gradient", c.glow || "soft", g, p) : { bg: p.off, fg: p.text, border: p.border, shadow: "none", light: false };
     const img = String(c.background_image || "").trim();
     const light = look.light || !!img;
     const fg = light ? "#FFFFFF" : p.text;
@@ -4276,7 +4290,7 @@ class RoostRoom extends RoostBase {
     const trackBg = light ? "rgba(255,255,255,.28)" : p.track;
     const barFill = hot ? "linear-gradient(90deg,#FF9F6B,#F43F6B)" : light ? "#FFFFFF" : `linear-gradient(90deg,${g[0]},${g[1]})`;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      .r{position:relative;min-height:${Number(c.height) || 170}px;height:100%;border-radius:${Number(c.radius) === 16 ? 22 : c.radius}px;padding:16px ${tb && c.temp_bar === "side" ? 26 : 16}px 16px 16px;display:grid;grid-template-rows:auto 1fr auto${tb && c.temp_bar === "bottom" ? " auto" : ""};gap:8px;overflow:hidden;box-sizing:border-box;
+      .r{position:relative;${shapeCss(c.shape || "square", c.height, 170)};border-radius:${Number(c.radius) === 16 ? 22 : c.radius}px;padding:16px ${tb && c.temp_bar === "side" ? 26 : 16}px 16px 16px;display:grid;grid-template-rows:auto 1fr auto${tb && c.temp_bar === "bottom" ? " auto" : ""};gap:8px;overflow:hidden;box-sizing:border-box;
         background:${img ? `linear-gradient(180deg,rgba(0,0,0,${(Number(c.image_dim ?? 45) / 100) * 0.6}) 0%,rgba(0,0,0,${Number(c.image_dim ?? 45) / 100}) 100%),url("${esc(img)}") center/cover` : look.bg};color:${fg};border:1px solid ${img ? "transparent" : look.border};box-shadow:${look.shadow};cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s}
       .r:active{transform:scale(.97)}
       .row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;min-width:0}
@@ -10379,7 +10393,7 @@ const CARDS = [
   ["roost-hero", RoostHero, "Roost Hero", "A greeting with the time, date and weather."],
   ["roost-nav", RoostNav, "Roost Nav", "Icon navigation: a bar on phones and a side rail on tablets."],
   ["roost-row", RoostRow, "Roost Row", "A long row with a ring (an AC's temperature or any number), a name, a state line and an arrow."],
-  ["roost-rooms", RoostRooms, "Roost Rooms", "A room switcher: tap a room pill to show that room's cards. Switching is instant."],
+  ["roost-rooms", RoostRooms, "Roost Rooms Selector", "A room switcher: tap a room pill to show that room's cards. Switching is instant."],
   ["roost-curtain", RoostCurtain, "Roost Curtain", "A window with curtains that really slide open and closed, with a sky behind them."],
   ["roost-gauge", RoostGauge, "Roost Gauge", "A big ring for one reading, such as a temperature or a plug's power. It turns orange when too high."],
   ["roost-automations", RoostAutomations, "Roost Automations", "A list of automations with a switch and when each last ran."],

@@ -2,6 +2,13 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.13.0
+
+- Roost Rooms is now called **Roost Rooms Selector** in the card picker (nothing to change in your dashboards).
+- Rooms Selector: tiles are square by default. Pick wide (4:3), tall (3:4), by the tile size, or your own height (`tile_shape`, `tile_height`).
+- Room tile and device tile: a shape option, square by default for room tiles (`shape: square | wide | tall | custom` with `height`).
+- Room tiles use the same purple gradient, glow and soft top highlight as the device tiles; when nothing is on they use the calm tile colour.
+
 ## 1.12.0
 
 - Alarm: a new compact look (the default): the state in one line and a slim switch for Home, Away and Off, the same size as the other cards. The old big shield is `style: big`. Asking before arming now uses Roost's own question box.

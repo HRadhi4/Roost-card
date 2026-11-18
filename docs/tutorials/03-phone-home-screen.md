@@ -15,7 +15,7 @@
 | 1 | **Roost Hero** | Your weather. Under *Next*, add your prayer times (or any time sensors) |
 | 2 | **Roost Chips** | Your doors, alarm, lights, air conditioners and people |
 | 3 | **Roost Buttons** | 3 to 5 quick actions, for example *Good night*, *Lights off* |
-| 4 | **Roost Rooms** | One room per button; pick each room's devices |
+| 4 | **Roost Rooms Selector** | One room per button; pick each room's devices |
 | 5 | **Roost Nav** | The pages of your dashboard (Home, Rooms, Security…) |
 
 4. For cards 1 to 5, open **Layout** in the card editor and choose **full width**.

@@ -164,7 +164,7 @@ Each GIF shows the card in use, then in the other colour mode, then as frosted g
 | **Roost Full Screen** | Hides Home Assistant's top bar and sidebar so your dashboard feels like an app: by itself (invisible), as a button that maximizes and minimizes, or as the tap action of any card. Comes back while editing. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fullscreen.gif" width="180" alt="Roost Full Screen"> |
 | **Roost Page** | A whole phone page laid out like the original: even spacing, the night-sky background and room for the bottom bar. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/page.gif" width="180" alt="Roost Page"> |
 | **Roost Panel** | A rounded box with a title that holds other cards, such as a list of rooms. It can fold open and closed. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/panel.gif" width="180" alt="Roost Panel"> |
-| **Roost Rooms** | A room switcher: tap a room pill and that room's cards appear below, instantly. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="180" alt="Roost Rooms"> |
+| **Roost Rooms Selector** | A room switcher: tap a room pill and that room's cards appear below, instantly. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="180" alt="Roost Rooms"> |
 
 
 Every setting of every card, with YAML to copy: **[docs/cards.md](docs/cards.md)**.
