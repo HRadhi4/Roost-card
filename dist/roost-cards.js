@@ -2552,7 +2552,7 @@ class RoostCurtain extends RoostBase {
     // one fold: a shadow valley, the cloth and a lit ridge (the pitch is set as it opens, so folds bunch up)
     const fold = `linear-gradient(90deg,${mix(-deep)} 0%,${mix(-deep * 0.35)} 18%,${mix(0.14)} 42%,${mix(0.05)} 60%,${mix(-deep * 0.55)} 85%,${mix(-deep)} 100%)`;
     this._pitch = { pleat: 26, wave: 42, sheer: 30, banded: 30 }[look] || 0;
-    // folds: 1 few and wide … 6 many and narrow (3 is the usual)
+    // folds: 1 few and wide, up to 6 many and narrow (3 is the usual)
     const many = Math.max(1, Math.min(6, Number(c.folds) || 3)), scale = [1.55, 1.25, 1, 0.75, 0.55, 0.42][many - 1];
     this._fold = ({ banded: 30, photo: 30 }[look] || this._pitch) * scale;
     if (look !== "photo" && this._pitch) this._pitch = Math.round(this._pitch * scale);
