@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.24.0";
+const ROOST_VERSION = "1.24.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -10052,6 +10052,16 @@ const RoostSheet = {
   },
 };
 window.RoostSheet = RoostSheet;
+
+// Dragging a Roost slider (a curtain, its bar, a dial) must never change the dashboard page. Page-swipe add-ons
+// (like swipe navigation) watch every finger on the screen; a touch that starts on one of these is kept from them.
+if (!window.__roostNoSwipe) {
+  window.__roostNoSwipe = true;
+  const ours = (e) => { const p = e.composedPath(); return p.some((n) => n.dataset?.noswipe != null || n.getAttribute?.("role") === "slider") && p.some((n) => n.tagName?.startsWith?.("ROOST-")); };
+  let held = false;
+  window.addEventListener("touchstart", (e) => { held = ours(e); if (held) e.stopPropagation(); }, { capture: true, passive: true });
+  for (const t of ["touchmove", "touchend", "touchcancel"]) window.addEventListener(t, (e) => { if (held) e.stopPropagation(); if (t !== "touchmove") held = false; }, { capture: true, passive: true });
+}
 
 // ------------------------------------------------------------------ Roost Popup
 // One popup for everything: the doorbell with its camera, alarms, leaks, a door left open, the washing done,

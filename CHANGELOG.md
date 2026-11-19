@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.24.1
+
+- Fix: dragging a curtain's bar or the curtain itself changed the dashboard page when a page-swipe add-on (like swipe navigation) is installed. Roost's sliders now keep the finger to themselves.
+
 ## 1.24.0
 
 - **Greeting card: how the house is, as glass chips** next to the people, in plain words: “Door open”, “Doors closed”, “Someone in or near Entrance”, “Alarm off”. The room comes from the sensor's area in Home Assistant, so sensor names never show.
