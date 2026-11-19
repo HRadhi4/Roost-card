@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.22.0
+
+- Curtain card: new **How many folds** setting, from 1 (few, wide folds) to 6 (many, narrow folds). Works for every curtain look, your own fabric picture too.
+
 ## 1.21.1
 
 - Details sheet: the lowest and highest numbers now match the chart, and are not repeated once you swipe up.

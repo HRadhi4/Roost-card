@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.21.1";
+const ROOST_VERSION = "1.22.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -2481,6 +2481,7 @@ class RoostCurtain extends RoostBase {
           { name: "look", label: "Curtain look", selector: pick([["classic", "Classic stripes (bright, simple)"], ["pleat", "Pinch pleat drapes on a metal rod"], ["wave", "Wave curtain on rings"], ["banded", "Ripple folds with a band at the bottom"], ["sheer", "Sheer behind a blackout curtain"]]) },
           { type: "grid", name: "", schema: [{ name: "band", label: "Bottom band (ripple with band)", selector: pick([["grey", "Stone grey"], ["silver", "Light grey"], ["taupe", "Taupe"], ["linen", "Linen"], ["sand", "Sand"], ["sage", "Sage"], ["navy", "Navy"], ["charcoal", "Charcoal"], ["blush", "Blush"], ["black", "Black"]]) }, { name: "band_height", label: "Band height", selector: slider(10, 40, 1, "%") }] },
           { name: "band_wave", label: "Wavy band edge and curved hem", selector: { boolean: {} } },
+          { name: "folds", label: "How many folds (1 few and wide, 6 many and narrow)", selector: { number: { min: 1, max: 6, step: 1, mode: "slider" } } },
           { name: "fabric_image", label: "Your fabric: a picture of it (for example /local/roost/fabric.jpg)", selector: { text: {} } },
           { type: "grid", name: "", schema: [{ name: "photo_folds", label: "Add folds (off if the picture already shows folds)", selector: { boolean: {} } }, { name: "photo_band", label: "Add the bottom band", selector: { boolean: {} } }] },
           { name: "blind_look", label: "Blind look", selector: pick([["classic", "Classic stripes (bright, simple)"], ["venetian", "Venetian slats that tilt"], ["roller", "Roller blind that rolls up"], ["roman", "Roman shade with soft folds"]]) },
@@ -2551,7 +2552,10 @@ class RoostCurtain extends RoostBase {
     // one fold: a shadow valley, the cloth and a lit ridge (the pitch is set as it opens, so folds bunch up)
     const fold = `linear-gradient(90deg,${mix(-deep)} 0%,${mix(-deep * 0.35)} 18%,${mix(0.14)} 42%,${mix(0.05)} 60%,${mix(-deep * 0.55)} 85%,${mix(-deep)} 100%)`;
     this._pitch = { pleat: 26, wave: 42, sheer: 30, banded: 30 }[look] || 0;
-    this._fold = { banded: 30, photo: 30 }[look] || this._pitch;
+    // folds: 1 few and wide … 6 many and narrow (3 is the usual)
+    const many = Math.max(1, Math.min(6, Number(c.folds) || 3)), scale = [1.55, 1.25, 1, 0.75, 0.55, 0.42][many - 1];
+    this._fold = ({ banded: 30, photo: 30 }[look] || this._pitch) * scale;
+    if (look !== "photo" && this._pitch) this._pitch = Math.round(this._pitch * scale);
     // your own curtain photo: one seamless strip of the real fabric, squeezed together as the curtain opens
     if (look === "photo") this._pitch = Number(c.fabric_tile) || Math.round((Number(c.height) || 150) * 1.3);
     const photo = look === "photo" ? `url("${String(c.fabric_image).replace(/["\\]/g, "")}")` : "";
