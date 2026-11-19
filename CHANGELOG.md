@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.24.0
+
+- **Greeting card: how the house is, as glass chips** next to the people, in plain words: “Door open”, “Doors closed”, “Someone in or near Entrance”, “Alarm off”. The room comes from the sensor's area in Home Assistant, so sensor names never show.
+- New settings under *Weather and readings*: **Show** (doors and windows, someone moving, alarm, how many are home) and **Look** (chips or one sentence).
+
 ## 1.23.0
 
 - **Presence Map: much more to set.**

@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.23.0";
+const ROOST_VERSION = "1.24.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1596,13 +1596,55 @@ class RoostScene extends RoostBase {
 // a soft light sweep, the date and time, the weather, and an optional "what's next" pill.
 class RoostHero extends RoostBase {
   static get defaults() { return { sky: "auto", sun: "sun.sun", show_date: true, show_clock: true, show_orb: true, show_stars: true, show_sheen: true, min_height: 180, upcoming: [], upcoming_title: "Next", radius: 26, theme: "auto",
-    greeting: "", show_greeting: true, show_name: true, greeting_size: 25, align: "left", show_weather: true, info: [], orb_size: 56, pill_style: "glass", tap_action: { action: "none" } }; }
+    greeting: "", show_greeting: true, show_name: true, greeting_size: 25, align: "left", show_weather: true, info: [], orb_size: 56, pill_style: "glass", status_style: "chips", status_show: ["doors", "moving", "alarm", "people"], tap_action: { action: "none" } }; }
 
   watched() { const c = this._config; return [c.weather, c.sun, ...(c.upcoming || []).map((u) => u.entity), ...(c.info || []).map((u) => u.entity), ...(c.people || []), ...(c.status_entities || [])].filter(Boolean); }
 
   extraSignature() { return Math.floor(Date.now() / 30000); }
 
-  // "Doors are closed, the alarm is off and no one is home."
+  // The room (area) a thing is in, from Home Assistant's own rooms.
+  areaOf(id) {
+    const h = this._hass, e = h?.entities?.[id], aid = e?.area_id || h?.devices?.[e?.device_id]?.area_id;
+    return aid ? h.areas?.[aid]?.name || "" : "";
+  }
+
+  // How the house is, as short glass chips: "Door open", "Someone in or near Entrance", "Alarm off".
+  statusChips() {
+    const c = this._config, ids = c.status_entities || [], show = c.status_show || ["doors", "moving", "alarm", "people"];
+    const dc = (id) => this.sx(id)?.attributes?.device_class;
+    const st = (id) => this.sx(id)?.state;
+    const out = [];
+    const DOORS = ["door", "garage_door", "opening", "lock", undefined, ""], WINDOWS = ["window"];
+    const isOpen = (id) => ["on", "open", "unlocked", "opening"].includes(st(id));
+    const group = (list, one, many, icon, iconOpen) => {
+      if (!list.length) return;
+      const open = list.filter(isOpen);
+      if (open.length) out.push({ id: open[0], icon: iconOpen, tone: "warn", text: open.length > 1 ? `${open.length} ${many} open` : `${one} open` });
+      else out.push({ id: list[0], icon, tone: "calm", text: list.length > 1 ? `${many.charAt(0).toUpperCase()}${many.slice(1)} closed` : `${one} closed` });
+    };
+    if (show.includes("doors")) {
+      group(ids.filter((id) => /^(lock|cover)\./.test(id) || (id.startsWith("binary_sensor.") && DOORS.includes(dc(id)))), "Door", "doors", "mdi:door-closed", "mdi:door-open");
+      group(ids.filter((id) => id.startsWith("binary_sensor.") && WINDOWS.includes(dc(id))), "Window", "windows", "mdi:window-closed-variant", "mdi:window-open-variant");
+    }
+    if (show.includes("moving")) {
+      const moving = ids.filter((id) => id.startsWith("binary_sensor.") && ["motion", "occupancy", "presence", "moving"].includes(dc(id)) && st(id) === "on");
+      const rooms = [...new Set(moving.map((id) => this.areaOf(id)).filter(Boolean))];
+      if (moving.length) out.push({ id: moving[0], icon: "mdi:walk", tone: "live", text: rooms.length ? `Someone in or near ${rooms.join(" and ")}` : "Someone moving" });
+    }
+    if (show.includes("alarm")) ids.filter((id) => id.startsWith("alarm_control_panel.")).forEach((id) => {
+      const s = st(id) || "";
+      if (s === "disarmed") out.push({ id, icon: "mdi:shield-off-outline", tone: "calm", text: "Alarm off" });
+      else if (s === "triggered") out.push({ id, icon: "mdi:alarm-light", tone: "alert", text: "Alarm ringing!" });
+      else if (s.startsWith("armed")) out.push({ id, icon: "mdi:shield-check", tone: "ok", text: `Alarm on · ${s.replace("armed_", "").replace("_", " ")}` });
+    });
+    if (show.includes("people")) {
+      const people = ids.filter((id) => id.startsWith("person."));
+      if (people.length) { const home = people.filter((id) => st(id) === "home"); out.push({ id: people[0], icon: home.length ? "mdi:home-account" : "mdi:home-outline", tone: "calm", text: home.length ? `${home.length} home` : "No one home" }); }
+    }
+    return out;
+  }
+
+  // "Doors are closed, the alarm is off and no one is home." (the sentence style)
   status() {
     const c = this._config;
     if (c.message) return c.message;
@@ -1616,9 +1658,9 @@ class RoostHero extends RoostBase {
     const moving = ids.filter((id) => id.startsWith("binary_sensor.") && MOVING.includes(dc(id)) && this.sx(id)?.state === "on");
     if (doors.length) {
       const open = doors.filter((id) => { const s = this.sx(id)?.state; return s === "on" || s === "open" || s === "unlocked" || s === "opening"; });
-      out.push(open.length ? `${open.map((id) => this.name(id)).join(" and ")} ${open.length > 1 ? "are" : "is"} open` : "Doors are closed");
+      out.push(open.length ? (open.length > 1 ? `${open.length} doors are open` : "the door is open") : "doors are closed");
     }
-    if (moving.length) out.push(`someone is moving: ${moving.map((id) => this.name(id)).join(", ")}`);
+    if (moving.length) { const rooms = [...new Set(moving.map((id) => this.areaOf(id)).filter(Boolean))]; out.push(rooms.length ? `someone is in or near ${rooms.join(" and ")}` : "someone is moving"); }
     ids.filter((id) => id.startsWith("alarm_control_panel.")).forEach((id) => {
       const s = this.sx(id)?.state || "";
       out.push(s === "disarmed" ? "the alarm is off" : s.startsWith("armed") ? `the alarm is on (${s.replace("armed_", "").replace("_", " ")})` : s === "triggered" ? "THE ALARM IS RINGING" : "");
@@ -1651,7 +1693,9 @@ class RoostHero extends RoostBase {
         { type: "expandable", name: "", title: "Weather and readings", icon: "mdi:weather-partly-cloudy", schema: [
           { name: "weather", selector: { entity: { domain: "weather" } } },
           { name: "show_weather", label: "Show the weather line", selector: { boolean: {} } },
-          { name: "status_entities", label: "Say how the house is (doors, alarm, people), for example “Doors are closed and the alarm is off.”", selector: { entity: { multiple: true, domain: ["binary_sensor", "lock", "cover", "alarm_control_panel", "person"] } } },
+          { name: "status_entities", label: "How the house is: pick doors, windows, motion or presence sensors, the alarm and people", selector: { entity: { multiple: true, domain: ["binary_sensor", "lock", "cover", "alarm_control_panel", "person"] } } },
+          { name: "status_show", label: "Show", selector: { select: { multiple: true, mode: "list", options: [{ value: "doors", label: "Doors and windows (open or closed)" }, { value: "moving", label: "Someone moving (and in which room)" }, { value: "alarm", label: "Alarm" }, { value: "people", label: "How many are home" }] } } },
+          { name: "status_style", label: "Look", selector: pick([["chips", "Chips, like the people"], ["sentence", "One sentence"]]) },
           { name: "message", label: "Or your own sentence", selector: { text: {} } },
           { name: "people", label: "People chips (picture or first letter, and where they are)", selector: { entity: { multiple: true, domain: "person" } } },
           { name: "info", label: "Small readings under the weather (for example inside temperature)", selector: { object: { multiple: true, label_field: "name", fields: {
@@ -1718,7 +1762,10 @@ class RoostHero extends RoostBase {
       const v = isNaN(parseFloat(st.state)) ? st.state : `${Math.round(parseFloat(st.state) * 10) / 10}${st.attributes.unit_of_measurement || ""}`;
       return `<span class="inf t" data-e="${esc(it.entity)}">${it.icon ? `<ha-icon icon="${esc(it.icon)}"></ha-icon>` : ""}${it.name ? `${esc(it.name)} ` : ""}<b>${esc(v)}</b></span>`;
     }).join("");
-    const say = this.status();
+    const chipStyle = (c.status_style || "chips") === "chips" && !c.message;
+    const say = chipStyle ? "" : this.status();
+    const TONE = { warn: ["#F59E0B", "#FDBA74"], live: ["#14B8A6", "#5EEAD4"], alert: ["#EF4444", "#FB7185"], ok: ["#10B981", "#6EE7B7"], calm: ["#6366F1", "#A5B4FC"] };
+    const facts = chipStyle ? this.statusChips().map((f) => `<span class="who t" data-e="${esc(f.id)}"><span class="av" style="background:linear-gradient(135deg,${TONE[f.tone][0]},${TONE[f.tone][1]})"><ha-icon icon="${f.icon}"></ha-icon></span>${esc(f.text)}</span>`).join("") : "";
     const PG = [["#38BDF8", "#6D4BFF"], ["#FF5577", "#FF9F6B"], ["#10B981", "#6EE7B7"], ["#F59E0B", "#FDE68A"]];
     const chips = (c.people || []).map((id, k) => {
       const st = this.sx(id);
@@ -1775,7 +1822,8 @@ class RoostHero extends RoostBase {
       @container (max-width: 520px){:host .house{display:none}:host .orb.wh{right:24px}}
       .say{font-size:15px;line-height:1.5;opacity:.9;max-width:470px}
       .whos{display:flex;flex-wrap:wrap;gap:8px}
-      .who{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border-radius:999px;padding:4px 12px 4px 4px;font-size:13px;cursor:pointer}
+      .who{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border-radius:999px;padding:4px 12px 4px 4px;font-size:13px;cursor:pointer;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+      .who .av ha-icon{--mdc-icon-size:14px;color:#fff}
       .av{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;overflow:hidden;flex:none}
       .av img{width:100%;height:100%;object-fit:cover}
       .dot{position:relative;width:10px;height:10px;border-radius:50%;background:#E9E2FF;flex:none}
@@ -1788,7 +1836,7 @@ class RoostHero extends RoostBase {
         ${c.show_weather && w && temp != null ? `<span class="wx t">${esc(Math.round(temp) + unit)}${cond ? ` · ${esc(cond)}` : ""}</span>` : ""}
         ${info ? `<div class="infos">${info}</div>` : ""}
         ${say ? `<span class="say t">${esc(say)}</span>` : ""}
-        ${chips ? `<div class="whos">${chips}</div>` : ""}
+        ${facts || chips ? `<div class="whos">${facts}${chips}</div>` : ""}
         ${pill}
       </div></div>`;
     this.shadowRoot.querySelectorAll(".inf,.who").forEach((el) => el.addEventListener("click", (e) => { e.stopPropagation(); this.moreInfo(el.dataset.e); }));
