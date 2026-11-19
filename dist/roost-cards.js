@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.24.1";
+const ROOST_VERSION = "1.24.2";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -70,8 +70,14 @@ function coverView(s, reverse) {
   if (pos != null && reverse) pos = 100 - pos;
   let state = reverse ? FLIP_STATE[s.state] || s.state : s.state;
   // when the position is known, it decides open or closed (some integrations mix the two up)
-  if (pos != null && (state === "open" || state === "closed")) state = pos > 0 ? "open" : "closed";
-  return { state, pos };
+  // a curtain only 10% open or less still counts as closed
+  if (pos != null && (state === "open" || state === "closed")) state = pos > 10 ? "open" : "closed";
+  return { state, pos, word: coverWord(state, pos) };
+}
+// plain words for where a curtain is: Closed up to 10%, Partly closed below half, Partly open from half, Open from 90%
+function coverWord(state, pos) {
+  if (state === "opening" || state === "closing" || pos == null) return state.charAt(0).toUpperCase() + state.slice(1);
+  return pos <= 10 ? "Closed" : pos >= 90 ? "Open" : pos < 50 ? "Partly closed" : "Partly open";
 }
 // Curtains set to "reverse" in any Roost card. Every command to them (from any card or the details sheet)
 // is turned around in one place, so Open always opens and Close always closes.
@@ -1041,7 +1047,7 @@ class RoostTile extends RoostBase {
     const d = s.entity_id.split(".")[0];
     const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
     if (d === "climate") return on ? `${cap(s.state.replace("_only", "").replace("heat_cool", "auto"))}${s.attributes.temperature != null ? ` · ${s.attributes.temperature}°` : ""}` : "Off";
-    if (d === "cover") { const v = coverView(s, this._config.reverse); return cap(v.state) + (v.pos != null && v.pos > 0 && v.pos < 100 ? ` · ${v.pos}% open` : ""); }
+    if (d === "cover") { const v = coverView(s, this._config.reverse); return v.word + (v.pos != null && v.pos > 10 && v.pos < 90 ? ` · ${v.pos}% open` : ""); }
     if (d === "binary_sensor") {
       const cls = s.attributes.device_class;
       if (["door", "window", "opening", "garage_door"].includes(cls)) return s.state === "on" ? "Open" : "Closed";
@@ -2810,8 +2816,8 @@ class RoostCurtain extends RoostBase {
     if (wx) this.weather(wx, day, sky);
     const un = !s || UNAVAILABLE.includes(s.state);
     const v = this.view(s);
-    const word = !s ? "Device not found" : un ? (s.attributes.assumed_state ? "Ready" : "Offline") : v.state.charAt(0).toUpperCase() + v.state.slice(1);
-    const pct = c.show_percent && v.pos != null && pos > 0 && pos < 100 ? ` · ${pos}% open` : "";
+    const word = !s ? "Device not found" : un ? (s.attributes.assumed_state ? "Ready" : "Offline") : v.word;
+    const pct = c.show_percent && v.pos != null && pos > 10 && pos < 90 ? ` · ${pos}% open` : "";
     const nm = root.querySelector(".nm"), stt = root.querySelector(".stt");
     if (nm) nm.textContent = this.name(c.entity);
     if (stt) stt.textContent = word + pct;
@@ -4182,7 +4188,7 @@ class RoostRoom extends RoostBase {
       if (d === "binary_sensor" && ["door", "window", "garage_door", "opening"].includes(cls)) { doors.push(s.state === "on"); continue; }
       if (d === "binary_sensor" && ["occupancy", "presence", "motion"].includes(cls)) { parts.push(s.state === "on" ? "someone there" : "no one there"); continue; }
       if (d === "climate") parts.push(`${word} ${s.state === "off" ? "off" : s.state.replace("_only", "").replace("heat_cool", "auto")}`);
-      else if (d === "cover") parts.push(`${word} ${coverView(s, typeof e === "object" && e.reverse).state}`);
+      else if (d === "cover") parts.push(`${word} ${coverView(s, typeof e === "object" && e.reverse).word.toLowerCase()}`);
       else if (d === "media_player") parts.push(`${word} ${["off", "standby"].includes(s.state) ? "off" : "on"}`);
       else if (d === "sensor") { const u = s.attributes.unit_of_measurement || ""; parts.push(`${word} ${fmt(num(s.state) ?? s.state, /^(W|kW|lx|ppm)$/.test(u) ? 0 : decOf(s.state))}${unitGap(u)}`); }
       else parts.push(`${word} ${s.state === "on" ? "on" : "off"}`);
@@ -9543,7 +9549,7 @@ class RoostCamera extends RoostBase {
 // or the choice made on this screen with the language button (Roost Theme), or the card's own "language".
 // Words are looked up in one list per language; your own device names stay as you wrote them.
 const AR_WORDS = {
-  "On": "يعمل", "Off": "مطفأ", "Open": "مفتوح", "Closed": "مغلق", "Opening": "يُفتح", "Closing": "يُغلق", "Locked": "مقفل", "Unlocked": "مفتوح القفل", "Lock": "قفل", "Unlock": "فتح القفل",
+  "On": "يعمل", "Off": "مطفأ", "Open": "مفتوح", "Closed": "مغلق", "Partly open": "مفتوح جزئياً", "Partly closed": "مغلق جزئياً", "Opening": "يُفتح", "Closing": "يُغلق", "Locked": "مقفل", "Unlocked": "مفتوح القفل", "Lock": "قفل", "Unlock": "فتح القفل",
   "Home": "الرئيسية", "At home": "في المنزل", "Away": "خارج المنزل", "Offline": "غير متصل", "Not found": "غير موجود", "Device not found": "الجهاز غير موجود", "Unavailable": "غير متاح", "Unknown": "غير معروف",
   "Turn on": "تشغيل", "Turn off": "إطفاء", "Start": "ابدأ", "Stop": "إيقاف", "Pause": "إيقاف مؤقت", "Play": "تشغيل", "Close": "إغلاق", "Run now": "شغّل الآن", "Press": "اضغط", "Install": "تثبيت",
   "Swipe up for more": "اسحب للأعلى للمزيد", "More in Home Assistant": "المزيد في Home Assistant", "LATELY": "مؤخراً", "DETAILS": "التفاصيل", "Show more": "عرض المزيد", "Show less": "عرض أقل",
@@ -9686,7 +9692,7 @@ const RoostSheet = {
     if (UNAVAILABLE.includes(s.state)) return "Offline";
     if (dom === "light") return s.state === "on" ? `On${a.brightness != null ? ` · ${Math.round(a.brightness / 2.55)}%` : ""}` : "Off";
     if (dom === "climate") return s.state === "off" ? "Off" : `${s.state.replace("_only", "").replace("heat_cool", "auto").replace(/^./, (m) => m.toUpperCase())}${a.current_temperature != null ? ` · Room ${a.current_temperature}°` : ""}`;
-    if (dom === "cover") { const v = coverView(s, RoostReversed.has(s.entity_id)); return v.pos != null ? `${v.pos}% open` : v.state.replace(/^./, (m) => m.toUpperCase()); }
+    if (dom === "cover") { const v = coverView(s, RoostReversed.has(s.entity_id)); return v.pos != null && v.pos > 10 && v.pos < 90 ? `${v.word} · ${v.pos}% open` : v.word; }
     if (dom === "sensor" && num(s.state) != null) return `${fmt(num(s.state), decOf(s.state))}${unitGap(a.unit_of_measurement || "")}`;
     if (dom === "binary_sensor") return this.binWord(s);
     if (dom === "person" || dom === "device_tracker") return s.state === "home" ? "At home" : s.state === "not_home" ? "Away" : s.state;
@@ -11105,7 +11111,7 @@ class RoostPanel extends RoostPage {
       else if (d === "binary_sensor" && ["occupancy", "presence", "motion"].includes(cls)) { const o = s.state === "on"; icon = icon || (o ? "mdi:motion-sensor" : "mdi:motion-sensor-off"); col = wc = o ? "#B794FF" : p.muted; word = o ? "Yes" : "No"; }
       else if (d === "sensor") { icon = icon || (cls === "illuminance" ? "mdi:brightness-6" : null); col = cls === "illuminance" ? "#FCD34D" : p.muted; const v = num(s.state); word = v == null ? s.state : `${fmt(v, decOf(s.state, s.attributes.unit_of_measurement))}${unitGap(s.attributes.unit_of_measurement || "")}`; }
       else if (d === "lock") { const u = s.state !== "locked"; icon = icon || (u ? "mdi:lock-open-variant" : "mdi:lock"); col = wc = u ? "#FF9F6B" : "#34D399"; word = { locked: "Locked", unlocked: "Unlocked", locking: "Locking", unlocking: "Unlocking", jammed: "Stuck", open: "Open", opening: "Opening" }[s.state] || s.state; }
-      else if (d === "cover") { const o = s.state !== "closed"; col = wc = o ? "#FF9F6B" : p.muted; word = { open: "Open", closed: "Closed", opening: "Opening", closing: "Closing" }[s.state] || s.state; }
+      else if (d === "cover") { const v = coverView(s, RoostReversed.has(s.entity_id)); const o = v.state !== "closed"; col = wc = o ? "#FF9F6B" : p.muted; word = v.word; }
       else if (d === "climate") { const o = s.state !== "off"; col = wc = o ? "#38BDF8" : p.muted; word = o ? ({ heating: "Heating", cooling: "Cooling", drying: "Drying", idle: "Resting" }[s.attributes.hvac_action] || "On") : "Off"; }
       else if (d === "media_player") { const o = !["off", "standby", "idle"].includes(s.state); col = wc = o ? "#B794FF" : p.muted; word = { playing: "Playing", paused: "Paused", on: "On", idle: "Idle", off: "Off", standby: "Off" }[s.state] || s.state; }
       else if (d === "person") { const h = s.state === "home"; col = wc = h ? "#34D399" : p.muted; word = h ? "Home" : s.state === "not_home" ? "Away" : s.state; }

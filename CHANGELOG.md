@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.24.2
+
+- Curtains read the way people say it: up to 10% open counts as Closed, below half is Partly closed, from half is Partly open, and from 90% it is Open. The same words show on every card, the details sheet and the hero.
+
 ## 1.24.1
 
 - Fix: dragging a curtain's bar or the curtain itself changed the dashboard page when a page-swipe add-on (like swipe navigation) is installed. Roost's sliders now keep the finger to themselves.
