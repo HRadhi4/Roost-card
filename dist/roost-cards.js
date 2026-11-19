@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.20.1";
+const ROOST_VERSION = "1.21.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -9621,6 +9621,63 @@ const RoostSheet = {
     }
     return `<div class="big">${esc(this.stateWord(s))}</div><div class="note">Since ${esc(since(s.last_changed).replace(/^for /, ""))} ago</div>`;
   },
+  // the part that only shows after swiping up: things the small view does not already say
+  more(s, g, p, attrs) {
+    const el = this.el, dom = s.entity_id.split(".")[0], a = s.attributes, out = [];
+    const rows = el.rows || [], now = Date.now(), from = now - 24 * 3600e3, dec = decOf(s.state);
+    const word = (st) => { if (UNAVAILABLE.includes(st)) return "Offline"; return this.stateWord({ ...s, state: st, attributes: { ...a, brightness: null, current_temperature: null, temperature: null, battery_level: null } }).replace(/ · .*$/, ""); };
+    const dur = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}`; };
+    const clock = (t) => new Date(t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const tiles = (list) => `<div class="stats">${list.filter(Boolean).map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join("")}</div>`;
+    const chips = (title, list, cur, key) => list && list.length > 1 ? `<div class="sec">${esc(title)}</div><div class="chips">${list.slice(0, 12).map((o) => `<button class="${String(cur) === String(o) ? "on" : ""}" data-act="${key}:${esc(o)}">${esc(String(o).replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase()))}</button>`).join("")}</div>` : "";
+    const numeric = num(s.state) != null && ["sensor", "number", "input_number"].includes(dom);
+    if (numeric) {
+      const pts = rows.map((r) => ({ v: num(r.state), t: Math.max(from, r.at) })).filter((x) => x.v != null);
+      if (pts.length > 1) {
+        pts.push({ v: num(s.state), t: now });
+        let lo = pts[0], hi = pts[0], area = 0;
+        for (let k = 0; k < pts.length; k++) { if (pts[k].v < lo.v) lo = pts[k]; if (pts[k].v > hi.v) hi = pts[k]; if (k) area += pts[k - 1].v * (pts[k].t - pts[k - 1].t); }
+        const avg = area / ((now - pts[0].t) || 1), first = pts[0].v, diff = num(s.state) - first, u = a.unit_of_measurement || "";
+        const W = 320, H = 120, x = (t) => ((t - from) / (now - from)) * W, y = (v) => H - 8 - ((v - lo.v) / ((hi.v - lo.v) || 1)) * (H - 22);
+        const d = pts.map((q, k) => `${k ? `H${x(q.t).toFixed(1)}V` : `M${x(q.t).toFixed(1)} `}${y(q.v).toFixed(1)}`).join("");
+        out.push(`<div class="sec">LAST 24 HOURS</div><div class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="${d}V${H}H${x(pts[0].t).toFixed(1)}Z" fill="${g[1]}" opacity=".16"></path><path d="${d}" fill="none" stroke="${g[1]}" stroke-width="2.5" vector-effect="non-scaling-stroke"></path></svg>
+          <div class="ax"><span>${esc(clock(from))}</span><span>${esc(clock(from + 12 * 3600e3))}</span><span>Now</span></div></div>`);
+        out.push(tiles([["Average", `${fmt(avg, dec)}${unitGap(u)}`], ["Since yesterday", `${diff > 0 ? "+" : diff < 0 ? "−" : ""}${fmt(Math.abs(diff), dec)}${unitGap(u)}`],
+          ["Highest", `${fmt(hi.v, dec)} at ${clock(hi.t)}`], ["Lowest", `${fmt(lo.v, dec)} at ${clock(lo.t)}`]]));
+      } else out.push(`<div class="note">No history for the last day yet.</div>`);
+      out.push(tiles([["Last change", ago(s.last_changed)], ["Last report", ago(s.last_updated)]]));
+    } else if (!["camera", "weather", "scene", "script", "button", "input_button", "update"].includes(dom)) {
+      // a day strip: when it was on, open, home… and for how long
+      const active = (st) => !UNAVAILABLE.includes(st) && !OFF_STATES.includes(st);
+      const seg = []; let onMs = 0, turns = 0;
+      for (let k = 0; k < rows.length; k++) {
+        const t0 = Math.max(from, rows[k].at), t1 = k + 1 < rows.length ? rows[k + 1].at : now; if (t1 <= t0) continue;
+        const st = rows[k].state; if (active(st)) { onMs += t1 - t0; if (k && !active(rows[k - 1].state)) turns++; }
+        seg.push(`<i style="left:${((t0 - from) / 864e3).toFixed(2)}%;width:${((t1 - t0) / 864e3).toFixed(2)}%;background:${UNAVAILABLE.includes(st) ? p.border : active(st) ? `linear-gradient(90deg,${g[0]},${g[1]})` : "transparent"}"></i>`);
+      }
+      if (seg.length) {
+        const onWord = word(rows.find((r) => active(r.state))?.state || s.state);
+        out.push(`<div class="sec">LAST 24 HOURS</div><div class="strip">${seg.join("")}</div><div class="ax"><span>${esc(clock(from))}</span><span>${esc(clock(from + 12 * 3600e3))}</span><span>Now</span></div>`);
+        out.push(tiles([[`${onWord} for`, onMs ? dur(onMs) : "Not at all"], ["Times", String(turns + (rows.length && active(rows[0].state) && rows[0].at > from ? 1 : 0))], ["Like this since", clock(new Date(s.last_changed).getTime())], ["That is", ago(s.last_changed)]]));
+        const list = rows.slice(-6).reverse();
+        if (list.length > 1) out.push(`<div class="sec">LATELY</div><div class="tl">${list.map((c, k) => { const end = k ? list[k - 1].at : now; return `<div><i style="background:${active(c.state) ? g[1] : p.knob}"></i><span>${esc(word(c.state))}<small> · ${esc(dur(end - c.at))}</small></span><span>${esc(clock(c.at))}</span></div>`; }).join("")}</div>`);
+      }
+    }
+    // extra controls the small view leaves out
+    if (dom === "light" && s.state === "on") {
+      if ((a.supported_color_modes || []).some((m) => ["rgb", "rgbw", "rgbww", "hs", "xy"].includes(m))) out.push(`<div class="sec">COLOUR</div><div class="row">${[[255, 80, 60], [255, 150, 40], [255, 220, 90], [80, 210, 120], [70, 140, 255], [150, 90, 255], [255, 90, 190]].map((c) => `<button class="sw" style="background:rgb(${c})" data-act="rgb:${c}" aria-label="Colour"></button>`).join("")}</div>`);
+      out.push(chips("EFFECT", a.effect_list, a.effect, "fx"));
+    }
+    if (dom === "climate") { out.push(chips("FAN", a.fan_modes, a.fan_mode, "fanm")); out.push(chips("PRESET", a.preset_modes, a.preset_mode, "pre")); out.push(chips("SWING", a.swing_modes, a.swing_mode, "swg")); }
+    if (dom === "fan") { out.push(chips("MODE", a.preset_modes, a.preset_mode, "fpre")); if (a.oscillating != null) out.push(`<button class="wb${a.oscillating ? " pr" : ""}" data-act="osc"><ha-icon icon="mdi:arrow-oscillating"></ha-icon>Swing ${a.oscillating ? "on" : "off"}</button>`); }
+    if (dom === "media_player") { out.push(chips("SOURCE", a.source_list, a.source, "src")); if (a.is_volume_muted != null) out.push(`<button class="wb" data-act="mute"><ha-icon icon="${a.is_volume_muted ? "mdi:volume-off" : "mdi:volume-high"}"></ha-icon>${a.is_volume_muted ? "Sound off" : "Sound on"}</button>`); }
+    const shown = new Set(["brightness", "color_temp", "color_temp_kelvin", "effect", "fan_mode", "preset_mode", "swing_mode", "source", "is_volume_muted", "oscillating", "temperature", "current_temperature", "current_position", "media_title", "media_artist", "volume_level", "percentage", "options", "min", "max", "step", "mode", "last_triggered", "battery_level", "latest_version", "installed_version"]);
+    const nice = (v) => v === true ? "Yes" : v === false ? "No" : typeof v === "number" ? fmt(v, Number.isInteger(v) ? 0 : 1) : /^\d{4}-\d\d-\d\dT/.test(String(v)) ? ago(v) : String(v).replace(/_/g, " ");
+    const left = attrs.filter(([k]) => !shown.has(k));
+    if (left.length) out.push(`<div class="sec">DETAILS</div><div class="kv">${left.map(([k, v]) => `<div><span>${esc(k.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase()))}</span><span>${esc(nice(v))}</span></div>`).join("")}</div>`);
+    out.push(`<button class="wb" data-act="ha"><ha-icon icon="mdi:cog-outline"></ha-icon>More in Home Assistant</button>`);
+    return out.filter(Boolean).join("");
+  },
   spark(pts, colour) {
     const w = 300, h = 60, mn = Math.min(...pts), mx = Math.max(...pts);
     const d = pts.map((p, i) => `${i ? "L" : "M"}${(i * w / (pts.length - 1)).toFixed(1)} ${(h - 6 - (p - mn) / ((mx - mn) || 1) * (h - 14)).toFixed(1)}`).join(" ");
@@ -9630,11 +9687,12 @@ const RoostSheet = {
     try {
       const start = new Date(Date.now() - 24 * 3600e3).toISOString();
       const r = await this.hass().callApi("GET", `history/period/${start}?filter_entity_id=${encodeURIComponent(id)}&minimal_response&no_attributes`);
-      const rows = (r && r[0]) || [];
+      const raw = (r && r[0]) || [], rows = raw.filter((x, i) => !i || x.state !== raw[i - 1].state);
+      this.el.rows = rows.map((x) => ({ state: x.state, at: new Date(x.last_changed || x.last_updated).getTime() }));
       this.el.changes = rows.slice(-6).reverse().map((x) => ({ state: x.state, at: x.last_changed }));
       const nums = rows.map((x) => num(x.state)).filter((v) => v != null);
       this.el.hist = nums.length > 60 ? nums.filter((_, i) => i % Math.ceil(nums.length / 60) === 0).concat(nums[nums.length - 1]) : nums;
-    } catch (e) { this.el.hist = []; this.el.changes = []; }
+    } catch (e) { this.el.hist = []; this.el.changes = []; this.el.rows = []; }
     if (this.el) this.draw();
   },
   // Holding a room tile: the room's devices as small tiles (tap switches), one bar for all its lights.
@@ -9709,6 +9767,12 @@ const RoostSheet = {
       .chips{display:flex;flex-wrap:wrap;gap:8px}.chips button{height:40px;padding:0 14px;border-radius:999px;border:0;background:${p.inset};color:${p.text};font-size:14px;font-weight:600}.chips button.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:#FFFFFF}
       .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.tiles button{min-height:72px;border-radius:18px;border:0;padding:12px;background:${p.inset};color:${p.text};display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:6px;text-align:left;--mdc-icon-size:20px}
       .tiles button span{font-size:14px;font-weight:600}.tiles button small{font-size:12px;opacity:.8}.tiles button.on{color:#FFFFFF}
+      .sh{transition:transform .18s ease-out}
+      .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stats div{border-radius:16px;background:${p.inset};padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0}.stats span{font-size:12px;color:${p.muted}}.stats b{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .chart{border-radius:18px;background:${p.inset};padding:10px 10px 6px}.chart svg{width:100%;height:120px;display:block}
+      .ax{display:flex;justify-content:space-between;font-size:11px;color:${p.muted};padding:4px 2px 0}
+      .strip{position:relative;height:28px;border-radius:10px;background:${p.inset};overflow:hidden}.strip i{position:absolute;top:0;bottom:0}
+      .tl small{color:${p.muted};font-size:12px}
       .kv{border-radius:16px;background:${p.inset};padding:4px 14px}.kv div{display:flex;justify-content:space-between;gap:12px;padding:10px 0;font-size:14px;border-top:1px solid ${p.border}}.kv div:first-child{border-top:0}.kv span:first-child{color:${p.muted}}
     `;
   },
@@ -9725,7 +9789,7 @@ const RoostSheet = {
     const icon = a.icon || { light: "mdi:lightbulb", switch: "mdi:power-socket-uk", climate: "mdi:snowflake", cover: "mdi:curtains", lock: "mdi:lock", media_player: "mdi:television", fan: "mdi:fan", sensor: "mdi:thermometer", binary_sensor: "mdi:door", scene: "mdi:palette", script: "mdi:script-text-play", automation: "mdi:robot",
       camera: "mdi:cctv", alarm_control_panel: "mdi:shield-home", vacuum: "mdi:robot-vacuum", water_heater: "mdi:water-boiler", person: "mdi:account", device_tracker: "mdi:cellphone-marker", weather: "mdi:weather-partly-cloudy",
       select: "mdi:format-list-bulleted", input_select: "mdi:format-list-bulleted", number: "mdi:ray-vertex", input_number: "mdi:ray-vertex", update: "mdi:package-up", humidifier: "mdi:air-humidifier", siren: "mdi:bullhorn" }[dom] || "mdi:information-outline";
-    const attrs = Object.entries(a).filter(([k, v]) => !["friendly_name", "icon", "entity_picture", "supported_features", "supported_color_modes", "color_mode", "hvac_modes", "fan_modes", "preset_modes", "swing_modes", "effect_list", "source_list", "sound_mode_list", "entity_id", "attribution", "device_class", "state_class", "unit_of_measurement", "restored", "editable", "id", "min_mireds", "max_mireds", "min_color_temp_kelvin", "max_color_temp_kelvin", "xy_color", "hs_color", "rgb_color", "rgbw_color", "rgbww_color"].includes(k) && v != null && (typeof v !== "object")).slice(0, 6);
+    const attrs = Object.entries(a).filter(([k, v]) => !["friendly_name", "icon", "entity_picture", "supported_features", "supported_color_modes", "color_mode", "hvac_modes", "fan_modes", "preset_modes", "swing_modes", "effect_list", "source_list", "sound_mode_list", "entity_id", "attribution", "device_class", "state_class", "unit_of_measurement", "restored", "editable", "id", "min_mireds", "max_mireds", "min_color_temp_kelvin", "max_color_temp_kelvin", "xy_color", "hs_color", "rgb_color", "rgbw_color", "rgbww_color"].includes(k) && v != null && (typeof v !== "object")).slice(0, 14);
     el.root.innerHTML = `<style>${this.css(p, g, dark, el)}</style>
     <div class="dim" data-act="close"></div>
     <div class="sh" role="dialog" aria-modal="true" aria-label="${esc(name)}">
@@ -9733,10 +9797,7 @@ const RoostSheet = {
       <div class="hdr"><span class="ic"><ha-icon icon="${esc(icon)}"></ha-icon></span><span class="nm"><b>${esc(name)}</b><span>${esc(this.stateWord(s))}</span></span>
         <button class="x" data-act="close" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button></div>
       ${this.main(s, g, p)}
-      ${el.full ? `
-        ${el.changes && el.changes.length ? `<div class="sec">LATELY</div><div class="tl">${el.changes.map((c) => `<div><i style="background:${OFF_STATES.includes(c.state) ? p.knob : g[1]}"></i><span>${esc(String(c.state).replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase()))}</span><span>${esc(ago(c.at))}</span></div>`).join("")}</div>` : ""}
-        ${attrs.length ? `<div class="sec">DETAILS</div><div class="kv">${attrs.map(([k, v]) => `<div><span>${esc(k.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase()))}</span><span>${esc(String(v))}</span></div>`).join("")}</div>` : ""}
-        <button class="wb" data-act="ha"><ha-icon icon="mdi:cog-outline"></ha-icon>More in Home Assistant</button>`
+      ${el.full ? this.more(s, g, p, attrs)
     : `<button class="more" data-act="grow">Swipe up for more</button>`}
     </div>`;
     this.wire(s, g);
@@ -9775,6 +9836,15 @@ const RoostSheet = {
       if (act === "install") return this.call("update", "install", { entity_id: id });
       if (act.startsWith("dev:")) { const d = act.slice(4); return this.call(d.startsWith("cover.") ? "cover" : "homeassistant", d.startsWith("cover.") ? "toggle" : "toggle", { entity_id: d }); }
       if (act.startsWith("open:")) { this.open(act.slice(5)); return undefined; }
+      if (act.startsWith("rgb:")) return this.call("light", "turn_on", { entity_id: id, rgb_color: act.slice(4).split(",").map(Number) });
+      if (act.startsWith("fx:")) return this.call("light", "turn_on", { entity_id: id, effect: act.slice(3) });
+      if (act.startsWith("fanm:")) return this.call("climate", "set_fan_mode", { entity_id: id, fan_mode: act.slice(5) });
+      if (act.startsWith("pre:")) return this.call("climate", "set_preset_mode", { entity_id: id, preset_mode: act.slice(4) });
+      if (act.startsWith("swg:")) return this.call("climate", "set_swing_mode", { entity_id: id, swing_mode: act.slice(4) });
+      if (act.startsWith("fpre:")) return this.call("fan", "set_preset_mode", { entity_id: id, preset_mode: act.slice(5) });
+      if (act === "osc") return this.call("fan", "oscillate", { entity_id: id, oscillating: !a.oscillating });
+      if (act.startsWith("src:")) return this.call("media_player", "select_source", { entity_id: id, source: act.slice(4) });
+      if (act === "mute") return this.call("media_player", "volume_mute", { entity_id: id, is_volume_muted: !a.is_volume_muted });
       return undefined;
     }));
     // "Close" on a curtain uses its own name so it does not shut the sheet
@@ -9799,14 +9869,24 @@ const RoostSheet = {
         v = null;
       });
     });
-    // swipe the sheet: up for more, down to close
+    // swipe the sheet: up for more, down for less or to close. Works from anywhere on it, buttons included.
     const sh = root.querySelector(".sh");
-    let y0 = null;
-    sh.addEventListener("pointerdown", (e) => { if (e.target.closest("[data-bar],button")) return; y0 = e.clientY; });
-    sh.addEventListener("pointerup", (e) => {
-      if (y0 == null) return; const dy = e.clientY - y0; y0 = null;
-      if (dy < -40 && !el.full) { el.full = true; this.draw(); } else if (dy > 60) { if (el.full) { el.full = false; this.draw(); } else this.close(); }
-    });
+    let y0 = null, x0 = 0, top0 = 0, moved = false;
+    const start = (x, y, t) => { if (t.closest?.("[data-bar]")) return; y0 = y; x0 = x; top0 = sh.scrollTop; moved = false; el.busy = true; };
+    const move = (x, y) => { if (y0 == null) return; const dy = y - y0; if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(x - x0)) moved = true; if (moved && ((dy < 0 && !el.full) || (dy > 0 && top0 <= 0))) sh.style.transform = `translateY(${dy > 0 ? dy : dy / 3}px)`; };
+    const end = (y) => {
+      if (y0 == null) return; const dy = y - y0; y0 = null; el.busy = false; sh.style.transform = "";
+      if (!moved) return;
+      sh.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); }, { capture: true, once: true }); setTimeout(() => { moved = false; }, 0);
+      if (dy < -40 && !el.full) { el.full = true; this.draw(); } else if (dy > 60 && top0 <= 0) { if (el.full) { el.full = false; this.draw(); } else this.close(); }
+    };
+    sh.addEventListener("touchstart", (e) => start(e.touches[0].clientX, e.touches[0].clientY, e.target), { passive: true });
+    sh.addEventListener("touchmove", (e) => move(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+    sh.addEventListener("touchend", (e) => end(e.changedTouches[0].clientY));
+    sh.addEventListener("touchcancel", () => { y0 = null; el.busy = false; sh.style.transform = ""; });
+    sh.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") start(e.clientX, e.clientY, e.target); });
+    sh.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") move(e.clientX, e.clientY); });
+    sh.addEventListener("pointerup", (e) => { if (e.pointerType === "mouse") end(e.clientY); });
   },
 };
 window.RoostSheet = RoostSheet;

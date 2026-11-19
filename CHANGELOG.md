@@ -2,6 +2,15 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.21.0
+
+- **Details sheet: swiping up now works.** Swipe up anywhere on the sheet (buttons too) to see more, swipe down to go back or close.
+- **"More" now shows new things, not the same numbers again.**
+  - Sensors: a 24-hour chart with times, the average, the change since yesterday, and when the highest and lowest were.
+  - Switches, lights, doors, people and the like: a 24-hour strip showing when it was on or open, for how long, how many times, and a short list of recent changes with how long each lasted.
+  - Extra controls: light colours and effects, air-conditioner fan, preset and swing, fan modes and swing, TV or speaker source and mute.
+  - Details list shows only what is not already on screen, in plain words.
+
 ## 1.20.1
 
 - **"Not working right now" stays inside its card.** The note no longer covers the bottom bar; the bar and pop-ups always stay on top.
