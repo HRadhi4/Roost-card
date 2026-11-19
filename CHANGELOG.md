@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.24.3
+
+- Room tiles (halo layout) never split a word of the room name across two lines. If a word like "Bathroom" is too wide, the name gets a little smaller until it fits. Room tiles side by side then all use that same smaller size, so the names on a page always match. Name size still sets the size to aim for.
+
 ## 1.24.2
 
 - Curtains read the way people say it: up to 10% open counts as Closed, below half is Partly closed, from half is Partly open, and from 90% it is Open. The same words show on every card, the details sheet and the hero.

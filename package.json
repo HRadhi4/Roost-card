@@ -1,6 +1,6 @@
 {
   "name": "roost-cards",
-  "version": "1.24.2",
+  "version": "1.24.3",
   "private": true,
   "description": "Beautiful, fully customisable Home Assistant dashboard cards for phones and tablets",
   "type": "module",

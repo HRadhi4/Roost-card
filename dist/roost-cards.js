@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.24.2";
+const ROOST_VERSION = "1.24.3";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -4349,7 +4349,7 @@ class RoostRoom extends RoostBase {
         background:${img ? `linear-gradient(180deg,rgba(0,0,0,${dim * 0.5}),rgba(0,0,0,${dim})),url("${esc(img)}") center/cover` : look.bg};color:${light ? "#FFFFFF" : p.text};border:1px solid ${img ? "transparent" : look.border};box-shadow:${look.light ? `inset 0 1px 0 rgba(255,255,255,.22),${look.shadow === "none" ? "0 0 0 transparent" : look.shadow}` : look.shadow}}
       .r:active{transform:scale(.97)}
       .tx{min-width:0;position:relative;z-index:1}
-      .n{font-size:${Number(c.name_size) || 17}px;font-weight:700;line-height:1.2}
+      .n{font-size:${Number(c.name_size) || 17}px;font-weight:700;line-height:1.2;overflow-wrap:normal}
       .rd{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:${Number(c.temp_size) || 13}px;font-weight:600;opacity:.9;${hot ? "color:#FFE1D1" : ""}}
       .rd .sep{width:3px;height:3px;border-radius:50%;background:currentColor;opacity:.6}
       .l{font-size:12px;line-height:1.35;opacity:.75;margin-top:4px}
@@ -4383,6 +4383,32 @@ class RoostRoom extends RoostBase {
       else if (c.temperature) this.moreInfo(c.temperature);
     }, () => (c.hold_action && c.hold_action.action !== "none" ? this.run(c.hold_action) : this.roomSheet()));
     this.placeKids();
+    this.fitName();
+  }
+
+  // A long word in the room name ("Bathroom" on a narrow phone) is never split in two:
+  // the name gets just a little smaller until every word fits on its line.
+  fitName() {
+    const n = this.shadowRoot.querySelector(".tx .n");
+    if (!n) return;
+    // room tiles side by side keep one name size: the smallest any of them needed
+    const group = this.getRootNode?.() || document, sizes = (group.__roostNames ||= new Map());
+    const fit = () => {
+      const want = Number(this._config.name_size) || 17;
+      n.style.fontSize = "";
+      if (!n.clientWidth) return;
+      let f = want;
+      while (n.scrollWidth > n.clientWidth + 1 && f > 11) n.style.fontSize = `${--f}px`;
+      const before = Math.min(...sizes.values(), Infinity);
+      sizes.set(this, f);
+      for (const [card] of sizes) if (!card.isConnected) sizes.delete(card);
+      const all = Math.min(...sizes.values());
+      n.style.fontSize = all < want ? `${all}px` : "";
+      if (all !== before) for (const [card] of sizes) if (card !== this) card._nameAll?.(all);
+    };
+    this._nameAll = (all) => { const want = Number(this._config.name_size) || 17; n.style.fontSize = all < want ? `${all}px` : ""; };
+    (window.requestAnimationFrame || setTimeout)(fit);
+    if (window.ResizeObserver) { this._nameObs?.disconnect(); this._nameObs = new ResizeObserver(() => fit()); this._nameObs.observe(n); }
   }
 
   // Holding a room tile opens the room's own sheet (its devices and one bar for its lights).
