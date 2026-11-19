@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.19.0
+
+- **Curtain: ripple folds with a band at the bottom.** A new look like most modern ripple-fold curtains: soft white folds with a second fabric sewn along the hem (light grey by default; choose its colour and height).
+- **Curtain: your own curtain photo.** Give the card a photo of your real curtain (for example `/local/roost/curtain.jpg`) and it is drawn with your fabric; the folds bunch up as it opens, like the real thing. Works best with a straight-on photo of the closed curtain, cropped to the fabric.
+
 ## 1.18.1
 
 - **Reversed curtains, everywhere.** When a curtain is set to *Reverse*, every control now follows: the Open and Close buttons, the slide bar, tapping the window, and the details sheet that opens when you hold the card (it also shows the right "% open"). Open always opens, Close always closes.
