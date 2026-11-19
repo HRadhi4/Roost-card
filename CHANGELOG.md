@@ -5,7 +5,7 @@ Every version of Roost Cards, newest first.
 ## 1.18.0
 
 - **Roost 3D Home (new card).** Your home from Roost Atelier on the dashboard: one calm line about what is going on, the live 3D view and the realistic photos of the whole floor and every room (tap one to see it big). Without Roost Atelier it explains how to get it.
-- **A logo.** Roost Cards has its own logo: a little bird on a house-shaped card.
+- **A logo.** Roost Cards has its own logo: a bird roosting on the roof of a home.
 - The Roost popup can now show a picture.
 
 ## 1.17.0
