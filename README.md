@@ -1,3 +1,5 @@
+<p align="center"><img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/banner.png" width="720" alt="Roost Cards"></p>
+
 <h1 align="center">Roost Cards</h1>
 
 <p align="center"><b>A finished, app-like Home Assistant dashboard for your phone and wall tablet, without building it card by card.</b><br>
@@ -45,6 +47,11 @@ Hold any card and Roost's own details sheet slides up: the name, the state and o
 **Roost Now** shows only what matters at this moment, most urgent first: someone at the door, a leak, the next prayer or the iftar countdown, a door open in the heat, lights left on when everyone is out (one tap turns them off). When all is well, one calm line.
 
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/now.png" width="360" alt="Roost Now: a door open while nobody is home, lights left on, a low battery">
+
+### Your home in 3D
+**Roost 3D Home** brings your home from [Roost Atelier](https://github.com/HRadhi4/Roost-Atelier) onto the dashboard: one calm line about what is going on, the live 3D view (tap a device to control it), and the realistic photos Atelier made of the whole floor and every room. Tap a photo to see it big.
+
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/3d-home.gif" width="360" alt="Roost 3D Home: the live 3D home and photos of every room">
 
 ### Arabic, right to left
 Every card follows your Home Assistant language. In Arabic the whole dashboard turns right to left, with Arabic words and, if you like, Arabic numbers. Switch between Arabic and English on any screen with one chip.
@@ -178,6 +185,7 @@ Each GIF shows the card in use, then in the other colour mode, then as frosted g
 | **Roost Full Screen** | Hides Home Assistant's top bar and sidebar so your dashboard feels like an app: by itself (invisible), as a button that maximizes and minimizes, or as the tap action of any card. Comes back while editing. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fullscreen.gif" width="180" alt="Roost Full Screen"> |
 | **Roost Page** | A whole phone page laid out like the original: even spacing, the night-sky background and room for the bottom bar. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/page.gif" width="180" alt="Roost Page"> |
 | **Roost Panel** | A rounded box with a title that holds other cards, such as a list of rooms. It can fold open and closed. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/panel.gif" width="180" alt="Roost Panel"> |
+| **Roost 3D Home** | Your home from Roost Atelier: what is going on, the live 3D view and realistic photos of every room. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/3d-home.gif" width="180" alt="Roost 3D Home"> |
 | **Roost Now** | What matters right now, most urgent first; one calm line when all is well. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/now.png" width="180" alt="Roost Now"> |
 | **Roost Rooms Selector** | A room switcher: tap a room pill and that room's cards appear below, instantly. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="180" alt="Roost Rooms"> |
 

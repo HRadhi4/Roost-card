@@ -1,3 +1,18 @@
+## Roost 3D Home
+
+Your home from [Roost Atelier](https://github.com/HRadhi4/Roost-Atelier) (install it first, then draw your home): a head with one calm line (lights on, doors open, who is home), the live 3D view and the realistic photos Atelier makes by itself of the whole floor and every room. Tap a photo to see it big; the arrow opens Atelier (for admins).
+
+```yaml
+type: custom:roost-3d-home
+plan: ""          # empty = your first home
+floor: 0          # 0 = ground level
+view: 3d          # 3d, top or walk
+height: 320       # height of the 3D view
+live: true        # the live 3D view
+photos: true      # the realistic photos
+```
+Without Roost Atelier the card says how to install it.
+
 
 ## Roost Now
 

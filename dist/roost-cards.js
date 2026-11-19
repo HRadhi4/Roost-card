@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.17.0";
+const ROOST_VERSION = "1.18.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -9963,6 +9963,7 @@ class RoostPopupLayer extends RoostBase {
         <div class="tx"><b id="pt" class="t">${esc(it.title || "Roost")}</b>${it.subtitle || it.entity ? `<span class="sub t">${esc(this.subText(it))}</span>` : ""}</div>
         ${it.dismissible === false ? "" : '<button class="x" data-close="1" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button>'}</div>
       ${it.camera ? `<div class="cam" role="button" tabindex="0" aria-label="Open the camera">${!cam ? '<div class="off t">Camera not found</div>' : UNAVAILABLE.includes(cam.state) ? '<div class="off t">Camera offline</div>' : it.live ? "" : `<img alt="" src="${esc(cam.attributes.entity_picture || "")}">`}<span class="tag"><i></i>${esc(cam?.attributes.friendly_name || "Camera")}</span></div>` : ""}
+      ${it.image ? `<div class="cam pic"><img alt="" src="${esc(it.image)}"></div>` : ""}
       ${it.message ? `<div class="msg t">${esc(this.message(it))}</div>` : ""}
       ${Array.isArray(it.cards) && it.cards.length ? '<div class="cards"></div>' : ""}
       ${buttons.length ? `<div class="bts">${buttons.map((b, i) => { const c = bcol(b); return `<button class="bt ${c ? "" : "plain"}" data-b="${i}" style="${c ? `background:linear-gradient(135deg,${c[0]},${c[1]});color:${c[3]};box-shadow:0 10px 22px -10px ${c[2]}` : ""}">${b.icon ? `<ha-icon icon="${esc(b.icon)}"></ha-icon>` : ""}<span class="t">${esc(b.name || "OK")}</span></button>`; }).join("")}</div>` : ""}
@@ -10977,6 +10978,162 @@ class RoostNow extends ticking(RoostBase, 30000) {
   }
 }
 
+// Roost 3D Home: the home from Roost Atelier (a separate integration) inside a Roost card: a head with what is
+// going on, the live 3D view, and the realistic photos the Atelier made of the whole floor and every room.
+class RoostHome3d extends RoostBase {
+  static get defaults() { return { plan: "", floor: 0, view: "3d", height: 320, live: true, photos: true, theme: "auto" }; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "name", label: "Name (empty = the home's own name)", selector: { text: {} } },
+        { name: "plan", label: "Home id (empty = the first home)", selector: { text: {} } },
+        { type: "grid", name: "", schema: [
+          { name: "floor", label: "Level (0 = ground)", selector: { number: { min: 0, max: 9, mode: "box" } } },
+          { name: "view", label: "Start in", selector: pick([["3d", "3D"], ["top", "From above"], ["walk", "Walk-through"]]) },
+        ] },
+        { name: "height", label: "Height of the 3D view", selector: slider(200, 800, 20, "px") },
+        { type: "grid", name: "", schema: [
+          { name: "live", label: "Live 3D view", selector: { boolean: {} } },
+          { name: "photos", label: "Realistic photos", selector: { boolean: {} } },
+        ] },
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return {}; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  setConfig(config) { this._built = false; this._plan = null; this._shots = null; super.setConfig(config); }
+
+  set hass(h) {
+    if (h && RoostPop.hass !== h) RoostPop.setHass(h);
+    const first = !this._hass; this._hass = h;
+    if (!h || !this._config) return;
+    const dark = this.dark;
+    if (!this._built || dark !== this._wasDark) { this._wasDark = dark; this._built = true; this.render(); if (first || !this._plan) this.load(); return; }
+    if (this._inner) this._inner.hass = h;
+    this.summary();
+  }
+
+  get hass() { return this._hass; }
+
+  ws(msg) { return this._hass.connection.sendMessagePromise(msg); }
+
+  // the home, its photos, and whether Roost Atelier is installed at all
+  async load() {
+    const c = this._config;
+    try {
+      const plans = await this.ws({ type: "roost_atelier/plans" });
+      const id = c.plan || plans[0]?.id;
+      if (!id) { this._state = "empty"; return this.render(); }
+      this._plan = await this.ws({ type: "roost_atelier/plan", plan_id: id });
+      this._state = "ok";
+    } catch (e) { this._state = "missing"; return this.render(); }
+    this.render();
+    if (c.photos) this.loadShots();
+  }
+
+  async loadShots() {
+    const plan = this._plan; if (!plan) return;
+    const fi = Number(this._config.floor) || 0, pre = `${plan.id}_${fi}_`;
+    try {
+      const list = (await this.ws({ type: "roost_atelier/photos", plan_id: plan.id })).filter((x) => x.key.startsWith(pre));
+      const rooms = this.level()?.rooms || [], name = (rid) => (rid === "all" ? "Whole floor" : rooms.find((r) => r.id === rid)?.name || "Room");
+      const out = [];
+      for (const x of list) {
+        const rid = x.key.slice(pre.length); if (rid !== "all" && !rooms.some((r) => r.id === rid)) continue;
+        this._urls ||= new Map(); const k = `${x.key}@${x.updated}`;
+        if (!this._urls.has(k)) { const r = await this._hass.fetchWithAuth(`/api/roost_atelier/photo/${x.key}`); if (!r.ok) continue; this._urls.set(k, URL.createObjectURL(await r.blob())); }
+        out.push({ rid, name: name(rid), url: this._urls.get(k) });
+      }
+      out.sort((a, b) => (a.rid === "all" ? -1 : b.rid === "all" ? 1 : a.name.localeCompare(b.name)));
+      this._shots = out; this.drawShots();
+    } catch (e) { /* no photos yet */ }
+  }
+
+  level() { const f = this._plan?.floors || []; return f[Number(this._config.floor) || 0] || f[0]; }
+
+  // one calm line: lights on, doors open, who is home (only the devices placed in this home)
+  summaryText() {
+    const S = this._hass.states, devs = this.level()?.devices || [], ent = (k) => devs.filter((d) => (d.kind || "") === k || (d.entity || "").startsWith(`${k}.`)).map((d) => S[d.entity]).filter(Boolean);
+    const lights = devs.filter((d) => /^(light|switch)\./.test(d.entity || "") && (d.kind === "light" || d.entity.startsWith("light."))).map((d) => S[d.entity]).filter(Boolean);
+    const on = lights.filter((s) => s.state === "on").length;
+    const doors = ent("door").filter((s) => ["on", "open", "opening", "unlocked"].includes(s.state)).length;
+    const people = ent("person").filter((s) => s.state === "home").length;
+    const parts = [];
+    parts.push(on ? `${on} ${on === 1 ? "light" : "lights"} on` : "All lights off");
+    if (doors) parts.push(`${doors} ${doors === 1 ? "door" : "doors"} open`);
+    if (people) parts.push(`${people} at home`);
+    return parts.join(" · ");
+  }
+
+  summary() { const el = this.shadowRoot?.querySelector(".sb"); if (el && this._plan) { const t = this.summaryText(); if (el.textContent !== t) el.textContent = t; } }
+
+  open() { history.pushState(null, "", "/roost-atelier"); window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } })); }
+
+  render() {
+    if (!this._hass || !this._config || !this.shadowRoot) return;
+    const c = this._config, p = this.p, st = this._state, admin = !!this._hass.user?.is_admin;
+    const title = c.name || (this._plan ? `${this._plan.name}${(this._plan.floors?.length || 0) > 1 ? ` · ${this.level()?.name || ""}` : ""}` : "Home in 3D");
+    const sub = st === "missing" ? "Roost Atelier isn't installed yet" : st === "empty" ? "No home drawn yet" : this._plan ? this.summaryText() : "Loading";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, 22)};padding:16px;display:flex;flex-direction:column;gap:12px}
+      .hd{display:flex;align-items:center;gap:12px}
+      .ic{width:42px;height:42px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;color:#FFFFFF;--mdc-icon-size:20px;background:linear-gradient(135deg,${ACTIVE[0]},${ACTIVE[1]});box-shadow:0 10px 22px -12px ${ACTIVE[2]}}
+      .tx{flex:1;min-width:0}.tt{font-size:15px;font-weight:600;line-height:1.2}.sb{font-size:12px;color:${p.muted};margin-top:4px}
+      .go{width:36px;height:36px;border-radius:999px;border:0;flex:none;display:flex;align-items:center;justify-content:center;background:${p.inset};color:${p.text};cursor:pointer;--mdc-icon-size:20px;transition:transform .12s}
+      .go:active{transform:scale(.94)}
+      .live{border-radius:16px;overflow:hidden;background:${p.inset};--ha-card-border-radius:16px;--ha-card-box-shadow:none;--ha-card-border-width:0}
+      .note{display:flex;flex-direction:column;gap:8px;padding:16px;border-radius:16px;background:${p.inset};font-size:13px;line-height:1.4;color:${p.muted}}
+      .note b{font-size:15px;color:${p.text}}.note a{color:${ACTIVE[1]};font-weight:600}
+      .shots{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -4px;padding:0 4px}.shots::-webkit-scrollbar{display:none}
+      .shot{flex:none;width:132px;display:flex;flex-direction:column;gap:4px;border:0;padding:0;background:none;color:${p.text};font:inherit;cursor:pointer;text-align:start}
+      .shot img{width:132px;height:84px;border-radius:12px;object-fit:cover;display:block;background:${p.inset}}
+      .shot span{font-size:12px;color:${p.muted};line-height:1.25}
+      .wait{font-size:12px;color:${p.muted}}
+    </style>
+    <div class="card">
+      <div class="hd"><span class="ic"><ha-icon icon="mdi:floor-plan"></ha-icon></span>
+        <span class="tx"><div class="tt">${esc(title)}</div><div class="sb">${esc(sub)}</div></span>
+        ${admin && st === "ok" ? '<button class="go" aria-label="Open Roost Atelier"><ha-icon icon="mdi:arrow-top-right"></ha-icon></button>' : ""}</div>
+      ${st === "missing" ? `<div class="note"><b>See your home in realistic 3D</b>Install Roost Atelier from the Marketplace (as a custom repository) and draw your home. This card then shows it live, with photos of every room.<a href="https://github.com/HRadhi4/Roost-Atelier" target="_blank" rel="noopener">How to install</a></div>` : ""}
+      ${st === "empty" ? `<div class="note"><b>Draw your home first</b>Open Atelier in the sidebar and pick a ready-made home or draw your own.</div>` : ""}
+      ${st === "ok" && c.live ? '<div class="live"></div>' : ""}
+      ${st === "ok" && c.photos ? '<div class="shots"></div>' : ""}
+    </div>`;
+    this.shadowRoot.querySelector(".go")?.addEventListener("click", () => { this.vibrate(); this.open(); });
+    if (st === "ok" && c.live) this.mountLive();
+    if (st === "ok" && c.photos) this.drawShots();
+  }
+
+  // the Atelier's own live 3D card, kept alive between updates (it is never rebuilt on a state change)
+  async mountLive() {
+    const box = this.shadowRoot.querySelector(".live"); if (!box) return;
+    const ok = await Promise.race([customElements.whenDefined("roost-atelier-card").then(() => true), new Promise((r) => setTimeout(() => r(false), 6000))]);
+    if (!ok) { box.outerHTML = '<div class="note">The 3D view is loading. If it doesn\'t appear, refresh the page.</div>'; return; }
+    const c = this._config, cfg = { plan: this._plan.id, floor: Number(c.floor) || 0, view: c.view, height: Number(c.height) || 320, toolbar: true, hotspots: true };
+    const key = JSON.stringify(cfg);
+    if (!this._inner || this._innerKey !== key) { this._inner = document.createElement("roost-atelier-card"); this._inner.setConfig(cfg); this._innerKey = key; }
+    box.appendChild(this._inner); this._inner.hass = this._hass;
+  }
+
+  drawShots() {
+    const el = this.shadowRoot?.querySelector(".shots"); if (!el) return;
+    const list = this._shots;
+    if (!list) { el.innerHTML = '<span class="wait">Looking for photos</span>'; return; }
+    if (!list.length) { el.innerHTML = '<span class="wait">Photos appear here by themselves once Roost Atelier has made them</span>'; return; }
+    el.innerHTML = list.map((x, i) => `<button class="shot" data-i="${i}"><img alt="" src="${esc(x.url)}"><span>${esc(x.name)}</span></button>`).join("");
+    el.querySelectorAll(".shot").forEach((b) => b.addEventListener("click", () => {
+      const x = list[+b.dataset.i]; this.vibrate();
+      RoostPop.open({ id: "roost-3d-photo", kind: "info", title: x.name, icon: "mdi:camera-iris", image: x.url, close_after: 0, buttons: [] });
+    }));
+  }
+}
+
 const CARDS = [
   ["roost-tile", RoostTile, "Roost Tile", "A big tile with a switch, colour, icon and how long it has been on."],
   ["roost-chips", RoostChips, "Roost Chips", "Status chips in one row: doors, alarm, lights (with count), AC and people bubbles."],
@@ -11042,6 +11199,7 @@ const CARDS = [
   ["roost-page", RoostPage, "Roost Page", "A phone page laid out like the original dashboard: even spacing, the night-sky background and room for the bottom bar."],
   ["roost-panel", RoostPanel, "Roost Panel", "A rounded panel with a title that holds other cards, such as a list of rooms."],
   ["roost-now", RoostNow, "Roost Now", "What matters right now, most urgent first: the alarm, a leak, the doorbell, the next prayer or iftar, a door open in the heat, lights left on. One calm line when all is well."],
+  ["roost-3d-home", RoostHome3d, "Roost 3D Home", "Your home from Roost Atelier: what is going on, the live 3D view and realistic photos of every room."],
   ["roost-fullscreen", RoostFullscreen, "Roost Full Screen", "Full screen without Home Assistant's top bar and sidebar: by itself, or as a button that maximizes and minimizes."],
 ];
 window.customCards = window.customCards || [];
