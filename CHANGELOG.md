@@ -2,6 +2,13 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.23.0
+
+- **Presence Map: much more to set.**
+  - A settings button on the card for the sensor's own settings: how long it waits before "Nobody here", tracking one or more people, the sensor's light and Bluetooth, and restarting it.
+  - **Draw zones with your finger** right on the map (up to 3), choose what zones do (count only inside, or ignore inside), and remove a zone. Saved on the sensor.
+  - In the card editor: name each zone, the room width and where the sensor sits (draws the walls), flip left and right, show where people walked, distance and walking or still by each person, and a row with light level, motion, moving and still counts, and how long the room has been busy or empty.
+
 ## 1.22.0
 
 - Curtain card: new **How many folds** setting, from 1 (few, wide folds) to 6 (many, narrow folds). Works for every curtain look, your own fabric picture too.

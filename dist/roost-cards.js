@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.22.0";
+const ROOST_VERSION = "1.23.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -5319,13 +5319,15 @@ class RoostRemote extends RoostBase {
 // The room from above as a presence radar (for example the LD2450 in an Athom presence sensor) sees it: people as moving dots, and its zones.
 const ZONE_COLOURS = ["#8B6CFF", "#2BC4A8", "#FF8F6B"];
 class RoostPresence extends RoostBase {
-  static get defaults() { return { range: 6, show_zones: true, show_grid: true, radius: 22, color: "active", theme: "auto" }; }
+  static get defaults() { return { range: 6, show_zones: true, show_grid: true, show_people: true, show_details: true, show_settings: true, mirror: false, trail: false, room_width: 0, sensor_at: 0, radius: 22, color: "active", theme: "auto" }; }
 
   validate(c) { if (!c.device) throw new Error("Choose the presence sensor (device)"); }
 
   ids() { return deviceEntities(this._hass, this._config.device); }
 
-  watched() { return this._hass ? this.ids().filter((id) => /target_\d_[xy]$|zone_\d_|presence|occupancy|target_count/.test(id)) : []; }
+  watched() { return this._hass ? this.ids().filter((id) => !/uptime|wifi|ssid|mac_address|ip_address|last_restart|firmware|bt_mac|resolution/.test(id)) : []; }
+
+  extraSignature() { return `${this._panel || ""}|${this._zone || ""}`; }
 
   static getConfigForm() {
     return {
@@ -5333,7 +5335,12 @@ class RoostPresence extends RoostBase {
         { name: "device", label: "Presence sensor", required: true, selector: { device: {} } },
         { name: "name", selector: { text: {} } },
         { type: "grid", name: "", schema: [{ name: "range", label: "Room depth to show (metres)", selector: slider(2, 8, 0.5, "m") }, { name: "radius", selector: slider(0, 40, 2) }] },
+        { type: "grid", name: "", schema: [{ name: "room_width", label: "Room width (metres, 0 = no walls)", selector: slider(0, 10, 0.5, "m") }, { name: "sensor_at", label: "Sensor from the room middle (metres, minus = left)", selector: slider(-5, 5, 0.5, "m") }] },
+        { type: "grid", name: "", schema: [{ name: "mirror", label: "Flip left and right", selector: { boolean: {} } }, { name: "trail", label: "Show where people walked", selector: { boolean: {} } }] },
+        { type: "grid", name: "", schema: [{ name: "show_people", label: "Distance and speed by each person", selector: { boolean: {} } }, { name: "show_details", label: "Light, motion and counts row", selector: { boolean: {} } }] },
         { type: "grid", name: "", schema: [{ name: "show_zones", label: "Zones", selector: { boolean: {} } }, { name: "show_grid", label: "Metre lines", selector: { boolean: {} } }] },
+        { type: "grid", name: "", schema: [{ name: "zone_1_name", label: "Zone 1 name", selector: { text: {} } }, { name: "zone_2_name", label: "Zone 2 name", selector: { text: {} } }, { name: "zone_3_name", label: "Zone 3 name", selector: { text: {} } }] },
+        { name: "show_settings", label: "Sensor settings button on the card (timeout, zones, drawing zones)", selector: { boolean: {} } },
         ...colourFields("color", "Dot colour"),
         THEME_FIELD,
       ],
@@ -5350,46 +5357,148 @@ class RoostPresence extends RoostBase {
 
   val(ids, suffix) { const id = findBySuffix(ids, suffix); return id ? num(this.sx(id)?.state) : null; }
 
+  id(suffix) { return findBySuffix(this.ids(), suffix); }
+
+  mm(v, ref) { return v == null ? null : v * (Math.abs(ref ?? v) < 20 ? 1000 : 1); }
+
+  zoneName(n) { return this._config[`zone_${n}_name`] || `Zone ${n}`; }
+
+  set(domain, service, data) { try { navigator.vibrate?.(12); } catch (e) { /* no vibration */ } return this._hass.callService(domain, service, data); }
+
   render() {
     if (!this._hass || !this._config) return;
-    const c = this._config, p = this.p, g = this.colour(), ids = this.ids();
+    const c = this._config, p = this.p, g = this.colour(), ids = this.ids(), flip = c.mirror ? -1 : 1;
     const R = c.range * 1000, s60 = Math.sin(Math.PI / 3), c60 = Math.cos(Math.PI / 3);
-    const targets = [1, 2, 3].map((n) => ({ n, x: this.val(ids, `target_${n}_x`), y: this.val(ids, `target_${n}_y`) })).filter((t) => t.x != null && t.y != null && !(t.x === 0 && t.y === 0)).map((t) => ({ ...t, y: Math.abs(t.y) }));
-    const occ = ids.map((id) => this.sx(id)).find((s) => s && s.entity_id.startsWith("binary_sensor.") && ["occupancy", "presence"].includes(s.attributes.device_class));
-    const zones = c.show_zones ? [1, 2, 3].map((n) => {
+    const targets = [1, 2, 3].map((n) => ({ n, x: this.val(ids, `target_${n}_x`), y: this.val(ids, `target_${n}_y`), sp: this.val(ids, `target_${n}_speed`), d: this.val(ids, `target_${n}_distance`) }))
+      .filter((t) => t.x != null && t.y != null && !(t.x === 0 && t.y === 0)).map((t) => ({ ...t, x: t.x * flip, y: Math.abs(t.y) }));
+    // a short memory of where each person was, for the trail
+    this._trail = this._trail || {};
+    if (c.trail) for (const t of targets) { const tr = (this._trail[t.n] = this._trail[t.n] || []); const last = tr[tr.length - 1]; if (!last || Math.hypot(last[0] - t.x, last[1] - t.y) > 120) { tr.push([t.x, t.y]); if (tr.length > 24) tr.shift(); } }
+    const occ = ids.map((id) => this.sx(id)).find((s) => s && s.entity_id.startsWith("binary_sensor.") && ["occupancy", "presence"].includes(s.attributes.device_class)) || this.sx(findBySuffix(ids, "_presence"));
+    const zoneBox = (n) => {
       const z = { x1: this.val(ids, `zone_${n}_x1`), y1: this.val(ids, `zone_${n}_y1`), x2: this.val(ids, `zone_${n}_x2`), y2: this.val(ids, `zone_${n}_y2`) };
-      if ([z.x1, z.x2, z.y1, z.y2].some((v) => v == null) || (!z.x1 && !z.x2 && !z.y1 && !z.y2)) return "";
-      const cnt = this.val(ids, `zone_${n}_all_target_count`) ?? this.val(ids, `zone_${n}_target_count`);
-      const x = Math.min(z.x1, z.x2) * (Math.abs(z.x1) < 20 ? 1000 : 1), y = Math.min(z.y1, z.y2) * (Math.abs(z.y1) < 20 ? 1000 : 1);
-      const w = Math.abs(z.x2 - z.x1) * (Math.abs(z.x1) < 20 ? 1000 : 1), hgt = Math.abs(z.y2 - z.y1) * (Math.abs(z.y1) < 20 ? 1000 : 1);
-      const on = cnt > 0;
-      return `<rect x="${x}" y="${y}" width="${w}" height="${hgt}" rx="120" fill="${ZONE_COLOURS[n - 1]}" fill-opacity="${on ? 0.3 : 0.1}" stroke="${ZONE_COLOURS[n - 1]}" stroke-width="${on ? 50 : 25}"/>
-        <text x="${x + 140}" y="${y + 340}" font-size="280" font-weight="700" fill="${ZONE_COLOURS[n - 1]}">${n}${cnt ? ` · ${cnt}` : ""}</text>`;
+      if ([z.x1, z.x2, z.y1, z.y2].some((v) => v == null) || (!z.x1 && !z.x2 && !z.y1 && !z.y2)) return null;
+      const xa = this.mm(z.x1, z.x1) * flip, xb = this.mm(z.x2, z.x1) * flip, ya = this.mm(z.y1, z.y1), yb = this.mm(z.y2, z.y1);
+      return { x: Math.min(xa, xb), y: Math.min(ya, yb), w: Math.abs(xb - xa), h: Math.abs(yb - ya) };
+    };
+    const zoneCount = (n) => this.val(ids, `zone_${n}_all_target_count`) ?? this.val(ids, `zone_${n}_target_count`);
+    const zones = c.show_zones || this._panel === "zones" ? [1, 2, 3].map((n) => {
+      const b = zoneBox(n); if (!b) return "";
+      const cnt = zoneCount(n), on = cnt > 0, pick = this._panel === "zones" && this._zone === n;
+      return `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="120" fill="${ZONE_COLOURS[n - 1]}" fill-opacity="${on ? 0.3 : 0.1}" stroke="${ZONE_COLOURS[n - 1]}" stroke-width="${pick ? 80 : on ? 50 : 25}"${pick ? ' stroke-dasharray="160 100"' : ""}/>
+        <text x="${b.x + 140}" y="${b.y + 340}" font-size="280" font-weight="700" fill="${ZONE_COLOURS[n - 1]}">${esc(this.zoneName(n))}${cnt ? ` · ${cnt}` : ""}</text>`;
     }).join("") : "";
     let grid = "";
-    if (c.show_grid) for (let d = 1000; d <= R; d += 1000) grid += `<path d="M${-d * s60} ${d * c60} A${d} ${d} 0 0 0 ${d * s60} ${d * c60}" fill="none" stroke="${p.text}" stroke-opacity=".08" stroke-width="22"/><text x="${d * s60 + 120}" y="${d * c60}" font-size="230" fill="${p.muted}">${d / 1000} m</text>`;
+    if (c.show_grid) for (let d = 1000; d <= R; d += 1000) grid += `<path d="M${-d * s60} ${d * c60} A${d} ${d} 0 0 0 ${d * s60} ${d * c60}" fill="none" stroke="${p.text}" stroke-opacity=".08" stroke-width="22"/><text x="${d * s60 + 120}" y="${d * c60}" font-size="260" fill="${p.muted}">${d / 1000} m</text>`;
+    // the room's walls, when its width is known
+    let walls = "";
+    if (Number(c.room_width) > 0) { const W = c.room_width * 1000, off = (Number(c.sensor_at) || 0) * 1000 * flip, l = -W / 2 - off, r = W / 2 - off; walls = `<path d="M${l} 0 L${l} ${R} M${r} 0 L${r} ${R} M${l} 0 L${r} 0" fill="none" stroke="${p.text}" stroke-opacity=".35" stroke-width="60" stroke-linecap="round"/>`; }
+    const trails = c.trail ? targets.map((t) => { const tr = this._trail[t.n] || []; return tr.length > 1 ? `<path d="${tr.map((q, k) => `${k ? "L" : "M"}${q[0]} ${q[1]}`).join("")}" fill="none" stroke="${g[1]}" stroke-opacity=".45" stroke-width="70" stroke-linecap="round" stroke-linejoin="round"/>` : ""; }).join("") : "";
+    const people = c.show_people ? targets.map((t) => { const dist = t.d != null ? t.d : Math.hypot(t.x, t.y); const word = `${fmt(dist / 1000, 1)} m${t.sp ? ` · ${Math.abs(t.sp) >= 100 ? "walking" : "still"}` : " · still"}`; return `<text x="${t.x}" y="${t.y + 560}" text-anchor="middle" font-size="240" font-weight="600" fill="${p.text}">${esc(word)}</text>`; }).join("") : "";
     const n = targets.length;
+    // details: light, motion sensor, moving and still people
+    const lux = this.val(ids, "light_sensor") ?? this.val(ids, "_illuminance"), pir = this.sx(findBySuffix(ids, "pir_sensor"));
+    const moving = this.val(ids, "moving_target_count"), still = this.val(ids, "still_target_count");
+    const chips = c.show_details ? [lux != null ? `<span><ha-icon icon="mdi:brightness-6"></ha-icon>${fmt(lux, 0)} lx</span>` : "", pir ? `<span><ha-icon icon="mdi:motion-sensor"></ha-icon>${pir.state === "on" ? "Motion" : "No motion"}</span>` : "",
+      moving != null ? `<span><ha-icon icon="mdi:walk"></ha-icon>${fmt(moving, 0)} moving</span>` : "", still != null ? `<span><ha-icon icon="mdi:human-handsdown"></ha-icon>${fmt(still, 0)} still</span>` : "",
+      occ?.last_changed ? `<span><ha-icon icon="mdi:clock-outline"></ha-icon>${esc(occ.state === "on" ? "Here " : "Empty ")}${esc(since(occ.last_changed))}</span>` : ""].filter(Boolean).join("") : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:10px}
-      .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+      .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
       .n{font-size:15px;font-weight:600}
-      .l{font-size:13px;font-weight:600;color:${n ? g[this.dark ? 1 : 0] : p.muted}}
-      svg{display:block;width:100%;height:auto}
+      .l{font-size:13px;font-weight:600;color:${n ? g[this.dark ? 1 : 0] : p.muted};margin-left:auto}
+      .gear{width:36px;height:36px;border-radius:12px;border:0;background:${this._panel ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${this._panel ? "#fff" : p.muted};display:flex;align-items:center;justify-content:center;cursor:pointer;--mdc-icon-size:20px;flex:none}
+      svg{display:block;width:100%;height:auto;touch-action:${this._panel === "zones" ? "none" : "auto"}}
       .dot{transition:transform .12s linear}
-      .sweep{transform-origin:0 0;animation:roost-spin 6s linear infinite}
+      .chips{display:flex;flex-wrap:wrap;gap:6px}.chips span{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:${p.inset};color:${p.muted};--mdc-icon-size:14px}
+      .set{display:flex;flex-direction:column;gap:10px;border-top:1px solid ${p.border};padding-top:12px}
+      .row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px}
+      .row b{font-weight:600}.row small{display:block;font-size:12px;color:${p.muted};font-weight:400}
+      .seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:${p.inset}}
+      .seg button{flex:1;height:36px;border:0;border-radius:10px;background:transparent;color:${p.muted};font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+      .seg button.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:#fff}
+      .tg{width:46px;height:28px;border-radius:999px;border:0;background:${p.track};position:relative;cursor:pointer;flex:none}
+      .tg i{position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .12s}
+      .tg.on{background:linear-gradient(135deg,${g[0]},${g[1]})}.tg.on i{transform:translateX(18px)}
+      input[type=range]{width:100%;accent-color:${g[0]}}
+      .btns{display:flex;gap:8px;flex-wrap:wrap}.btns button{flex:1;min-height:40px;border:0;border-radius:12px;background:${p.inset};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:0 12px}
+      .hint{font-size:12px;color:${p.muted}}
     </style>
     <div class="card">
       <div class="top"><span class="n t">${esc(c.name || this._hass.devices?.[c.device]?.name_by_user || this._hass.devices?.[c.device]?.name || "Presence")}</span>
-        <span class="l t">${n ? `${n} ${n > 1 ? "people" : "person"} here` : occ?.state === "on" ? "Someone is still" : "Nobody here"}</span></div>
+        <span class="l t">${n ? `${n} ${n > 1 ? "people" : "person"} here` : occ?.state === "on" ? "Someone is still" : "Nobody here"}</span>
+        ${c.show_settings ? `<button class="gear" data-gear aria-label="Sensor settings"><ha-icon icon="${this._panel ? "mdi:close" : "mdi:tune-variant"}"></ha-icon></button>` : ""}</div>
       <svg viewBox="${-R * s60 - 300} -300 ${2 * R * s60 + 1300} ${R + 500}">
         <defs><radialGradient id="fov" cx="0.5" cy="0" r="1"><stop offset="0" stop-color="${g[0]}" stop-opacity=".28"/><stop offset="1" stop-color="${g[1]}" stop-opacity=".04"/></radialGradient>
           <radialGradient id="dg"><stop offset="0" stop-color="#fff"/><stop offset=".45" stop-color="${g[1]}"/><stop offset="1" stop-color="${g[0]}" stop-opacity="0"/></radialGradient></defs>
         <path d="M0 0 L${R * s60} ${R * c60} A${R} ${R} 0 0 1 ${-R * s60} ${R * c60} Z" fill="url(#fov)" stroke="${g[0]}" stroke-opacity=".35" stroke-width="25"/>
-        ${grid}${zones}
+        ${grid}${walls}${zones}${trails}
         <rect x="-260" y="-200" width="520" height="200" rx="60" fill="${g[0]}"/>
         ${targets.map((t) => `<g class="dot" data-glide="${t.n}" style="transform:translate(${t.x}px,${t.y}px)"><circle r="520" fill="url(#dg)" opacity=".55"><animate attributeName="r" values="380;620;380" dur="2s" repeatCount="indefinite"/></circle><circle r="170" fill="${g[1]}" stroke="#fff" stroke-width="45"/></g>`).join("")}
+        ${people}<rect class="draft" x="0" y="0" width="0" height="0" rx="120" fill="${ZONE_COLOURS[(this._zone || 1) - 1]}" fill-opacity=".25" stroke="${ZONE_COLOURS[(this._zone || 1) - 1]}" stroke-width="60" stroke-dasharray="160 100"/>
       </svg>
+      ${chips ? `<div class="chips">${chips}</div>` : ""}
+      ${this._panel ? this.panelHtml(ids) : ""}
     </div>`;
+    this.wire(ids);
+  }
+
+  // the sensor's own settings, kept on the sensor itself
+  panelHtml(ids) {
+    const tab = this._panel;
+    const seg = `<div class="seg"><button class="${tab === "main" ? "on" : ""}" data-tab="main">Sensor</button><button class="${tab === "zones" ? "on" : ""}" data-tab="zones">Zones</button></div>`;
+    const toggle = (suffix, title, help) => { const id = findBySuffix(ids, suffix), s = this.sx(id); return s ? `<div class="row"><span><b>${title}</b>${help ? `<small>${help}</small>` : ""}</span><button class="tg ${s.state === "on" ? "on" : ""}" data-tog="${esc(id)}" role="switch" aria-checked="${s.state === "on"}" aria-label="${title}"><i></i></button></div>` : ""; };
+    if (tab === "main") {
+      const tid = findBySuffix(ids, "_timeout"), ts = this.sx(tid);
+      const timeout = ts ? `<div class="row"><span><b>Wait before "Nobody here"</b><small>After the last movement</small></span><b class="tv">${fmt(num(ts.state), 0)} s</b></div><input type="range" data-num="${esc(tid)}" min="${ts.attributes.min ?? 0}" max="${Math.min(ts.attributes.max ?? 600, 600)}" step="${ts.attributes.step || 1}" value="${num(ts.state) ?? 0}">` : "";
+      const restart = findBySuffix(ids, "ld2450_restart") || findBySuffix(ids, "restart_esp");
+      return `<div class="set">${seg}${timeout}${toggle("multi_target_tracking", "Track more than one person", "Off: only the nearest person")}${toggle("status_led", "Light on the sensor")}${toggle("_bluetooth", "Bluetooth on the sensor", "Only needed for the maker's phone app")}
+        ${restart ? `<div class="btns"><button data-press="${esc(restart)}">Restart the sensor</button></div>` : ""}</div>`;
+    }
+    const zt = findBySuffix(ids, "zone_type"), zs = this.sx(zt);
+    const modes = zs ? `<div class="row"><span><b>Zones are used to</b><small>${{ Disabled: "Not used: the whole room counts", Detection: "Only count people inside the zones", Filter: "Ignore people inside the zones" }[zs.state] || ""}</small></span></div>
+      <div class="seg">${(zs.attributes.options || []).map((o) => `<button class="${zs.state === o ? "on" : ""}" data-sel="${esc(o)}">${esc({ Disabled: "Off", Detection: "Count inside", Filter: "Ignore inside" }[o] || o)}</button>`).join("")}</div>` : "";
+    const z = this._zone || 1;
+    return `<div class="set">${seg}${modes}
+      <div class="seg">${[1, 2, 3].map((n) => `<button class="${z === n ? "on" : ""}" data-zone="${n}" style="${z === n ? `background:${ZONE_COLOURS[n - 1]}` : ""}">${esc(this.zoneName(n))}</button>`).join("")}</div>
+      <div class="hint">Draw ${esc(this.zoneName(z))} on the map with your finger: press, drag, let go. It is saved on the sensor.</div>
+      <div class="btns"><button data-clear="${z}">Remove ${esc(this.zoneName(z))}</button></div></div>`;
+  }
+
+  wire(ids) {
+    const root = this.shadowRoot, again = () => { this._sig = null; this.hass = this._hass; };
+    root.querySelector("[data-gear]")?.addEventListener("click", () => { this._panel = this._panel ? null : "main"; this.vibrate?.(); again(); });
+    root.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { this._panel = b.dataset.tab; this._zone = this._zone || 1; again(); }));
+    root.querySelectorAll("[data-zone]").forEach((b) => b.addEventListener("click", () => { this._zone = Number(b.dataset.zone); again(); }));
+    root.querySelectorAll("[data-tog]").forEach((b) => b.addEventListener("click", () => this.set(b.dataset.tog.split(".")[0], "toggle", { entity_id: b.dataset.tog })));
+    root.querySelectorAll("[data-press]").forEach((b) => b.addEventListener("click", () => this.set("button", "press", { entity_id: b.dataset.press })));
+    root.querySelectorAll("[data-sel]").forEach((b) => b.addEventListener("click", () => this.set("select", "select_option", { entity_id: findBySuffix(ids, "zone_type"), option: b.dataset.sel })));
+    root.querySelectorAll("[data-num]").forEach((r) => {
+      const tv = root.querySelector(".tv");
+      r.addEventListener("pointerdown", () => { this._menuOpen = true; });
+      r.addEventListener("input", () => { if (tv) tv.textContent = `${r.value} s`; });
+      r.addEventListener("change", () => { this._menuOpen = false; this.set("number", "set_value", { entity_id: r.dataset.num, value: Number(r.value) }); });
+    });
+    root.querySelectorAll("[data-clear]").forEach((b) => b.addEventListener("click", () => this.saveZone(Number(b.dataset.clear), 0, 0, 0, 0)));
+    // drawing a zone on the map
+    const svg = root.querySelector("svg"), draft = root.querySelector(".draft");
+    if (this._panel !== "zones" || !svg) return;
+    const at = (e) => { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const q = pt.matrixTransform(svg.getScreenCTM().inverse()); return [q.x, Math.max(0, q.y)]; };
+    let a = null;
+    svg.addEventListener("pointerdown", (e) => { a = at(e); this._menuOpen = true; svg.setPointerCapture(e.pointerId); });
+    svg.addEventListener("pointermove", (e) => { if (!a) return; const b = at(e); draft.setAttribute("x", Math.min(a[0], b[0])); draft.setAttribute("y", Math.min(a[1], b[1])); draft.setAttribute("width", Math.abs(b[0] - a[0])); draft.setAttribute("height", Math.abs(b[1] - a[1])); });
+    svg.addEventListener("pointerup", (e) => {
+      if (!a) return; const b = at(e), flip = this._config.mirror ? -1 : 1; const start = a; a = null; this._menuOpen = false;
+      if (Math.abs(b[0] - start[0]) < 200 || Math.abs(b[1] - start[1]) < 200) { draft.setAttribute("width", 0); return; }
+      this.saveZone(this._zone || 1, Math.round(Math.min(start[0], b[0]) * flip), Math.round(Math.min(start[1], b[1])), Math.round(Math.max(start[0], b[0]) * flip), Math.round(Math.max(start[1], b[1])));
+    });
+  }
+
+  saveZone(n, x1, y1, x2, y2) {
+    const ids = this.ids(), put = (k, v) => { const id = findBySuffix(ids, `zone_${n}_${k}`); if (!id) return null; const a = this.sx(id)?.attributes || {}; const ref = num(this.sx(id)?.state); const scale = ref != null && Math.abs(ref) > 0 && Math.abs(ref) < 20 ? 0.001 : 1; let val = v * scale; if (a.min != null) val = Math.max(a.min, val); if (a.max != null) val = Math.min(a.max, val); return this._hass.callService("number", "set_value", { entity_id: id, value: val }); };
+    const lo = [Math.min(x1, x2), Math.max(x1, x2)];
+    try { navigator.vibrate?.(12); } catch (e) { /* no vibration */ }
+    return Promise.all([put("x1", lo[0]), put("y1", y1), put("x2", lo[1]), put("y2", y2)]);
   }
 }
 
