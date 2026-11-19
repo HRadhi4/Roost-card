@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.21.0";
+const ROOST_VERSION = "1.21.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -9573,7 +9573,7 @@ const RoostSheet = {
     if (dom === "sensor" && num(s.state) != null) {
       const h = this.el.hist;
       return `<div class="sens"><div class="big num">${fmt(num(s.state), decOf(s.state))}<small>${esc(a.unit_of_measurement || "")}</small></div>${h && h.length > 2 ? this.spark(h, g[1]) : ""}</div>
-        ${h && h.length > 2 ? `<div class="note">Lowest ${fmt(Math.min(...h), decOf(s.state))} · Highest ${fmt(Math.max(...h), decOf(s.state))} today</div>` : ""}`;
+        ${h && h.length > 2 && !this.el.full && this.el.lo != null ? `<div class="note">Lowest ${fmt(this.el.lo, decOf(s.state))} · Highest ${fmt(this.el.hi, decOf(s.state))} in the last day</div>` : ""}`;
     }
     if (dom === "camera") {
       const pic = a.entity_picture;
@@ -9691,6 +9691,7 @@ const RoostSheet = {
       this.el.rows = rows.map((x) => ({ state: x.state, at: new Date(x.last_changed || x.last_updated).getTime() }));
       this.el.changes = rows.slice(-6).reverse().map((x) => ({ state: x.state, at: x.last_changed }));
       const nums = rows.map((x) => num(x.state)).filter((v) => v != null);
+      this.el.lo = nums.length ? Math.min(...nums) : null; this.el.hi = nums.length ? Math.max(...nums) : null;
       this.el.hist = nums.length > 60 ? nums.filter((_, i) => i % Math.ceil(nums.length / 60) === 0).concat(nums[nums.length - 1]) : nums;
     } catch (e) { this.el.hist = []; this.el.changes = []; this.el.rows = []; }
     if (this.el) this.draw();

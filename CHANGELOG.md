@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.21.1
+
+- Details sheet: the lowest and highest numbers now match the chart, and are not repeated once you swipe up.
+
 ## 1.21.0
 
 - **Details sheet: swiping up now works.** Swipe up anywhere on the sheet (buttons too) to see more, swipe down to go back or close.
