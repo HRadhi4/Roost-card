@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.18.0";
+const ROOST_VERSION = "1.18.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -72,6 +72,18 @@ function coverView(s, reverse) {
   // when the position is known, it decides open or closed (some integrations mix the two up)
   if (pos != null && (state === "open" || state === "closed")) state = pos > 0 ? "open" : "closed";
   return { state, pos };
+}
+// Curtains set to "reverse" in any Roost card. Every command to them (from any card or the details sheet)
+// is turned around in one place, so Open always opens and Close always closes.
+const RoostReversed = (window.RoostReversed ||= new Set());
+function fixCover(domain, service, data) {
+  if (domain !== "cover" || !data) return [service, data];
+  const ids = [].concat(data.entity_id || []);
+  if (!ids.length || !ids.every((id) => RoostReversed.has(id))) return [service, data];
+  if (service === "open_cover") return ["close_cover", data];
+  if (service === "close_cover") return ["open_cover", data];
+  if (service === "set_cover_position" && data.position != null) return [service, { ...data, position: 100 - Number(data.position) }];
+  return [service, data];
 }
 const REVERSE_FIELD = { name: "reverse", label: "Reverse (my curtain reports open and closed the wrong way round)", selector: { boolean: {} } };
 
@@ -412,6 +424,7 @@ class RoostBase extends HTMLElement {
       if (this.localName === "roost-remote" && config.entity && !config.athom_remote) config = { ...config, entity: undefined, athom_remote: "Sample TV" };
     }
     this._config = { ...this.constructor.defaults, ...config };
+    if (this._config.reverse && String(this._config.entity || "").startsWith("cover.")) RoostReversed.add(this._config.entity);
     // A card that still needs a device shows a friendly "pick one" note, like Home Assistant's own cards, instead of a red error.
     this._setup = "";
     try { this.validate?.(this._config); } catch (e) { this._setup = e.message || String(e); }
@@ -686,6 +699,7 @@ class RoostBase extends HTMLElement {
 
   async call(domain, service, data) {
     try {
+      [service, data] = fixCover(domain, service, data);
       await this._hass.callService(domain, service, data);
       return true;
     } catch (e) {
@@ -705,9 +719,9 @@ class RoostBase extends HTMLElement {
     switch (a.action) {
       case "toggle":
         if (String(entityId).startsWith("cover.") && this._config?.reverse) {
-          // reversed curtain: decide from what it really is, then send the command the motor understands
+          // reversed curtain: decide from what it really is (open or closed), then ask for the other
           const v = coverView(this.sx(entityId), true);
-          return this.call("cover", v.state === "closed" || v.state === "closing" ? "close_cover" : "open_cover", { entity_id: entityId });
+          return this.call("cover", v.state === "closed" || v.state === "closing" ? "open_cover" : "close_cover", { entity_id: entityId });
         }
         return this.call("homeassistant", "toggle", { entity_id: entityId });
       case "more-info": return this.moreInfo(a.entity || entityId);
@@ -2406,7 +2420,11 @@ class RoostRooms extends RoostBase {
       });
       if (c.swipe) {
         let x0 = null, y0 = 0;
-        box.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+        box.addEventListener("touchstart", (e) => {
+          // a finger on something you drag (a curtain, a slider, a dial) never changes the room
+          if (e.composedPath().some((n) => n.dataset?.noswipe != null || n.getAttribute?.("role") === "slider")) { x0 = null; return; }
+          x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+        }, { passive: true });
         box.addEventListener("touchend", (e) => {
           if (x0 == null) return;
           const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
@@ -2487,6 +2505,7 @@ class RoostCurtain extends RoostBase {
   view(s = this.st()) { return coverView(s, this._config.reverse); }
 
   position(s) {
+    if (this._dragPos != null) return this._dragPos;
     if (!s || UNAVAILABLE.includes(s.state)) return 0;
     const v = this.view(s);
     if (v.pos != null) return Math.max(0, Math.min(100, v.pos));
@@ -2628,15 +2647,16 @@ class RoostCurtain extends RoostBase {
       <button class="btn" data-a="open" aria-label="Open"><ha-icon icon="${blind ? "mdi:arrow-up" : "mdi:arrow-expand-horizontal"}"></ha-icon></button></div>` : ""}</div>`;
     this._shown = null;
     const win = this.shadowRoot.querySelector(".win");
-    this.press(win, () => this.run(c.tap_action, c.entity), () => this.run(c.hold_action, c.entity));
+    win.dataset.noswipe = "1";
+    this.press(win, () => { if (this._winDrag?.on || this._dragged) { this._dragged = false; return; } this.run(c.tap_action, c.entity); }, () => { if (!this._winDrag?.on) this.run(c.hold_action, c.entity); });
+    this.dragWindow(win);
     this.shadowRoot.querySelector("[data-sch]")?.addEventListener("click", () => { this.vibrate(); this.call("automation", "toggle", { entity_id: c.schedule }); });
     this.shadowRoot.querySelectorAll(".btn").forEach((el) => el.addEventListener("click", () => {
       this.vibrate();
       const a = el.dataset.a;
       if (a === "stop" && c.stop_action && c.stop_action.action && c.stop_action.action !== "none") { this.run(c.stop_action, c.entity); this.call("cover", "stop_cover", { entity_id: c.entity }); return; }
       this._moveUntil = Date.now() + c.travel_time * 1000 + 300;
-      const cmd = c.reverse && a !== "stop" ? (a === "open" ? "close" : "open") : a;
-      this.call("cover", `${cmd}_cover`, { entity_id: c.entity });
+      this.call("cover", `${a}_cover`, { entity_id: c.entity });
     }));
     const trk = this.shadowRoot.querySelector(".trk");
     if (trk) {
@@ -2655,6 +2675,34 @@ class RoostCurtain extends RoostBase {
     }
   }
 
+  // slide the curtains open or closed with a finger on the window (sideways), or a blind up and down
+  dragWindow(win) {
+    const c = this._config, blind = c.style === "blind";
+    win.style.touchAction = blind ? "none" : "pan-y";
+    win.addEventListener("pointerdown", (e) => {
+      const r = win.getBoundingClientRect();
+      this._winDrag = { x: e.clientX, y: e.clientY, w: r.width || 1, h: r.height || 1, side: e.clientX - r.left > r.width / 2 ? 1 : -1, p0: this.position(this.st()), on: false, id: e.pointerId };
+    });
+    win.addEventListener("pointermove", (e) => {
+      const d = this._winDrag; if (!d) return;
+      const dx = e.clientX - d.x, dy = e.clientY - d.y;
+      if (!d.on) {
+        if (blind ? Math.abs(dy) < 10 || Math.abs(dy) < Math.abs(dx) : Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy)) return;
+        d.on = true; try { win.setPointerCapture(d.id); } catch (err) { /* fine */ }
+      }
+      // how far the edge of the fabric moved, as a share of how far it can travel
+      const k = blind ? (-dy / d.h) / 0.88 : c.style === "pair" ? ((d.side * dx) / d.w) / 0.43 : c.style === "left" ? (-dx / d.w) / 0.88 : (dx / d.w) / 0.88;
+      this._dragPos = Math.round(Math.max(0, Math.min(100, d.p0 + k * 100)) / 5) * 5;
+      this.update(); if (this.shadowRoot.querySelector(".trk")) this.showDrag(this._dragPos);
+    });
+    const end = () => {
+      const d = this._winDrag; this._winDrag = null; if (!d?.on) return;
+      this._dragged = true; const v = this._dragPos; this._dragPos = null; this._dragging = false;
+      if (v != null) this.goTo(v);
+    };
+    win.addEventListener("pointerup", end); win.addEventListener("pointercancel", end);
+  }
+
   showDrag(v) {
     this._dragging = true;
     const R = this.shadowRoot;
@@ -2668,8 +2716,8 @@ class RoostCurtain extends RoostBase {
     this.vibrate();
     this._moveUntil = Date.now() + (Number(c.travel_time) || 1.4) * 1000 + 300;
     const canPos = s && (s.attributes.supported_features & 4) && s.attributes.current_position != null;
-    if (canPos && v > 0 && v < 100) this.call("cover", "set_cover_position", { entity_id: c.entity, position: c.reverse ? 100 - v : v });
-    else { const open = v >= 50; this.call("cover", `${(c.reverse ? !open : open) ? "open" : "close"}_cover`, { entity_id: c.entity }); }
+    if (canPos && v > 0 && v < 100) this.call("cover", "set_cover_position", { entity_id: c.entity, position: v });
+    else this.call("cover", `${v >= 50 ? "open" : "close"}_cover`, { entity_id: c.entity });
     this._sig = null; this.update();
   }
 
@@ -9440,7 +9488,7 @@ const RoostSheet = {
     clearInterval(this._tick); window.removeEventListener("keydown", this._key);
     this.el.host.remove(); this.el = null;
   },
-  call(domain, service, data) { try { navigator.vibrate?.(12); } catch (e) { /* no vibration */ } return this.hass()?.callService(domain, service, data); },
+  call(domain, service, data) { try { navigator.vibrate?.(12); } catch (e) { /* no vibration */ } [service, data] = fixCover(domain, service, data); return this.hass()?.callService(domain, service, data); },
   look(dom, s) {
     const on = s && !UNAVAILABLE.includes(s.state) && !OFF_STATES.includes(s.state);
     const g = { light: COLORS.amber, switch: COLORS.green, input_boolean: COLORS.green, fan: COLORS.teal, climate: COLORS.blue, water_heater: COLORS.coral, cover: COLORS.coral,
@@ -9462,7 +9510,7 @@ const RoostSheet = {
     if (UNAVAILABLE.includes(s.state)) return "Offline";
     if (dom === "light") return s.state === "on" ? `On${a.brightness != null ? ` · ${Math.round(a.brightness / 2.55)}%` : ""}` : "Off";
     if (dom === "climate") return s.state === "off" ? "Off" : `${s.state.replace("_only", "").replace("heat_cool", "auto").replace(/^./, (m) => m.toUpperCase())}${a.current_temperature != null ? ` · Room ${a.current_temperature}°` : ""}`;
-    if (dom === "cover") { const v = coverView(s); return a.current_position != null ? `${v.position ?? a.current_position}% open` : v.state.replace(/^./, (m) => m.toUpperCase()); }
+    if (dom === "cover") { const v = coverView(s, RoostReversed.has(s.entity_id)); return v.pos != null ? `${v.pos}% open` : v.state.replace(/^./, (m) => m.toUpperCase()); }
     if (dom === "sensor" && num(s.state) != null) return `${fmt(num(s.state), decOf(s.state))}${unitGap(a.unit_of_measurement || "")}`;
     if (dom === "binary_sensor") return this.binWord(s);
     if (dom === "person" || dom === "device_tracker") return s.state === "home" ? "At home" : s.state === "not_home" ? "Away" : s.state;
@@ -9494,7 +9542,7 @@ const RoostSheet = {
         <div class="seg" style="grid-template-columns:repeat(${modes.length},minmax(0,1fr))">${modes.map((m) => `<button class="${s.state === m ? "on" : ""}" data-act="mode:${m}">${esc({ fan_only: "Fan", heat_cool: "Auto" }[m] || m.charAt(0).toUpperCase() + m.slice(1))}</button>`).join("")}</div>`;
     }
     if (dom === "cover") {
-      const pos = a.current_position;
+      const pos = coverView(s, RoostReversed.has(s.entity_id)).pos;
       const garage = ["garage", "gate", "door"].includes(a.device_class);
       return `${pos != null ? bar(pos, `linear-gradient(90deg,${g[0]},${g[1]})`, `${pos}% open`, "cover") : ""}<div class="g2"${pos == null ? ' style="grid-template-columns:repeat(3,minmax(0,1fr))"' : ""}>${wide("Close", garage ? "mdi:arrow-down" : "mdi:arrow-collapse-horizontal", false, "close")}${pos == null ? wide("Stop", "mdi:stop", false, "stop") : ""}${wide("Open", garage ? "mdi:arrow-up" : "mdi:arrow-expand-horizontal", true, "open")}</div>`;
     }

@@ -297,6 +297,8 @@ start_room: ""
 ### Roost Curtain
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/curtain.gif" width="320" alt="Roost curtain card in action">
 
+Drag sideways on the window to slide the curtains open or closed (up and down for a blind). With `reverse: true` every control is turned around for you: buttons, slide bar, tapping the window and the details sheet.
+
 ```yaml
 type: custom:roost-curtain
 entity: cover.living_room

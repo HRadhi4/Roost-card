@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.18.1
+
+- **Reversed curtains, everywhere.** When a curtain is set to *Reverse*, every control now follows: the Open and Close buttons, the slide bar, tapping the window, and the details sheet that opens when you hold the card (it also shows the right "% open"). Open always opens, Close always closes.
+- **Slide the curtains with your finger.** Drag sideways on the window to open or close the curtains (up and down for blinds); let go and the curtain goes there.
+- In the room switcher, dragging a curtain, a slider or a dial no longer changes the room.
+
 ## 1.18.0
 
 - **Roost 3D Home (new card).** Your home from Roost Atelier on the dashboard: one calm line about what is going on, the live 3D view and the realistic photos of the whole floor and every room (tap one to see it big). Without Roost Atelier it explains how to get it.
