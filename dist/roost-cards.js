@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.20.0";
+const ROOST_VERSION = "1.20.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -475,10 +475,11 @@ class RoostBase extends HTMLElement {
     if (!note || !root) return;
     root.querySelector(".roost-broken")?.remove();
     // the note covers just this card: the card itself is the frame
-    this.style.position = "relative"; if (!this.style.display) this.style.display = "block";
+    // isolation keeps the note inside this card: the bottom bar and pop-ups always stay on top of it
+    this.style.position = "relative"; this.style.isolation = "isolate"; if (!this.style.display) this.style.display = "block";
     const el = document.createElement("div");
     el.className = "roost-broken"; el.setAttribute("role", "status");
-    el.style.cssText = `position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px;box-sizing:border-box;text-align:center;border-radius:${Number(this._config.radius) || 22}px;background:rgba(10,8,30,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);color:#fff`;
+    el.style.cssText = `position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px;box-sizing:border-box;text-align:center;border-radius:${Number(this._config.radius) || 22}px;background:rgba(10,8,30,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);color:#fff`;
     el.innerHTML = `<ha-icon icon="mdi:alert-circle-outline" style="--mdc-icon-size:28px;color:#FF9F6B"></ha-icon><b style="font-size:14px">Not working right now</b><span style="font-size:12px;opacity:.85;line-height:1.35">${esc(note)}</span>`;
     root.appendChild(el);
   }
@@ -1981,7 +1982,7 @@ class RoostNav extends RoostBase {
     if (fixed) this.watchSide();
     const full = rail && c.rail_style === "full";
     const top = full && fixed ? RoostNav.topEdge() : 0;
-    const pos = fixed ? (rail ? (full ? `position:fixed;left:${edge + 24}px;top:${top + 24}px;bottom:24px;z-index:4` : `position:fixed;left:${edge + 16}px;top:50%;transform:translateY(-50%);z-index:4`) : `position:fixed;left:calc(${edge}px + (100% - ${edge}px) / 2);bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:4`) : "";
+    const pos = fixed ? (rail ? (full ? `position:fixed;left:${edge + 24}px;top:${top + 24}px;bottom:24px;z-index:8` : `position:fixed;left:${edge + 16}px;top:50%;transform:translateY(-50%);z-index:8`) : `position:fixed;left:calc(${edge}px + (100% - ${edge}px) / 2);bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:8`) : "";
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       :host{${fixed ? (rail || c.push_content !== false ? "height:0;" : "height:calc(76px + env(safe-area-inset-bottom));") : ""}display:block}
       .edit{font-size:12px;color:${p.muted};text-align:center;margin:0 0 6px}
@@ -2478,7 +2479,8 @@ class RoostCurtain extends RoostBase {
         { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
           { name: "style", label: "Kind", selector: pick([["pair", "Two curtains that meet in the middle"], ["left", "One curtain, opens from right to left (gathers on the left)"], ["right", "One curtain, opens from left to right (gathers on the right)"], ["blind", "Blind (up and down)"]]) },
           { name: "look", label: "Curtain look", selector: pick([["classic", "Classic stripes (bright, simple)"], ["pleat", "Pinch pleat drapes on a metal rod"], ["wave", "Wave curtain on rings"], ["banded", "Ripple folds with a band at the bottom"], ["sheer", "Sheer behind a blackout curtain"]]) },
-          { type: "grid", name: "", schema: [{ name: "band", label: "Bottom band (ripple with band)", selector: pick([["taupe", "Taupe"], ["silver", "Light grey"], ["grey", "Stone grey"], ["linen", "Linen"], ["sand", "Sand"], ["sage", "Sage"], ["navy", "Navy"], ["charcoal", "Charcoal"], ["blush", "Blush"], ["black", "Black"]]) }, { name: "band_height", label: "Band height", selector: slider(10, 40, 1, "%") }] },
+          { type: "grid", name: "", schema: [{ name: "band", label: "Bottom band (ripple with band)", selector: pick([["grey", "Stone grey"], ["silver", "Light grey"], ["taupe", "Taupe"], ["linen", "Linen"], ["sand", "Sand"], ["sage", "Sage"], ["navy", "Navy"], ["charcoal", "Charcoal"], ["blush", "Blush"], ["black", "Black"]]) }, { name: "band_height", label: "Band height", selector: slider(10, 40, 1, "%") }] },
+          { name: "band_wave", label: "Wavy band edge and curved hem", selector: { boolean: {} } },
           { name: "fabric_image", label: "Your fabric: a picture of it (for example /local/roost/fabric.jpg)", selector: { text: {} } },
           { type: "grid", name: "", schema: [{ name: "photo_folds", label: "Add folds (off if the picture already shows folds)", selector: { boolean: {} } }, { name: "photo_band", label: "Add the bottom band", selector: { boolean: {} } }] },
           { name: "blind_look", label: "Blind look", selector: pick([["classic", "Classic stripes (bright, simple)"], ["venetian", "Venetian slats that tilt"], ["roller", "Roller blind that rolls up"], ["roman", "Roman shade with soft folds"]]) },
@@ -2539,13 +2541,13 @@ class RoostCurtain extends RoostBase {
     const blind = c.style === "blind", look = this.kind(), real = look !== "classic";
     // a real fabric or finish, or the card's own colour
     const FAB = { cream: [230, 222, 206], taupe: [148, 141, 131], silver: [206, 204, 199], linen: [217, 203, 181], sand: [196, 164, 120], sage: [140, 160, 132], navy: [52, 70, 112], charcoal: [70, 72, 80], blush: [212, 160, 156], white: [238, 236, 231], oak: [196, 152, 102], walnut: [112, 76, 50], grey: [150, 152, 156], black: [44, 45, 50] };
-    const base = FAB[c.fabric] || FAB[c.fabric === "" && real ? (blind ? "white" : look === "banded" || look === "photo" ? "cream" : "linen") : ""] || null;
+    const base = FAB[c.fabric] || FAB[c.fabric === "" && real ? (blind ? "white" : look === "banded" || look === "photo" ? "white" : "linen") : ""] || null;
     const hex = (h) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(h)); return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null; };
     const tone = base || hex(g[0]) || [217, 203, 181];
     const mix = (k) => `rgb(${tone.map((v) => Math.max(0, Math.min(255, Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k))))).join(",")})`;
     const wood = c.fabric === "oak" || c.fabric === "walnut";
     const grain = wood ? "repeating-linear-gradient(90deg,rgba(0,0,0,.08) 0 2px,rgba(0,0,0,0) 2px 5px,rgba(255,255,255,.05) 5px 8px,rgba(0,0,0,.06) 8px 11px)," : "";
-    const deep = { pleat: 0.32, wave: 0.42, sheer: 0.38, banded: 0.2, photo: 0.2 }[look] || 0.35;
+    const deep = { pleat: 0.32, wave: 0.42, sheer: 0.38, banded: 0.3, photo: 0.2 }[look] || 0.35;
     // one fold: a shadow valley, the cloth and a lit ridge (the pitch is set as it opens, so folds bunch up)
     const fold = `linear-gradient(90deg,${mix(-deep)} 0%,${mix(-deep * 0.35)} 18%,${mix(0.14)} 42%,${mix(0.05)} 60%,${mix(-deep * 0.55)} 85%,${mix(-deep)} 100%)`;
     this._pitch = { pleat: 26, wave: 42, sheer: 30, banded: 30 }[look] || 0;
@@ -2555,7 +2557,7 @@ class RoostCurtain extends RoostBase {
     const photo = look === "photo" ? `url("${String(c.fabric_image).replace(/["\\]/g, "")}")` : "";
     const fabric = (dir) => (photo || (!real ? `repeating-linear-gradient(${blind ? 180 : 90}deg,${dir ? a : b} 0 9px,${dir ? b : a} 9px 18px)` : fold));
     // ripple folds with a band at the bottom (a second fabric sewn along the hem)
-    const btone = FAB[c.band || "taupe"] || FAB.taupe, bmix = (k) => `rgb(${btone.map((v) => Math.max(0, Math.min(255, Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k))))).join(",")})`;
+    const btone = FAB[c.band || "grey"] || FAB.grey, bmix = (k) => `rgb(${btone.map((v) => Math.max(0, Math.min(255, Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k))))).join(",")})`;
     const bandFold = `linear-gradient(90deg,${bmix(-deep)} 0%,${bmix(-deep * 0.35)} 18%,${bmix(0.14)} 42%,${bmix(0.05)} 60%,${bmix(-deep * 0.55)} 85%,${bmix(-deep)} 100%)`;
     const blindBg = { venetian: `${grain}linear-gradient(180deg,${mix(0.22)} 0,${mix(0)} 40%,${mix(-0.28)} var(--sl,80%),rgba(0,0,0,0) var(--sl,80%))`,
       roller: `repeating-linear-gradient(0deg,rgba(0,0,0,.05) 0 2px,rgba(0,0,0,0) 2px 4px),repeating-linear-gradient(90deg,rgba(0,0,0,.04) 0 2px,rgba(255,255,255,.04) 2px 4px),linear-gradient(90deg,${mix(-0.08)},${mix(0.05)} 50%,${mix(-0.08)})`,
@@ -2604,8 +2606,8 @@ class RoostCurtain extends RoostBase {
       .bl{left:0;right:0;background:${blind && real ? blindBg : fabric(1)};box-shadow:0 6px 18px rgba(0,0,0,.3)}
       ${real && !blind ? `.cl,.cr{background-size:${this._pitch}px 100%;background-repeat:repeat-x;border-radius:2px 2px ${look === "wave" ? 10 : 6}px ${look === "wave" ? 10 : 6}px}
       .cl::after,.cr::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(0,0,0,0) 30%,rgba(0,0,0,.18))}
-      ${look === "banded" || (look === "photo" && c.photo_band) ? `.cl::before,.cr::before{content:"";position:absolute;left:0;right:0;bottom:0;height:${Math.max(5, Math.min(60, Number(c.band_height) || 22))}%;background:radial-gradient(ellipse 50% 100% at 50% 0,${look === "photo" ? "rgba(0,0,0,0)" : mix(-0.04)} 0 96%,rgba(0,0,0,0) 100%) 0 -1px/var(--fold,30px) 7px repeat-x,${bandFold} 0 0/var(--fold,30px) 100% repeat-x}` : ""}
-      ${look === "banded" || look === "photo" ? `.cl,.cr{border-radius:2px;-webkit-mask:linear-gradient(#000,#000) 0 0/100% calc(100% - 5px) no-repeat,radial-gradient(ellipse 50% 100% at 50% 0,#000 0 96%,rgba(0,0,0,0) 100%) 0 100%/var(--fold,30px) 6px repeat-x;mask:linear-gradient(#000,#000) 0 0/100% calc(100% - 5px) no-repeat,radial-gradient(ellipse 50% 100% at 50% 0,#000 0 96%,rgba(0,0,0,0) 100%) 0 100%/var(--fold,30px) 6px repeat-x}` : ""}
+      ${look === "banded" || (look === "photo" && c.photo_band) ? `.cl::before,.cr::before{content:"";position:absolute;left:0;right:0;bottom:0;height:${Math.max(5, Math.min(60, Number(c.band_height) || 22))}%;background:${c.band_wave && look !== "photo" ? `radial-gradient(ellipse 50% 100% at 50% 0,${mix(-0.04)} 0 96%,rgba(0,0,0,0) 100%) 0 -1px/var(--fold,30px) 7px repeat-x,` : ""}${bandFold} 0 0/var(--fold,30px) 100% repeat-x}` : ""}
+      ${(look === "banded" || look === "photo") && c.band_wave ? `.cl,.cr{border-radius:2px;-webkit-mask:linear-gradient(#000,#000) 0 0/100% calc(100% - 5px) no-repeat,radial-gradient(ellipse 50% 100% at 50% 0,#000 0 96%,rgba(0,0,0,0) 100%) 0 100%/var(--fold,30px) 6px repeat-x;mask:linear-gradient(#000,#000) 0 0/100% calc(100% - 5px) no-repeat,radial-gradient(ellipse 50% 100% at 50% 0,#000 0 96%,rgba(0,0,0,0) 100%) 0 100%/var(--fold,30px) 6px repeat-x}` : ""}
       ${look === "photo" ? `.cl,.cr{background-color:${mix(0)}}.cl::after,.cr::after{background:${c.photo_folds === false ? "linear-gradient(180deg,rgba(255,255,255,.06),rgba(0,0,0,0) 30%,rgba(0,0,0,.10))" : `linear-gradient(90deg,rgba(0,0,0,.24) 0%,rgba(0,0,0,.08) 18%,rgba(255,255,255,.16) 42%,rgba(255,255,255,.05) 60%,rgba(0,0,0,.13) 85%,rgba(0,0,0,.24) 100%) 0 0/var(--fold,30px) 100% repeat-x,linear-gradient(180deg,rgba(255,255,255,.06),rgba(0,0,0,0) 30%,rgba(0,0,0,.10))`}}` : ""}
       .rod{height:7px;top:2px;border-radius:4px;background:linear-gradient(180deg,#E8E2D6,#9E968A);box-shadow:0 2px 4px rgba(0,0,0,.35)}
       ${look === "wave" ? `.rod::before{content:"";position:absolute;left:4px;right:4px;top:-3px;height:13px;background:radial-gradient(circle at 50% 50%,rgba(0,0,0,0) 3px,#C9C2B5 3.5px,#8E8578 5px,rgba(0,0,0,0) 5.5px) 0 0/${this._pitch / 2}px 13px repeat-x}` : `.rod::before,.rod::after{content:"";position:absolute;top:-3px;width:13px;height:13px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#F5F0E6,#8E8578)}.rod::before{left:-2px}.rod::after{right:-2px}`}

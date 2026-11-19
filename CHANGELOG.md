@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.20.1
+
+- **"Not working right now" stays inside its card.** The note no longer covers the bottom bar; the bar and pop-ups always stay on top.
+- **Curtain ripple look:** white folds with a straight grey band by default. The wavy band edge and curved hem are an option ("Wavy band edge and curved hem"); cream and taupe are still there as colours.
+
 ## 1.20.0
 
 - **Curtain: softer ripple folds.** The "Ripple folds with a band at the bottom" look now has cream folds, a gentle wave where the fabric meets the band (taupe by default) and a softly curved hem, and the folds bunch together as it opens.
