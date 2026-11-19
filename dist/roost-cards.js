@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.19.0";
+const ROOST_VERSION = "1.20.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -2476,12 +2476,13 @@ class RoostCurtain extends RoostBase {
         ] },
         { name: "name", selector: { text: {} } },
         { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
-          { name: "style", label: "Kind", selector: pick([["pair", "Two curtains that meet in the middle"], ["left", "One curtain, opens to the left"], ["right", "One curtain, opens to the right"], ["blind", "Blind (up and down)"]]) },
+          { name: "style", label: "Kind", selector: pick([["pair", "Two curtains that meet in the middle"], ["left", "One curtain, opens from right to left (gathers on the left)"], ["right", "One curtain, opens from left to right (gathers on the right)"], ["blind", "Blind (up and down)"]]) },
           { name: "look", label: "Curtain look", selector: pick([["classic", "Classic stripes (bright, simple)"], ["pleat", "Pinch pleat drapes on a metal rod"], ["wave", "Wave curtain on rings"], ["banded", "Ripple folds with a band at the bottom"], ["sheer", "Sheer behind a blackout curtain"]]) },
-          { type: "grid", name: "", schema: [{ name: "band", label: "Bottom band (ripple with band)", selector: pick([["silver", "Light grey"], ["grey", "Stone grey"], ["linen", "Linen"], ["sand", "Sand"], ["sage", "Sage"], ["navy", "Navy"], ["charcoal", "Charcoal"], ["blush", "Blush"], ["black", "Black"]]) }, { name: "band_height", label: "Band height", selector: slider(10, 40, 1, "%") }] },
-          { name: "fabric_image", label: "Your own curtain photo (for example /local/roost/curtain.jpg); it bunches up as it opens", selector: { text: {} } },
+          { type: "grid", name: "", schema: [{ name: "band", label: "Bottom band (ripple with band)", selector: pick([["taupe", "Taupe"], ["silver", "Light grey"], ["grey", "Stone grey"], ["linen", "Linen"], ["sand", "Sand"], ["sage", "Sage"], ["navy", "Navy"], ["charcoal", "Charcoal"], ["blush", "Blush"], ["black", "Black"]]) }, { name: "band_height", label: "Band height", selector: slider(10, 40, 1, "%") }] },
+          { name: "fabric_image", label: "Your fabric: a picture of it (for example /local/roost/fabric.jpg)", selector: { text: {} } },
+          { type: "grid", name: "", schema: [{ name: "photo_folds", label: "Add folds (off if the picture already shows folds)", selector: { boolean: {} } }, { name: "photo_band", label: "Add the bottom band", selector: { boolean: {} } }] },
           { name: "blind_look", label: "Blind look", selector: pick([["classic", "Classic stripes (bright, simple)"], ["venetian", "Venetian slats that tilt"], ["roller", "Roller blind that rolls up"], ["roman", "Roman shade with soft folds"]]) },
-          { name: "fabric", label: "Fabric or finish", selector: pick([["", "Card colour (below)"], ["linen", "Linen"], ["sand", "Sand"], ["sage", "Sage"], ["navy", "Navy"], ["charcoal", "Charcoal"], ["blush", "Blush"], ["white", "White"], ["oak", "Oak wood"], ["walnut", "Walnut wood"], ["grey", "Stone grey"], ["black", "Black"]]) },
+          { name: "fabric", label: "Fabric or finish", selector: pick([["", "Card colour (below)"], ["linen", "Linen"], ["sand", "Sand"], ["sage", "Sage"], ["navy", "Navy"], ["charcoal", "Charcoal"], ["blush", "Blush"], ["white", "White"], ["cream", "Cream"], ["oak", "Oak wood"], ["walnut", "Walnut wood"], ["grey", "Stone grey"], ["black", "Black"]]) },
           ...colourFields("color", "Card colour"),
           { type: "grid", name: "", schema: [{ name: "height", label: "Window height", selector: slider(90, 280, 10) }, { name: "radius", selector: slider(0, 32, 2) }] },
           { type: "grid", name: "", schema: [{ name: "travel_time", label: "Slide time", selector: slider(0.4, 4, 0.2, "s") }, { name: "frame", label: "Card background", selector: { boolean: {} } }] },
@@ -2537,23 +2538,24 @@ class RoostCurtain extends RoostBase {
     const a = `color-mix(in srgb, ${g[1]} 55%, ${g[0]})`, b = `color-mix(in srgb, ${g[0]} 80%, ${g[1]})`;
     const blind = c.style === "blind", look = this.kind(), real = look !== "classic";
     // a real fabric or finish, or the card's own colour
-    const FAB = { silver: [206, 204, 199], linen: [217, 203, 181], sand: [196, 164, 120], sage: [140, 160, 132], navy: [52, 70, 112], charcoal: [70, 72, 80], blush: [212, 160, 156], white: [238, 236, 231], oak: [196, 152, 102], walnut: [112, 76, 50], grey: [150, 152, 156], black: [44, 45, 50] };
-    const base = FAB[c.fabric] || FAB[c.fabric === "" && real ? (blind || look === "banded" ? "white" : "linen") : ""] || null;
+    const FAB = { cream: [230, 222, 206], taupe: [148, 141, 131], silver: [206, 204, 199], linen: [217, 203, 181], sand: [196, 164, 120], sage: [140, 160, 132], navy: [52, 70, 112], charcoal: [70, 72, 80], blush: [212, 160, 156], white: [238, 236, 231], oak: [196, 152, 102], walnut: [112, 76, 50], grey: [150, 152, 156], black: [44, 45, 50] };
+    const base = FAB[c.fabric] || FAB[c.fabric === "" && real ? (blind ? "white" : look === "banded" || look === "photo" ? "cream" : "linen") : ""] || null;
     const hex = (h) => { const m = /^#?([0-9a-f]{6})$/i.exec(String(h)); return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)) : null; };
     const tone = base || hex(g[0]) || [217, 203, 181];
     const mix = (k) => `rgb(${tone.map((v) => Math.max(0, Math.min(255, Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k))))).join(",")})`;
     const wood = c.fabric === "oak" || c.fabric === "walnut";
     const grain = wood ? "repeating-linear-gradient(90deg,rgba(0,0,0,.08) 0 2px,rgba(0,0,0,0) 2px 5px,rgba(255,255,255,.05) 5px 8px,rgba(0,0,0,.06) 8px 11px)," : "";
-    const deep = { pleat: 0.32, wave: 0.42, sheer: 0.38, banded: 0.24 }[look] || 0.35;
+    const deep = { pleat: 0.32, wave: 0.42, sheer: 0.38, banded: 0.2, photo: 0.2 }[look] || 0.35;
     // one fold: a shadow valley, the cloth and a lit ridge (the pitch is set as it opens, so folds bunch up)
     const fold = `linear-gradient(90deg,${mix(-deep)} 0%,${mix(-deep * 0.35)} 18%,${mix(0.14)} 42%,${mix(0.05)} 60%,${mix(-deep * 0.55)} 85%,${mix(-deep)} 100%)`;
-    this._pitch = { pleat: 26, wave: 42, sheer: 30, banded: 22 }[look] || 0;
+    this._pitch = { pleat: 26, wave: 42, sheer: 30, banded: 30 }[look] || 0;
+    this._fold = { banded: 30, photo: 30 }[look] || this._pitch;
     // your own curtain photo: one seamless strip of the real fabric, squeezed together as the curtain opens
     if (look === "photo") this._pitch = Number(c.fabric_tile) || Math.round((Number(c.height) || 150) * 1.3);
     const photo = look === "photo" ? `url("${String(c.fabric_image).replace(/["\\]/g, "")}")` : "";
     const fabric = (dir) => (photo || (!real ? `repeating-linear-gradient(${blind ? 180 : 90}deg,${dir ? a : b} 0 9px,${dir ? b : a} 9px 18px)` : fold));
     // ripple folds with a band at the bottom (a second fabric sewn along the hem)
-    const btone = FAB[c.band || "silver"] || FAB.silver, bmix = (k) => `rgb(${btone.map((v) => Math.max(0, Math.min(255, Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k))))).join(",")})`;
+    const btone = FAB[c.band || "taupe"] || FAB.taupe, bmix = (k) => `rgb(${btone.map((v) => Math.max(0, Math.min(255, Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k))))).join(",")})`;
     const bandFold = `linear-gradient(90deg,${bmix(-deep)} 0%,${bmix(-deep * 0.35)} 18%,${bmix(0.14)} 42%,${bmix(0.05)} 60%,${bmix(-deep * 0.55)} 85%,${bmix(-deep)} 100%)`;
     const blindBg = { venetian: `${grain}linear-gradient(180deg,${mix(0.22)} 0,${mix(0)} 40%,${mix(-0.28)} var(--sl,80%),rgba(0,0,0,0) var(--sl,80%))`,
       roller: `repeating-linear-gradient(0deg,rgba(0,0,0,.05) 0 2px,rgba(0,0,0,0) 2px 4px),repeating-linear-gradient(90deg,rgba(0,0,0,.04) 0 2px,rgba(255,255,255,.04) 2px 4px),linear-gradient(90deg,${mix(-0.08)},${mix(0.05)} 50%,${mix(-0.08)})`,
@@ -2602,8 +2604,9 @@ class RoostCurtain extends RoostBase {
       .bl{left:0;right:0;background:${blind && real ? blindBg : fabric(1)};box-shadow:0 6px 18px rgba(0,0,0,.3)}
       ${real && !blind ? `.cl,.cr{background-size:${this._pitch}px 100%;background-repeat:repeat-x;border-radius:2px 2px ${look === "wave" ? 10 : 6}px ${look === "wave" ? 10 : 6}px}
       .cl::after,.cr::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(0,0,0,0) 30%,rgba(0,0,0,.18))}
-      ${look === "banded" ? `.cl::before,.cr::before{content:"";position:absolute;left:0;right:0;bottom:0;height:${Math.max(5, Math.min(60, Number(c.band_height) || 22))}%;border-radius:0 0 inherit inherit;background:${bandFold};background-size:inherit;background-repeat:repeat-x}` : ""}
-      ${look === "photo" ? `.cl,.cr{background-color:${mix(0)};border-radius:2px 2px 4px 4px}.cl::after,.cr::after{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(0,0,0,0) 30%,rgba(0,0,0,.10))}` : ""}
+      ${look === "banded" || (look === "photo" && c.photo_band) ? `.cl::before,.cr::before{content:"";position:absolute;left:0;right:0;bottom:0;height:${Math.max(5, Math.min(60, Number(c.band_height) || 22))}%;background:radial-gradient(ellipse 50% 100% at 50% 0,${look === "photo" ? "rgba(0,0,0,0)" : mix(-0.04)} 0 96%,rgba(0,0,0,0) 100%) 0 -1px/var(--fold,30px) 7px repeat-x,${bandFold} 0 0/var(--fold,30px) 100% repeat-x}` : ""}
+      ${look === "banded" || look === "photo" ? `.cl,.cr{border-radius:2px;-webkit-mask:linear-gradient(#000,#000) 0 0/100% calc(100% - 5px) no-repeat,radial-gradient(ellipse 50% 100% at 50% 0,#000 0 96%,rgba(0,0,0,0) 100%) 0 100%/var(--fold,30px) 6px repeat-x;mask:linear-gradient(#000,#000) 0 0/100% calc(100% - 5px) no-repeat,radial-gradient(ellipse 50% 100% at 50% 0,#000 0 96%,rgba(0,0,0,0) 100%) 0 100%/var(--fold,30px) 6px repeat-x}` : ""}
+      ${look === "photo" ? `.cl,.cr{background-color:${mix(0)}}.cl::after,.cr::after{background:${c.photo_folds === false ? "linear-gradient(180deg,rgba(255,255,255,.06),rgba(0,0,0,0) 30%,rgba(0,0,0,.10))" : `linear-gradient(90deg,rgba(0,0,0,.24) 0%,rgba(0,0,0,.08) 18%,rgba(255,255,255,.16) 42%,rgba(255,255,255,.05) 60%,rgba(0,0,0,.13) 85%,rgba(0,0,0,.24) 100%) 0 0/var(--fold,30px) 100% repeat-x,linear-gradient(180deg,rgba(255,255,255,.06),rgba(0,0,0,0) 30%,rgba(0,0,0,.10))`}}` : ""}
       .rod{height:7px;top:2px;border-radius:4px;background:linear-gradient(180deg,#E8E2D6,#9E968A);box-shadow:0 2px 4px rgba(0,0,0,.35)}
       ${look === "wave" ? `.rod::before{content:"";position:absolute;left:4px;right:4px;top:-3px;height:13px;background:radial-gradient(circle at 50% 50%,rgba(0,0,0,0) 3px,#C9C2B5 3.5px,#8E8578 5px,rgba(0,0,0,0) 5.5px) 0 0/${this._pitch / 2}px 13px repeat-x}` : `.rod::before,.rod::after{content:"";position:absolute;top:-3px;width:13px;height:13px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#F5F0E6,#8E8578)}.rod::before{left:-2px}.rod::after{right:-2px}`}
       .shr{position:absolute;inset:0;z-index:1;background:repeating-linear-gradient(90deg,rgba(255,255,255,.30) 0 7px,rgba(255,255,255,.12) 7px 14px,rgba(255,255,255,.34) 14px 21px);backdrop-filter:blur(1.5px);-webkit-backdrop-filter:blur(1.5px)}` : ""}
@@ -2768,7 +2771,7 @@ class RoostCurtain extends RoostBase {
     }
     // real fabrics: folds bunch up as it opens, slats close up as a blind rises
     const look = this.kind(), H = Math.max(40, (Number(c.height) || 150) - 12);
-    if (look !== "classic" && c.style !== "blind" && this._pitch) root.querySelectorAll(".cl,.cr").forEach((el) => { el.style.backgroundSize = `${(this._pitch * (0.55 + 0.45 * (1 - pos / 100))).toFixed(1)}px 100%`; });
+    if (look !== "classic" && c.style !== "blind" && this._pitch) { const k = 0.55 + 0.45 * (1 - pos / 100); root.querySelectorAll(".cl,.cr").forEach((el) => { el.style.backgroundSize = `${(this._pitch * k).toFixed(1)}px 100%`; el.style.setProperty("--fold", `${((this._fold || this._pitch) * k).toFixed(1)}px`); }); }
     const bl = root.querySelector(".bl");
     if (bl && look !== "classic") {
       const covered = H * (1 - 0.88 * pos / 100);

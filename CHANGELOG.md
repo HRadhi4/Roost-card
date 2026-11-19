@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.20.0
+
+- **Curtain: softer ripple folds.** The "Ripple folds with a band at the bottom" look now has cream folds, a gentle wave where the fabric meets the band (taupe by default) and a softly curved hem, and the folds bunch together as it opens.
+- **Curtain: one side, clearer.** "One curtain, opens from right to left (gathers on the left)" and "… from left to right (gathers on the right)".
+- **Curtain: a picture of your fabric is enough.** Give a plain photo of the fabric and the card adds the folds (and, if you like, the bottom band). For a photo of the real hanging curtain, switch "Add folds" off.
+
 ## 1.19.0
 
 - **Curtain: ripple folds with a band at the bottom.** A new look like most modern ripple-fold curtains: soft white folds with a second fabric sewn along the hem (light grey by default; choose its colour and height).
