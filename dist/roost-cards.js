@@ -9647,7 +9647,7 @@ const RoostSheet = {
       } else out.push(`<div class="note">No history for the last day yet.</div>`);
       out.push(tiles([["Last change", ago(s.last_changed)], ["Last report", ago(s.last_updated)]]));
     } else if (!["camera", "weather", "scene", "script", "button", "input_button", "update"].includes(dom)) {
-      // a day strip: when it was on, open, home… and for how long
+      // a day strip: when it was on, open or home, and for how long
       const active = (st) => !UNAVAILABLE.includes(st) && !OFF_STATES.includes(st);
       const seg = []; let onMs = 0, turns = 0;
       for (let k = 0; k < rows.length; k++) {
@@ -9767,8 +9767,8 @@ const RoostSheet = {
       .chips{display:flex;flex-wrap:wrap;gap:8px}.chips button{height:40px;padding:0 14px;border-radius:999px;border:0;background:${p.inset};color:${p.text};font-size:14px;font-weight:600}.chips button.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:#FFFFFF}
       .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.tiles button{min-height:72px;border-radius:18px;border:0;padding:12px;background:${p.inset};color:${p.text};display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:6px;text-align:left;--mdc-icon-size:20px}
       .tiles button span{font-size:14px;font-weight:600}.tiles button small{font-size:12px;opacity:.8}.tiles button.on{color:#FFFFFF}
-      .sh{transition:transform .18s ease-out}
-      .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stats div{border-radius:16px;background:${p.inset};padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0}.stats span{font-size:12px;color:${p.muted}}.stats b{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .sh{transition:transform .12s ease-out}
+      .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stats div{border-radius:16px;background:${p.inset};padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0}.stats span{font-size:12px;color:${p.muted}}.stats b{font-size:15px;font-weight:600;overflow-wrap:anywhere}
       .chart{border-radius:18px;background:${p.inset};padding:10px 10px 6px}.chart svg{width:100%;height:120px;display:block}
       .ax{display:flex;justify-content:space-between;font-size:11px;color:${p.muted};padding:4px 2px 0}
       .strip{position:relative;height:28px;border-radius:10px;background:${p.inset};overflow:hidden}.strip i{position:absolute;top:0;bottom:0}
