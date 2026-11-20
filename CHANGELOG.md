@@ -2,6 +2,13 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.27.0
+
+- **Follow me** (Roost Rooms Selector): the card opens the room you are in, from the presence or motion sensors in each room, or from a Bluetooth room tracker such as Bermuda. After you pick a room yourself it waits a couple of minutes before following again.
+- **Arabic fits properly.** Buttons and switches move to the left and the room icon to the right, so names never run under them; switch knobs slide the right way, and numbers keep their units in order (214 km, 1240 L). The slide-to-unlock bar still slides left to right.
+- **A language button in the navigation bar.** A bar item set to *Arabic and English* now switches the language.
+- **Home Tour:** devices have dotted outlines; pressing one opens a side panel with the device in 3D and all its controls. Picture addresses are plain, so they always load.
+
 ## 1.26.0
 
 - **Roost Chips has five new looks** (card settings → Look). The classic pills stay the default.

@@ -292,6 +292,11 @@ auto_colors: true
 swipe: true
 remember: true
 start_room: ""
+follow: false              # Follow me: open the room you are in
+follow_tracker: ""         # or a Bluetooth room tracker, e.g. sensor.my_phone_area (Bermuda)
+follow_pause: 2            # minutes to wait after you pick a room yourself
+# per room: presence: binary_sensor.kitchen_presence (empty = any presence or motion sensor
+# in the Home Assistant area with the room's name), area: kitchen (if the area's name is different)
 ```
 
 ### Roost Curtain
