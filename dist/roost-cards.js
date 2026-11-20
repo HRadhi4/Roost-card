@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.25.0";
+const ROOST_VERSION = "1.25.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -9672,6 +9672,52 @@ try { if (!document.getElementById("roost-gutter")) { const st = document.create
 // Holding a Roost card opens this sheet instead of Home Assistant's window: half height, only what matters
 // (the name, the state and one main control). Swipe up (or tap "More") for history and details;
 // swipe down, tap outside or press Escape to close. "More in Home Assistant" still opens the usual window.
+// While a Roost sheet or popup is open, every touch, swipe, scroll and wheel stays inside it: the page behind
+// doesn't scroll, page-swipe add-ons don't see the finger, and a list inside the popup scrolls only itself.
+const RoostLayer = {
+  n: 0, saved: null,
+  // the part under the finger that can still scroll that way (null: nothing can)
+  scroller(e, host, dx, dy) {
+    for (const n of e.composedPath()) {
+      if (n === host || !(n instanceof Element)) break;
+      const cs = getComputedStyle(n);
+      if (dy && /(auto|scroll)/.test(cs.overflowY) && n.scrollHeight > n.clientHeight + 1 && (dy < 0 ? n.scrollTop + n.clientHeight < n.scrollHeight - 1 : n.scrollTop > 0)) return n;
+      if (dx && /(auto|scroll)/.test(cs.overflowX) && n.scrollWidth > n.clientWidth + 1 && (dx < 0 ? n.scrollLeft + n.clientWidth < n.scrollWidth - 1 : n.scrollLeft > 0)) return n;
+    }
+    return null;
+  },
+  hold(host) {
+    if (host.__roostHeld) return;
+    host.__roostHeld = true;
+    if (this.n++ === 0) {
+      const d = document.documentElement, b = document.body;
+      this.saved = [d.style.overflow, b.style.overflow, d.style.overscrollBehavior, b.style.overscrollBehavior];
+      d.style.overflow = "hidden"; b.style.overflow = "hidden"; d.style.overscrollBehavior = "none"; b.style.overscrollBehavior = "none";
+    }
+    let x0 = 0, y0 = 0;
+    const keep = (e) => e.stopPropagation();
+    for (const t of ["touchstart", "touchmove", "touchend", "touchcancel", "pointerdown", "pointermove", "pointerup", "pointercancel", "mousedown", "mouseup", "click", "wheel", "contextmenu"]) host.addEventListener(t, keep);
+    host.addEventListener("touchstart", (e) => { x0 = e.touches[0]?.clientX || 0; y0 = e.touches[0]?.clientY || 0; }, { passive: true });
+    host.addEventListener("touchmove", (e) => {
+      const t = e.touches[0]; if (!t || e.touches.length > 1) return;
+      // sliders and fields handle their own finger
+      if (e.composedPath().some((n) => n === host ? false : /^(INPUT|SELECT|TEXTAREA)$/.test(n.tagName || "") || n.getAttribute?.("role") === "slider" || n.dataset?.bar != null)) return;
+      const dx = t.clientX - x0, dy = t.clientY - y0, sideways = Math.abs(dx) > Math.abs(dy);
+      if (e.cancelable && !this.scroller(e, host, sideways ? dx : 0, sideways ? 0 : dy)) e.preventDefault();
+    }, { passive: false });
+    host.addEventListener("wheel", (e) => { if (e.cancelable && !e.ctrlKey && !this.scroller(e, host, e.shiftKey ? -e.deltaY : -e.deltaX, e.shiftKey ? 0 : -e.deltaY)) e.preventDefault(); }, { passive: false });
+  },
+  free(host) {
+    if (!host?.__roostHeld) return;
+    host.__roostHeld = false;
+    if (this.n > 0 && --this.n === 0 && this.saved) {
+      const d = document.documentElement, b = document.body;
+      [d.style.overflow, b.style.overflow, d.style.overscrollBehavior, b.style.overscrollBehavior] = this.saved; this.saved = null;
+    }
+  },
+};
+window.RoostLayer = RoostLayer;
+
 const RoostSheet = {
   ha() { return document.querySelector("home-assistant"); },
   hass() { return this.ha()?.hass; },
@@ -9683,6 +9729,7 @@ const RoostSheet = {
     host.style.cssText = "position:fixed;inset:0;z-index:998;display:block";
     const root = host.attachShadow({ mode: "open" });
     document.body.appendChild(host);
+    RoostLayer.hold(host);
     this.el = { host, root, id: entityId, room: room || null, full: false, hist: null, last: null };
     this._key = (e) => { if (e.key === "Escape") this.close(); };
     window.addEventListener("keydown", this._key);
@@ -9698,7 +9745,12 @@ const RoostSheet = {
   close() {
     if (!this.el) return;
     clearInterval(this._tick); window.removeEventListener("keydown", this._key);
-    this.el.host.remove(); this.el = null;
+    RoostLayer.free(this.el.host); this.el.host.remove(); this.el = null;
+  },
+  // a short settle at the end of a drag: quick at first, gentle at the end
+  glide(node, frames, ms = 220, fill = "none") {
+    let still = false; try { still = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { /* old browser */ }
+    try { return still ? Promise.resolve() : node.animate(frames, { duration: ms, easing: "cubic-bezier(.2,.8,.2,1)", fill }).finished.catch(() => {}); } catch (e) { return Promise.resolve(); }
   },
   call(domain, service, data) { try { navigator.vibrate?.(12); } catch (e) { /* no vibration */ } [service, data] = fixCover(domain, service, data); return this.hass()?.callService(domain, service, data); },
   look(dom, s) {
@@ -9929,8 +9981,8 @@ const RoostSheet = {
     const sheetBg = dark ? "#141831" : "#FFFFFF";
     return `
       :host{font-family:Inter,var(--paper-font-body1_-_font-family,system-ui),sans-serif;color:${p.text}}
-      .dim{position:absolute;inset:0;background:${dark ? "rgba(5,6,16,.55)" : "rgba(22,25,54,.28)"}}
-      .sh{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;box-sizing:border-box;border-radius:32px 32px 0 0;background:${sheetBg};padding:10px 20px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:18px;max-height:${el.full ? "88vh" : "60vh"};overflow-y:auto;box-shadow:0 -24px 60px -20px ${dark ? "rgba(109,75,255,.35)" : "rgba(40,30,90,.18)"};touch-action:pan-y}
+      .dim{position:absolute;inset:0;touch-action:none;background:${dark ? "rgba(5,6,16,.55)" : "rgba(22,25,54,.28)"}}
+      .sh{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;box-sizing:border-box;border-radius:32px 32px 0 0;background:${sheetBg};padding:10px 20px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:18px;max-height:${el.full ? "88vh" : "60vh"};overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;box-shadow:0 -24px 60px -20px ${dark ? "rgba(109,75,255,.35)" : "rgba(40,30,90,.18)"};touch-action:pan-y}
       .sh > *{flex-shrink:0}
       .hd{align-self:center;width:40px;height:5px;border-radius:3px;background:${p.track};border:0;padding:0;cursor:grab}
       .hdr{display:flex;align-items:center;gap:12px}
@@ -9965,7 +10017,6 @@ const RoostSheet = {
       .chips{display:flex;flex-wrap:wrap;gap:8px}.chips button{height:40px;padding:0 14px;border-radius:999px;border:0;background:${p.inset};color:${p.text};font-size:14px;font-weight:600}.chips button.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:#FFFFFF}
       .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.tiles button{min-height:72px;border-radius:18px;border:0;padding:12px;background:${p.inset};color:${p.text};display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:6px;text-align:left;--mdc-icon-size:20px}
       .tiles button span{font-size:14px;font-weight:600}.tiles button small{font-size:12px;opacity:.8}.tiles button.on{color:#FFFFFF}
-      .sh{transition:transform .12s ease-out}
       .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stats div{border-radius:16px;background:${p.inset};padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0}.stats span{font-size:12px;color:${p.muted}}.stats b{font-size:15px;font-weight:600;overflow-wrap:anywhere}
       .chart{border-radius:18px;background:${p.inset};padding:10px 10px 6px}.chart svg{width:100%;height:120px;display:block}
       .ax{display:flex;justify-content:space-between;font-size:11px;color:${p.muted};padding:4px 2px 0}
@@ -10007,13 +10058,13 @@ const RoostSheet = {
       ev.stopPropagation();
       const act = b.dataset.act;
       if (act === "close") return this.close();
-      if (act === "grow") { el.full = !el.full; return this.draw(); }
+      if (act === "grow") { const b4 = root.querySelector(".sh")?.getBoundingClientRect().height; el.full = !el.full; this.draw(); const n = root.querySelector(".sh"); if (n && b4) this.glide(n, [{ height: `${b4}px` }, { height: `${n.getBoundingClientRect().height}px` }]); return undefined; }
       if (act === "ha") { this.close(); this.ha()?.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true })); return undefined; }
       if (act === "toggle") return this.call("homeassistant", "toggle", { entity_id: id });
       if (act.startsWith("ct:")) return this.call("light", "turn_on", { entity_id: id, color_temp_kelvin: Number(act.slice(3)) });
       if (act.startsWith("t:")) { const t = Math.round(((a.temperature ?? 22) + Number(act.slice(2))) * 2) / 2; return this.call("climate", "set_temperature", { entity_id: id, temperature: t }); }
       if (act.startsWith("mode:")) return this.call("climate", "set_hvac_mode", { entity_id: id, hvac_mode: act.slice(5) });
-      if (act === "open" || act === "close_c") return this.call("cover", "open_cover", { entity_id: id });
+      if (act === "open") return this.call("cover", "open_cover", { entity_id: id });
       if (act === "lock" || act === "unlock") return this.call("lock", act, { entity_id: id });
       if (act === "play") return this.call("media_player", "media_play_pause", { entity_id: id });
       if (act === "prev") return this.call("media_player", "media_previous_track", { entity_id: id });
@@ -10067,24 +10118,72 @@ const RoostSheet = {
         v = null;
       });
     });
-    // swipe the sheet: up for more, down for less or to close. Works from anywhere on it, buttons included.
-    const sh = root.querySelector(".sh");
-    let y0 = null, x0 = 0, top0 = 0, moved = false;
-    const start = (x, y, t) => { if (t.closest?.("[data-bar]")) return; y0 = y; x0 = x; top0 = sh.scrollTop; moved = false; el.busy = true; };
-    const move = (x, y) => { if (y0 == null) return; const dy = y - y0; if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(x - x0)) moved = true; if (moved && ((dy < 0 && !el.full) || (dy > 0 && top0 <= 0))) sh.style.transform = `translateY(${dy > 0 ? dy : dy / 3}px)`; };
-    const end = (y) => {
-      if (y0 == null) return; const dy = y - y0; y0 = null; el.busy = false; sh.style.transform = "";
-      if (!moved) return;
-      sh.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); }, { capture: true, once: true }); setTimeout(() => { moved = false; }, 0);
-      if (dy < -40 && !el.full) { el.full = true; this.draw(); } else if (dy > 60 && top0 <= 0) { if (el.full) { el.full = false; this.draw(); } else this.close(); }
+    // swipe the sheet: pull up and it grows under the finger to show more; pull down for less or to close.
+    // It follows the finger exactly and settles with a short glide when let go (a quick flick is enough).
+    // The gesture lives on el.g so it carries on when the sheet is drawn again in the middle of it.
+    const sheet = () => root.querySelector(".sh");
+    const start = (x, y, t) => {
+      if (t.closest?.("[data-bar]") || el.g?.active) return;
+      const n = sheet(); n.getAnimations?.().forEach((an) => an.cancel());
+      el.g = { active: true, x0: x, y0: y, h0: n.getBoundingClientRect().height, mode: null, wasFull: el.full, ly: y, lt: performance.now(), v: 0, dy: 0 };
+      el.busy = true;
     };
+    const move = (x, y, e) => {
+      const g = el.g; if (!g?.active) return;
+      const dy = y - g.y0, now = performance.now();
+      if (now > g.lt) { g.v = 0.6 * g.v + 0.4 * ((y - g.ly) / Math.max(16, now - g.lt)); g.ly = y; g.lt = now; }
+      g.dy = dy;
+      if (!g.mode) {
+        if (Math.abs(dy) < 8 || Math.abs(dy) < Math.abs(x - g.x0)) return;
+        g.mode = dy < 0 && !el.full ? "grow" : dy > 0 && sheet().scrollTop <= 0 ? "down" : "scroll";
+        if (g.mode === "grow") {
+          el.full = true; this.draw();
+          const n = sheet(); n.style.overflow = "hidden"; n.style.height = "auto";
+          g.max = Math.min(n.getBoundingClientRect().height, window.innerHeight * 0.88); n.style.height = `${g.h0}px`;
+        }
+      }
+      if (g.mode === "scroll") return;
+      if (e?.cancelable) e.preventDefault();
+      const n = sheet();
+      if (g.mode === "grow") { const h = g.h0 - dy; n.style.height = `${h > g.max ? g.max + (h - g.max) / 4 : h < g.h0 ? g.h0 - (g.h0 - h) / 3 : h}px`; }
+      else n.style.transform = `translateY(${Math.max(0, dy)}px)`;
+    };
+    const end = () => {
+      const g = el.g; if (!g?.active) return;
+      g.active = false; el.busy = false;
+      if (!g.mode || g.mode === "scroll") return;
+      // the finger lifting after a drag is not a tap on whatever is under it
+      const eat = (ev) => { ev.stopPropagation(); ev.preventDefault(); };
+      window.addEventListener("click", eat, { capture: true, once: true }); setTimeout(() => window.removeEventListener("click", eat, true), 350);
+      const n = sheet(), dim = root.querySelector(".dim");
+      if (g.mode === "grow") {
+        const now = n.getBoundingClientRect().height;
+        if (g.dy < -40 || g.v < -0.3) { n.style.height = ""; n.style.overflow = ""; this.glide(n, [{ height: `${now}px` }, { height: `${n.getBoundingClientRect().height}px` }]); }
+        else { n.style.height = `${g.h0}px`; this.glide(n, [{ height: `${now}px` }, { height: `${g.h0}px` }], 180).then(() => { if (this.el === el) { el.full = false; this.draw(); } }); }
+        return;
+      }
+      const shut = g.dy > 90 || (g.dy > 24 && g.v > 0.45);
+      if (!shut) { n.style.transform = ""; this.glide(n, [{ transform: `translateY(${Math.max(0, g.dy)}px)` }, { transform: "translateY(0)" }], 180); return; }
+      if (g.wasFull) {
+        const from = g.h0 - g.dy; el.full = false; this.draw(); const m = sheet();
+        this.glide(m, [{ height: `${Math.max(0, from)}px` }, { height: `${m.getBoundingClientRect().height}px` }]);
+        return;
+      }
+      this.glide(n, [{ transform: `translateY(${Math.max(0, g.dy)}px)` }, { transform: "translateY(100%)" }], 200, "forwards");
+      if (dim) this.glide(dim, [{ opacity: 1 }, { opacity: 0 }], 200, "forwards");
+      setTimeout(() => { if (this.el === el) this.close(); }, 190);
+    };
+    const sh = sheet();
     sh.addEventListener("touchstart", (e) => start(e.touches[0].clientX, e.touches[0].clientY, e.target), { passive: true });
-    sh.addEventListener("touchmove", (e) => move(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-    sh.addEventListener("touchend", (e) => end(e.changedTouches[0].clientY));
-    sh.addEventListener("touchcancel", () => { y0 = null; el.busy = false; sh.style.transform = ""; });
-    sh.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse") start(e.clientX, e.clientY, e.target); });
-    sh.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") move(e.clientX, e.clientY); });
-    sh.addEventListener("pointerup", (e) => { if (e.pointerType === "mouse") end(e.clientY); });
+    sh.addEventListener("touchmove", (e) => move(e.touches[0].clientX, e.touches[0].clientY, e), { passive: false });
+    sh.addEventListener("touchend", end);
+    sh.addEventListener("touchcancel", () => { if (el.g) { el.g.dy = 0; el.g.v = 0; } end(); });
+    sh.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "mouse" || e.button !== 0) return;
+      start(e.clientX, e.clientY, e.target);
+      const mm = (ev) => move(ev.clientX, ev.clientY, ev), mu = () => { window.removeEventListener("pointermove", mm); window.removeEventListener("pointerup", mu); end(); };
+      window.addEventListener("pointermove", mm); window.addEventListener("pointerup", mu);
+    });
   },
 };
 window.RoostSheet = RoostSheet;
@@ -10209,14 +10308,15 @@ class RoostPopupLayer extends RoostBase {
 
   connectedCallback() { window.addEventListener("keydown", this._onKey); }
 
-  disconnectedCallback() { window.removeEventListener("keydown", this._onKey); }
+  disconnectedCallback() { window.removeEventListener("keydown", this._onKey); RoostLayer.free(this); }
 
   showItem(item, more) {
     clearTimeout(this._timer); clearInterval(this._pic);
     this._item = item; this._more = more; this._cards = null; this._sig = null;
     this._config = { theme: item?.theme || "auto" };
-    if (!item) { this.shadowRoot.innerHTML = ""; this.style.display = "none"; return; }
+    if (!item) { this.shadowRoot.innerHTML = ""; this.style.display = "none"; RoostLayer.free(this); return; }
     this.style.cssText = "position:fixed;inset:0;z-index:999;display:block";
+    RoostLayer.hold(this);
     if (item.sound) { try { new Audio(item.sound).play().catch(() => {}); } catch (e) { /* no sound here */ } }
     try { navigator.vibrate?.(item.kind === "alert" ? [60, 40, 60] : 20); } catch (e) { /* no vibration */ }
     const secs = Number(item.close_after) || 0;
@@ -11728,7 +11828,7 @@ class RoostTour extends RoostBase {
     </style>
     <div class="card">${st === "missing" ? `<div class="note"><b>Show your home as pictures</b>Install Roost Atelier (as a custom repository in the Marketplace), draw your home, then press Make dashboard pictures in its home settings. This card shows them.<a href="https://github.com/HRadhi4/Roost-Atelier" target="_blank" rel="noopener">How to install</a></div>`
       : st === "empty" ? `<div class="note"><b>Draw your home first</b>Open Atelier in the sidebar and pick a ready-made home or draw your own, then press Make dashboard pictures.</div>`
-      : `<div class="tour"><div class="stage"></div><div class="glow"></div><div class="hot"></div><div class="top"></div><div class="bar"></div><div class="list" hidden></div>${st === "ok" ? "" : '<div class="msg">Loading</div>'}</div>`}</div>`;
+      : `<div class="tour"><div class="stage" data-noswipe></div><div class="glow"></div><div class="hot"></div><div class="top"></div><div class="bar"></div><div class="list" hidden></div>${st === "ok" ? "" : '<div class="msg">Loading</div>'}</div>`}</div>`;
     const tour = this.shadowRoot.querySelector(".tour");
     if (!tour) return;
     this.el = { tour, stage: tour.querySelector(".stage"), glow: tour.querySelector(".glow"), hot: tour.querySelector(".hot"), bar: tour.querySelector(".bar"), top: tour.querySelector(".top"), list: tour.querySelector(".list") };

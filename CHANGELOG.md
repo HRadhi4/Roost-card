@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.25.1
+
+- **While a details sheet or popup is open, your finger only moves the popup.** The page behind no longer scrolls, swipes don't change the dashboard page, and a list inside the popup scrolls only itself. Everything behind is free again the moment it closes.
+- **Smoother pull-up for more.** Pulling the details sheet up now grows it under your finger, and it settles with a short glide when you let go (a quick flick is enough). Pulling down shrinks it back or closes it the same way, and a small pull just springs back.
+- The Roost Home Tour picture can be dragged without changing the dashboard page.
+
 ## 1.25.0
 
 - **New card: Roost Home Tour.** Your home as finished pictures made by Roost Atelier: the whole floor, and every room in 360°. Tap a room to step in, drag to look around, follow the arrows on the doors to the next room, or use the buttons along the bottom. Every light, AC, curtain and TV sits on the picture where it really is: tap it for its controls (or set it to switch on and off). Lights that are on glow in their own colour. The room button opens everything in that room at once.
