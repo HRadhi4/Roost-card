@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.24.3";
+const ROOST_VERSION = "1.25.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -9575,6 +9575,10 @@ class RoostCamera extends RoostBase {
 // or the choice made on this screen with the language button (Roost Theme), or the card's own "language".
 // Words are looked up in one list per language; your own device names stay as you wrote them.
 const AR_WORDS = {
+  "Whole home": "المنزل كاملاً", "Previous room": "الغرفة السابقة", "Next room": "الغرفة التالية", "Devices in this room": "أجهزة هذه الغرفة",
+  "This screen can't show 360° pictures": "هذه الشاشة لا تستطيع عرض صور 360°",
+  "This room's pictures aren't made yet. In Roost Atelier, open the home settings and press Make dashboard pictures.": "لم تُصنع صور هذه الغرفة بعد. في Roost Atelier افتح إعدادات المنزل واضغط اصنع صور لوحة التحكم.",
+  "The pictures of this home aren't made yet. In Roost Atelier, open the home settings and press Make dashboard pictures.": "لم تُصنع صور هذا المنزل بعد. في Roost Atelier افتح إعدادات المنزل واضغط اصنع صور لوحة التحكم.",
   "On": "يعمل", "Off": "مطفأ", "Open": "مفتوح", "Closed": "مغلق", "Partly open": "مفتوح جزئياً", "Partly closed": "مغلق جزئياً", "Opening": "يُفتح", "Closing": "يُغلق", "Locked": "مقفل", "Unlocked": "مفتوح القفل", "Lock": "قفل", "Unlock": "فتح القفل",
   "Home": "الرئيسية", "At home": "في المنزل", "Away": "خارج المنزل", "Offline": "غير متصل", "Not found": "غير موجود", "Device not found": "الجهاز غير موجود", "Unavailable": "غير متاح", "Unknown": "غير معروف",
   "Turn on": "تشغيل", "Turn off": "إطفاء", "Start": "ابدأ", "Stop": "إيقاف", "Pause": "إيقاف مؤقت", "Play": "تشغيل", "Close": "إغلاق", "Run now": "شغّل الآن", "Press": "اضغط", "Install": "تثبيت",
@@ -11481,6 +11485,410 @@ class RoostHome3d extends RoostBase {
   }
 }
 
+// Roost Home Tour: your home as finished pictures made by Roost Atelier (a separate integration). The Atelier
+// designs the home and renders it once: a photo of the whole floor and a 360° picture of every room. This card
+// only shows those pictures, like a street-view tour: tap a room to step in, drag to look around, follow the
+// arrows on the doors, and tap any device on the picture for its controls. No 3D engine, so it opens fast.
+const TOUR_COLOURS = { light: "#F5B041", ac: "#2EC4B6", curtain: "#4E8CFF", tv: "#8B6CFF", door: "#FF7A59", lock: "#FF7A59", fan: "#2EC4B6", speaker: "#8B6CFF", vacuum: "#5FBF77", sensor: "#7C86B8" };
+const TOUR_ICONS = { ac: "mdi:air-conditioner", tv: "mdi:television", door: "mdi:door", lock: "mdi:lock", fan: "mdi:fan", speaker: "mdi:speaker", vacuum: "mdi:robot-vacuum", sensor: "mdi:motion-sensor", camera: "mdi:cctv" };
+const Tour = {
+  sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+  dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  norm(a) { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+  inside([x, y], pts) {
+    let c = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const [xi, yi] = pts[i], [xj, yj] = pts[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; }
+    return c;
+  },
+  centroid(pts) {
+    let cx = 0, cy = 0, a = 0;
+    for (let i = 0; i < pts.length; i++) { const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length], f = x1 * y2 - x2 * y1; cx += (x1 + x2) * f; cy += (y1 + y2) * f; a += f; }
+    return Math.abs(a) < 1e-9 ? [pts[0][0], pts[0][1]] : [cx / (3 * a), cy / (3 * a)];
+  },
+  // where the 360° picture of a room was taken: the Atelier's own spot, or the middle of the room
+  eye(room) {
+    if (room.pano) return [room.pano[0], 1.5, room.pano[1]];
+    let [x, y] = this.centroid(room.pts);
+    if (!this.inside([x, y], room.pts)) {
+      const xs = room.pts.map((p) => p[0]), ys = room.pts.map((p) => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys); let best = null;
+      for (let i = 1; i < 10; i++) for (let j = 1; j < 10; j++) { const p = [x0 + ((x1 - x0) * i) / 10, y0 + ((y1 - y0) * j) / 10]; if (this.inside(p, room.pts)) { const d = Math.hypot(p[0] - x, p[1] - y); if (!best || d < best[2]) best = [...p, d]; } }
+      if (best) [x, y] = best;
+    }
+    return [x, 1.5, y];
+  },
+  // the camera a picture was taken with travels inside it (a JPEG comment written by the Atelier)
+  camera(buf) {
+    const b = new Uint8Array(buf);
+    if (b[0] !== 0xff || b[1] !== 0xd8 || b[2] !== 0xff || b[3] !== 0xfe) return null;
+    const text = new TextDecoder().decode(b.subarray(6, 4 + ((b[4] << 8) | b[5])));
+    if (!text.startsWith("roost:")) return null;
+    try { return JSON.parse(text.slice(6)); } catch (e) { return null; }
+  },
+  // a flat photo: where a point lands on it, 0..1 across and down (null when behind the camera)
+  flat(cam, p) {
+    const f = this.norm(this.sub(cam.target, cam.pos)), r = this.norm(this.cross(f, [0, 1, 0])), u = this.cross(r, f), d = this.sub(p, cam.pos), z = this.dot(d, f);
+    if (z < 0.1) return null;
+    const k = Math.tan((cam.fov * Math.PI) / 360);
+    return [0.5 + this.dot(d, r) / (z * k * cam.aspect) / 2, 0.5 - this.dot(d, u) / (z * k) / 2];
+  },
+  // a 360° view looking (yaw, pitch): where a point lands on the screen
+  pano(eye, yaw, pitch, fov, aspect, p) {
+    let [x, y, z] = this.sub(p, eye);
+    const cy = Math.cos(-yaw), sy = Math.sin(-yaw); [x, z] = [x * cy + z * sy, -x * sy + z * cy];
+    const cp = Math.cos(-pitch), sp = Math.sin(-pitch); [y, z] = [y * cp - z * sp, y * sp + z * cp];
+    if (z > -0.1) return null;
+    const k = Math.tan((fov * Math.PI) / 360);
+    return [0.5 + x / (-z * k * aspect) / 2, 0.5 - y / (-z * k) / 2];
+  },
+  // where a device's button goes: its real height in the room
+  point(dv, floor) {
+    const H = floor.height || 2.8, kind = dv.kind || "light", look = dv.look || "flush";
+    if (kind === "light") return [dv.x, look === "floor" ? 1.45 : look === "pendant" ? H - 0.85 : look === "chandelier" ? H - 0.9 : H - 0.04, dv.y];
+    if (kind === "ac") return [dv.x, H - 0.45, dv.y];
+    if (kind === "fan") return [dv.x, H - 0.4, dv.y];
+    if (kind === "curtain" || kind === "door" || kind === "lock") {
+      const ops = (floor.openings || []).filter((o) => (kind === "curtain" ? o.type !== "door" : o.type === "door")).sort((a, b) => Math.hypot(a.x - dv.x, a.y - dv.y) - Math.hypot(b.x - dv.x, b.y - dv.y));
+      const o = ops[0]; if (o && Math.hypot(o.x - dv.x, o.y - dv.y) < 1.5) return [o.x, (o.sill || 0) + (o.height || 2) * 0.55, o.y];
+      return [dv.x, 1.3, dv.y];
+    }
+    if (kind === "tv") return [dv.x, 1.2, dv.y];
+    return [dv.x, dv.z ?? 1.0, dv.y];
+  },
+  // the rooms a door leads to from a room
+  doors(floor, room) {
+    const out = [];
+    for (const o of floor.openings || []) {
+      if (o.type !== "door") continue;
+      const near = [];
+      for (let i = 0; i < 8; i++) { const a = (i * Math.PI) / 4, p = [o.x + Math.cos(a) * 0.35, o.y + Math.sin(a) * 0.35]; for (const r of floor.rooms) if (this.inside(p, r.pts) && !near.includes(r)) near.push(r); }
+      if (!near.includes(room)) continue;
+      for (const r of near) if (r !== room && !out.some((x) => x.room === r)) out.push({ room: r, at: [o.x, o.y] });
+    }
+    return out;
+  },
+  kelvin(k) {
+    const t = k / 100; let r, g, b;
+    if (t <= 66) { r = 255; g = 99.47 * Math.log(t) - 161.12; b = t <= 19 ? 0 : 138.52 * Math.log(t - 10) - 305.04; } else { r = 329.7 * (t - 60) ** -0.1332; g = 288.12 * (t - 60) ** -0.0755; b = 255; }
+    const c = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+    return `#${c(r)}${c(g)}${c(b)}`;
+  },
+};
+
+// the 360° picture, drawn with a tiny shader (the same picture three.js would show, without three.js)
+class TourSphere {
+  constructor(canvas) {
+    const gl = (this.gl = canvas.getContext("webgl", { antialias: false, premultipliedAlpha: false }));
+    if (!gl) throw new Error("no WebGL");
+    const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+    const pr = (this.pr = gl.createProgram());
+    gl.attachShader(pr, sh(gl.VERTEX_SHADER, "attribute vec2 p;varying vec2 v;void main(){v=p;gl_Position=vec4(p,0.,1.);}"));
+    gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, "precision highp float;varying vec2 v;uniform sampler2D tex;uniform mat3 rot;uniform vec2 k;void main(){vec3 d=normalize(rot*vec3(v.x*k.x,v.y*k.y,-1.));gl_FragColor=texture2D(tex,vec2(atan(d.z,d.x)*0.15915494+0.5,asin(clamp(d.y,-1.,1.))*0.31830989+0.5));}"));
+    gl.linkProgram(pr); gl.useProgram(pr);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(pr, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    this.uRot = gl.getUniformLocation(pr, "rot"); this.uK = gl.getUniformLocation(pr, "k"); this.tex = gl.createTexture();
+  }
+  image(img) {
+    const gl = this.gl; gl.bindTexture(gl.TEXTURE_2D, this.tex); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    let src = img; const max = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+    if (img.naturalWidth > max) { const c = document.createElement("canvas"); c.width = max; c.height = max / 2; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); src = c; }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, src);
+    for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+    this.ready = true;
+  }
+  draw(W, H, yaw, pitch, fov) {
+    const gl = this.gl, c = gl.canvas; if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+    gl.viewport(0, 0, W, H);
+    if (!this.ready) { gl.clearColor(0.043, 0.051, 0.09, 1); gl.clear(gl.COLOR_BUFFER_BIT); return; }
+    const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    gl.uniformMatrix3fv(this.uRot, false, new Float32Array([cy, 0, -sy, sy * sp, cp, cy * sp, sy * cp, -sp, cy * cp]));
+    const k = Math.tan((fov * Math.PI) / 360); gl.uniform2f(this.uK, k * (W / H), k);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+  dispose() { this.gl.deleteTexture(this.tex); this.gl.deleteProgram(this.pr); this.gl.getExtension("WEBGL_lose_context")?.loseContext(); }
+}
+
+class RoostTour extends RoostBase {
+  static get defaults() { return { plan: "", floor: 0, room: "", height: 420, tap: "details", devices: true, nav: true, theme: "auto" }; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { name: "plan", label: "Home id (empty = the first home)", selector: { text: {} } },
+        { type: "grid", name: "", schema: [
+          { name: "floor", label: "Level (0 = ground)", selector: { number: { min: 0, max: 9, mode: "box" } } },
+          { name: "room", label: "Start in this room (its id, empty = the whole home)", selector: { text: {} } },
+        ] },
+        { name: "height", label: "Height", selector: slider(240, 1200, 20, "px") },
+        { name: "tap", label: "Tapping a device", selector: pick([["details", "Shows its controls"], ["toggle", "Turns it on or off"]]) },
+        { type: "grid", name: "", schema: [
+          { name: "devices", label: "Device buttons on the pictures", selector: { boolean: {} } },
+          { name: "nav", label: "Room buttons along the bottom", selector: { boolean: {} } },
+        ] },
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return {}; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  setConfig(config) {
+    const before = this._config ? JSON.stringify(this._config) : null;
+    super.setConfig(config);
+    if (before !== null && before !== JSON.stringify(this._config)) { this.teardown(); this._tour = null; if (this._hass) { this.render(); this.load(); } }
+  }
+
+  set hass(h) {
+    if (h && RoostPop.hass !== h) RoostPop.setHass(h);
+    const first = !this._hass; this._hass = h;
+    if (!h || !this._config) return;
+    const dark = this.dark;
+    if (first || dark !== this._wasDark || !this.shadowRoot?.querySelector(".tour")) { this._wasDark = dark; this.render(); if (first || !this._tour) this.load(); return; }
+    this.drawHot();
+  }
+
+  get hass() { return this._hass; }
+
+  connectedCallback() { if (this._hass && this._config && !this._ro && this.shadowRoot?.querySelector(".tour")) this.render(); }
+  disconnectedCallback() { this.teardown(); }
+  teardown() { this._ro?.disconnect(); this._ro = null; this.sphere?.dispose(); this.sphere = null; for (const v of (this._pics || new Map()).values()) v.then((x) => x && URL.revokeObjectURL(x.url)); this._pics = new Map(); }
+
+  ws(msg) { return this._hass.connection.sendMessagePromise(msg); }
+
+  // the home from Roost Atelier, and whether it is installed at all
+  async load() {
+    const c = this._config;
+    try {
+      let tour;
+      try { tour = await this.ws({ type: "roost_atelier/tour", ...(c.plan ? { plan_id: c.plan } : {}) }); }
+      catch (e) {
+        if (e?.code === "not_found") { this._state = "empty"; return this.render(); }
+        // an older Roost Atelier: the whole home works too
+        const plans = await this.ws({ type: "roost_atelier/plans" }); const id = c.plan || plans[0]?.id;
+        if (!id) { this._state = "empty"; return this.render(); }
+        tour = await this.ws({ type: "roost_atelier/plan", plan_id: id });
+      }
+      this._tour = tour; this._state = "ok";
+    } catch (e) { this._state = "missing"; return this.render(); }
+    this.render();
+    this.go(this.floorData()?.rooms.some((r) => r.id === c.room) ? c.room : null);
+    if (!this._unsub) this._hass.connection.subscribeMessage((m) => { if (m.plan_id === this._tour?.id) { clearTimeout(this._re); this._re = setTimeout(() => { this.teardown(); this.load(); }, 1500); } }, { type: "roost_atelier/subscribe" }).then((u) => (this._unsub = u)).catch(() => {});
+  }
+
+  floorData() { const f = this._tour?.floors || []; return f[Number(this._config.floor) || 0] || f[0]; }
+
+  // a picture and the camera it was taken with; null when the Atelier hasn't made it
+  picture(key) {
+    this._pics ||= new Map();
+    if (!this._pics.has(key)) {
+      const fl = this.floorData(), fi = fl?.index ?? (Number(this._config.floor) || 0), made = fl?.pictures;
+      this._pics.set(key, made && !(key in made) ? Promise.resolve(null) : this._hass.fetchWithAuth(`/api/roost_atelier/photo/${this._tour.id}_${fi}_${key}${made ? `?v=${made[key]}` : ""}`).then(async (r) => {
+        if (!r.ok) return null; const buf = await r.arrayBuffer();
+        return { url: URL.createObjectURL(new Blob([buf], { type: "image/jpeg" })), camera: Tour.camera(buf) };
+      }).catch(() => null));
+    }
+    return this._pics.get(key);
+  }
+
+  render() {
+    if (!this._hass || !this._config || !this.shadowRoot) return;
+    const c = this._config, p = this.p, st = this._state;
+    const H = Math.max(240, Number(c.height) || 420);
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .card{${panelCss(p, 22)};overflow:hidden;position:relative}
+      .tour{position:relative;height:${H}px;overflow:hidden;background:#0B0D17;touch-action:none;user-select:none;-webkit-user-select:none}
+      .stage{position:absolute;inset:0}.stage img,.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover}
+      .stage.pano{cursor:grab}
+      .glow{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen}.glow i{position:absolute;border-radius:50%;transform:translate(-50%,-50%)}
+      .hot{position:absolute;inset:0;pointer-events:none}
+      .hs{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;-webkit-tap-highlight-color:transparent}
+      .hs[hidden]{display:none}
+      .hs button{all:unset;cursor:pointer;width:36px;height:36px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#FFFFFF;--mdc-icon-size:18px;background:rgba(20,24,49,.62);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18);box-shadow:0 4px 14px rgba(0,0,0,.3);transition:transform .12s}
+      .hs button:active{transform:scale(.92)}
+      .hs.on button{background:linear-gradient(135deg,var(--c),color-mix(in srgb,var(--c) 70%,#FFFFFF));border-color:transparent;box-shadow:0 0 18px color-mix(in srgb,var(--c) 70%,transparent)}
+      .hs.room button{width:auto;height:32px;padding:0 12px;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
+      .hs.door button{background:rgba(255,255,255,.9);color:#161936}
+      .msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:#9AA3D9;font-size:14px;line-height:1.5}
+      .top{position:absolute;left:12px;top:12px;right:12px;display:flex;pointer-events:none}
+      .top span{padding:6px 12px;border-radius:12px;background:rgba(11,13,23,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#FFFFFF;font-size:13px;font-weight:600}
+      .bar{position:absolute;left:10px;right:10px;bottom:10px;display:flex;align-items:center;justify-content:center;gap:6px;pointer-events:none}
+      .bar button{all:unset;pointer-events:auto;cursor:pointer;min-height:40px;min-width:40px;padding:0 12px;box-sizing:border-box;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:6px;color:#FFFFFF;font-size:13px;font-weight:600;--mdc-icon-size:18px;background:rgba(11,13,23,.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.14);transition:transform .12s}
+      .bar button:active{transform:scale(.94)}
+      .bar .nm{flex:0 1 auto;white-space:normal;text-align:center}
+      .list{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);z-index:3;max-height:70%;overflow:auto;padding:6px;border-radius:18px;background:rgba(20,24,49,.95);border:1px solid rgba(255,255,255,.12);display:flex;flex-direction:column;min-width:180px}
+      .list[hidden]{display:none}
+      .list button{all:unset;cursor:pointer;padding:10px 14px;border-radius:12px;color:#EEF0FF;font-size:14px}
+      .list button.cur{background:${ACTIVE[0]}40}
+      .note{display:flex;flex-direction:column;gap:8px;padding:20px;font-size:13px;line-height:1.4;color:${p.muted}}
+      .note b{font-size:15px;color:${p.text}}.note a{color:${ACTIVE[1]};font-weight:600}
+    </style>
+    <div class="card">${st === "missing" ? `<div class="note"><b>Show your home as pictures</b>Install Roost Atelier (as a custom repository in the Marketplace), draw your home, then press Make dashboard pictures in its home settings. This card shows them.<a href="https://github.com/HRadhi4/Roost-Atelier" target="_blank" rel="noopener">How to install</a></div>`
+      : st === "empty" ? `<div class="note"><b>Draw your home first</b>Open Atelier in the sidebar and pick a ready-made home or draw your own, then press Make dashboard pictures.</div>`
+      : `<div class="tour"><div class="stage"></div><div class="glow"></div><div class="hot"></div><div class="top"></div><div class="bar"></div><div class="list" hidden></div>${st === "ok" ? "" : '<div class="msg">Loading</div>'}</div>`}</div>`;
+    const tour = this.shadowRoot.querySelector(".tour");
+    if (!tour) return;
+    this.el = { tour, stage: tour.querySelector(".stage"), glow: tour.querySelector(".glow"), hot: tour.querySelector(".hot"), bar: tour.querySelector(".bar"), top: tour.querySelector(".top"), list: tour.querySelector(".list") };
+    this.bind();
+    this._ro?.disconnect(); this._ro = new ResizeObserver(() => this.draw()); this._ro.observe(tour);
+    if (st === "ok" && this._shown !== undefined) this.go(this._shown, true);
+  }
+
+  // go to a room (its 360°, or its photo when there is no 360° yet) or, with null, the whole floor
+  async go(roomId, again = false) {
+    const token = (this._token = (this._token || 0) + 1), fl = this.floorData(); if (!fl || !this.el) return;
+    this._shown = roomId; this.closeList();
+    const room = (this.room = fl.rooms.find((r) => r.id === roomId) || null);
+    this.el.hot.innerHTML = ""; this.el.glow.innerHTML = ""; this.hs = new Map(); this.glows = new Map();
+    this.el.tour.querySelector(".msg")?.remove();
+    this.drawBar();
+    const devices = this._config.devices === false ? [] : (fl.devices || []).filter((d) => d.entity);
+    let pic, kind = "flat";
+    if (room) { pic = await this.picture(`pano_${room.id}`); kind = "pano"; if (!pic) { pic = await this.picture(room.id); kind = "flat"; } }
+    else pic = await this.picture("all");
+    if (token !== this._token || !this.el) return;
+    this.kind = kind; this.cam = pic?.camera || null;
+    this.spots = devices.filter((d) => !room || Tour.inside([d.x, d.y], room.pts)).map((d) => ({ id: d.id, d, p: Tour.point(d, fl) }));
+    if (!room) for (const r of fl.rooms) { const [x, y] = Tour.centroid(r.pts); this.spots.push({ id: `room_${r.id}`, room: r, p: [x, 0.9, y] }); }
+    else for (const { room: r, at } of Tour.doors(fl, room)) this.spots.push({ id: `door_${r.id}`, room: r, door: true, p: [at[0], 1.1, at[1]] });
+    this.sphere?.dispose(); this.sphere = null; this.img = null; this.el.stage.innerHTML = ""; this.el.stage.className = "stage";
+    if (!pic) return this.message(room ? "This room's pictures aren't made yet. In Roost Atelier, open the home settings and press Make dashboard pictures." : "The pictures of this home aren't made yet. In Roost Atelier, open the home settings and press Make dashboard pictures.");
+    if (kind === "pano") {
+      this.el.stage.classList.add("pano");
+      const canvas = document.createElement("canvas"); this.el.stage.appendChild(canvas);
+      try { this.sphere = new TourSphere(canvas); } catch (e) { return this.message("This screen can't show 360° pictures"); }
+      this.eye = this.cam?.pos || Tour.eye(room);
+      if (!again) {
+        const pts = this.spots.filter((s) => s.d).map((s) => s.p);
+        this.yaw = pts.length ? Math.atan2(-(pts.reduce((a, p) => a + p[0], 0) / pts.length - this.eye[0]), -(pts.reduce((a, p) => a + p[2], 0) / pts.length - this.eye[2])) : 0;
+        this.pitch = 0; this.fov = 75;
+      }
+      const img = new Image(); img.onload = () => { if (token === this._token && this.sphere) { this.sphere.image(img); this.draw(); } }; img.src = pic.url;
+    } else { const img = (this.img = new Image()); img.alt = ""; img.onload = () => this.draw(); img.src = pic.url; this.el.stage.appendChild(img); }
+    this.draw();
+  }
+
+  message(text) { const m = document.createElement("div"); m.className = "msg"; m.textContent = text; this.el.tour.insertBefore(m, this.el.top); RoostLang.apply(this); }
+
+  drawBar() {
+    const fl = this.floorData(), room = this.room, rooms = fl.rooms, i = rooms.indexOf(room);
+    const title = room ? room.name || "Room" : this._config.name || this._tour.name || fl.name || "Home";
+    this.el.top.innerHTML = `<span>${esc(title)}</span>`;
+    if (this._config.nav === false) { this.el.bar.innerHTML = ""; RoostLang.apply(this); return; }
+    this.el.bar.innerHTML = room
+      ? `<button data-b="home" aria-label="Whole home"><ha-icon icon="mdi:home-outline"></ha-icon></button><button data-b="prev" aria-label="Previous room"><ha-icon icon="mdi:chevron-left"></ha-icon></button><button class="nm" data-b="list">${esc(room.name || "Room")}</button><button data-b="next" aria-label="Next room"><ha-icon icon="mdi:chevron-right"></ha-icon></button><button data-b="devs" aria-label="Devices in this room"><ha-icon icon="mdi:view-grid-outline"></ha-icon></button>`
+      : `<button class="nm" data-b="list"><ha-icon icon="mdi:door-open"></ha-icon>Rooms</button>`;
+    this.el.bar.querySelectorAll("button").forEach((b) => b.addEventListener("click", (e) => {
+      e.stopPropagation(); this.vibrate(); const k = b.dataset.b;
+      if (k === "home") this.go(null);
+      else if (k === "prev") this.go(rooms[(i - 1 + rooms.length) % rooms.length].id);
+      else if (k === "next") this.go(rooms[(i + 1) % rooms.length].id);
+      else if (k === "devs") this.roomSheet();
+      else this.el.list.hidden ? this.openList() : this.closeList();
+    }));
+    RoostLang.apply(this);
+  }
+
+  // everything in this room in Roost's own sheet: one bar for its lights, a tile per device
+  roomSheet() {
+    const fl = this.floorData(), ids = (fl.devices || []).filter((d) => d.entity && Tour.inside([d.x, d.y], this.room.pts)).map((d) => d.entity);
+    if (window.RoostSheet) window.RoostSheet.openRoom({ name: this.room.name || "Room", icon: "mdi:door-open", ids });
+  }
+
+  openList() {
+    const fl = this.floorData(), l = this.el.list;
+    l.innerHTML = `<button data-r="" class="${this.room ? "" : "cur"}">Whole home</button>` + fl.rooms.map((r) => `<button data-r="${esc(r.id)}" class="${r === this.room ? "cur" : ""}">${esc(r.name || "Room")}</button>`).join("");
+    l.querySelectorAll("button").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); this.vibrate(); this.go(b.dataset.r || null); }));
+    l.hidden = false; RoostLang.apply(this);
+  }
+
+  closeList() { if (this.el?.list) this.el.list.hidden = true; }
+
+  bind() {
+    const el = this.el.stage, ptrs = new Map(); let start = null;
+    const dist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a[0] - b[0], a[1] - b[1]); };
+    this.el.tour.addEventListener("pointerdown", (e) => { if (!e.composedPath().some((n) => n.classList?.contains?.("list") || n.classList?.contains?.("bar"))) this.closeList(); });
+    el.addEventListener("pointerdown", (e) => {
+      if (this.kind !== "pano") return;
+      ptrs.set(e.pointerId, [e.clientX, e.clientY]); el.setPointerCapture?.(e.pointerId);
+      start = { yaw: this.yaw, pitch: this.pitch, fov: this.fov, x: e.clientX, y: e.clientY, d: ptrs.size === 2 ? dist() : 0 };
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (!ptrs.has(e.pointerId) || !start) return; ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+      if (ptrs.size === 2) { if (!start.d) { start.d = dist(); start.fov = this.fov; } this.fov = Math.max(35, Math.min(95, start.fov * (start.d / dist()))); return this.draw(); }
+      const k = (this.fov / el.clientHeight) * (Math.PI / 180);
+      this.yaw = start.yaw + (e.clientX - start.x) * k; this.pitch = Math.max(-1.35, Math.min(1.35, start.pitch + (e.clientY - start.y) * k)); this.draw();
+    });
+    const up = (e) => { ptrs.delete(e.pointerId); start = ptrs.size ? { yaw: this.yaw, pitch: this.pitch, fov: this.fov, x: [...ptrs.values()][0][0], y: [...ptrs.values()][0][1], d: 0 } : null; };
+    el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+    el.addEventListener("wheel", (e) => { if (this.kind !== "pano") return; e.preventDefault(); this.fov = Math.max(35, Math.min(95, this.fov * (e.deltaY > 0 ? 1.08 : 0.93))); this.draw(); }, { passive: false });
+  }
+
+  // where a point of the home is on the card, in pixels (null when out of sight)
+  where(p, W, H) {
+    if (this.kind === "pano") { const q = Tour.pano(this.eye, this.yaw, this.pitch, this.fov, W / H, p); return q && [q[0] * W, q[1] * H]; }
+    if (!this.cam || !this.img?.naturalWidth) return null;
+    const q = Tour.flat(this.cam, p); if (!q) return null;
+    const iw = this.img.naturalWidth, ih = this.img.naturalHeight, s = Math.max(W / iw, H / ih);
+    return [(W - iw * s) / 2 + q[0] * iw * s, (H - ih * s) / 2 + q[1] * ih * s];
+  }
+
+  draw() {
+    if (this._raf || !this.el) return;
+    const raf = window.requestAnimationFrame || ((f) => setTimeout(f, 16));
+    this._raf = raf(() => {
+      this._raf = 0;
+      const W = this.el.tour.clientWidth, H = this.el.tour.clientHeight; if (!W || !H) return;
+      const r = Math.min(2, window.devicePixelRatio || 1);
+      if (this.sphere) this.sphere.draw(Math.round(W * r), Math.round(H * r), this.yaw, this.pitch, this.fov);
+      this.drawHot();
+    });
+  }
+
+  drawHot() {
+    if (!this.el || !this.spots) return;
+    const W = this.el.tour.clientWidth, H = this.el.tour.clientHeight, scale = this.kind === "pano" ? 75 / this.fov : 1, S = this._hass.states;
+    for (const s of this.spots) {
+      let el = this.hs.get(s.id);
+      if (!el) {
+        el = document.createElement("div"); el.className = `hs${s.room ? " room" : ""}${s.door ? " door" : ""}`;
+        el.innerHTML = s.room ? `<button><ha-icon icon="${s.door ? "mdi:arrow-up-bold-circle-outline" : "mdi:door-open"}"></ha-icon>${esc(s.room.name || "Room")}</button>` : `<button aria-label="${esc(s.d.name || S[s.d.entity]?.attributes?.friendly_name || s.d.entity)}"><ha-icon></ha-icon></button>`;
+        el.firstElementChild.addEventListener("click", (e) => { e.stopPropagation(); this.tap(s); });
+        this.el.hot.appendChild(el); this.hs.set(s.id, el);
+      }
+      const at = W && H ? this.where(s.p, W, H) : null, show = !!at && at[0] > -20 && at[0] < W + 20 && at[1] > -20 && at[1] < H - 44;
+      el.hidden = !show;
+      const glow = this.glows.get(s.id);
+      if (!show) { if (glow) glow.style.opacity = 0; continue; }
+      el.style.left = `${at[0]}px`; el.style.top = `${at[1]}px`;
+      if (!s.d) continue;
+      const st = S[s.d.entity], on = !!st && !UNAVAILABLE.includes(st.state) && !OFF_STATES.includes(st.state), kind = s.d.kind || "light";
+      el.classList.toggle("on", on); el.style.setProperty("--c", TOUR_COLOURS[kind] || ACTIVE[1]);
+      const icon = kind === "light" ? (on ? "mdi:lightbulb-on" : "mdi:lightbulb-outline") : kind === "curtain" ? (on ? "mdi:curtains" : "mdi:curtains-closed") : TOUR_ICONS[kind] || st?.attributes?.icon || "mdi:circle-medium";
+      const ic = el.querySelector("ha-icon"); if (ic.getAttribute("icon") !== icon) ic.setAttribute("icon", icon);
+      // a light that is on glows on the picture, in its own colour and brightness
+      if (kind === "light") {
+        const a = st?.attributes || {}, lit = st?.state === "on", k = lit ? (a.brightness != null ? 0.35 + 0.65 * (a.brightness / 255) : 1) : 0;
+        const col = a.rgb_color ? `rgb(${a.rgb_color.join(",")})` : Tour.kelvin(a.color_temp_kelvin || 2900);
+        let gi = glow; if (!gi) { gi = document.createElement("i"); this.el.glow.appendChild(gi); this.glows.set(s.id, gi); }
+        const r = (this.room ? 0.42 : 0.16) * Math.min(W, H) * scale * (0.7 + 0.3 * k);
+        gi.style.left = `${at[0]}px`; gi.style.top = `${at[1]}px`; gi.style.width = gi.style.height = `${2 * r}px`; gi.style.opacity = (0.55 * k).toFixed(2);
+        if (lit) gi.style.background = `radial-gradient(circle, ${col} 0%, color-mix(in srgb, ${col} 35%, transparent) 30%, transparent 70%)`;
+      }
+    }
+  }
+
+  tap(s) {
+    this.vibrate();
+    if (s.room) return this.go(s.room.id);
+    if (this._config.tap === "toggle") return this.call("homeassistant", "toggle", { entity_id: s.d.entity });
+    this.moreInfo(s.d.entity);
+  }
+}
+
 const CARDS = [
   ["roost-tile", RoostTile, "Roost Tile", "A big tile with a switch, colour, icon and how long it has been on."],
   ["roost-chips", RoostChips, "Roost Chips", "Status chips in one row: doors, alarm, lights (with count), AC and people bubbles."],
@@ -11546,6 +11954,7 @@ const CARDS = [
   ["roost-page", RoostPage, "Roost Page", "A phone page laid out like the original dashboard: even spacing, the night-sky background and room for the bottom bar."],
   ["roost-panel", RoostPanel, "Roost Panel", "A rounded panel with a title that holds other cards, such as a list of rooms."],
   ["roost-now", RoostNow, "Roost Now", "What matters right now, most urgent first: the alarm, a leak, the doorbell, the next prayer or iftar, a door open in the heat, lights left on. One calm line when all is well."],
+  ["roost-tour", RoostTour, "Roost Home Tour", "Your home as realistic pictures from Roost Atelier: the whole floor and every room in 360°. Tap a room to step in and any light, AC, curtain or TV to control it."],
   ["roost-3d-home", RoostHome3d, "Roost 3D Home", "Your home from Roost Atelier: what is going on, the live 3D view and realistic photos of every room."],
   ["roost-fullscreen", RoostFullscreen, "Roost Full Screen", "Full screen without Home Assistant's top bar and sidebar: by itself, or as a button that maximizes and minimizes."],
 ];

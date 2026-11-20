@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.25.0
+
+- **New card: Roost Home Tour.** Your home as finished pictures made by Roost Atelier: the whole floor, and every room in 360°. Tap a room to step in, drag to look around, follow the arrows on the doors to the next room, or use the buttons along the bottom. Every light, AC, curtain and TV sits on the picture where it really is: tap it for its controls (or set it to switch on and off). Lights that are on glow in their own colour. The room button opens everything in that room at once.
+- It loads no 3D engine, so it opens fast on phones and wall tablets. Make the pictures in Roost Atelier: open the home settings and press *Make dashboard pictures*.
+
 ## 1.24.3
 
 - Room tiles (halo layout) never split a word of the room name across two lines. If a word like "Bathroom" is too wide, the name gets a little smaller until it fits. Room tiles side by side then all use that same smaller size, so the names on a page always match. Name size still sets the size to aim for.
