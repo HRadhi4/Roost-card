@@ -9694,7 +9694,7 @@ const AR_WORDS = {
   "On": "يعمل", "Off": "مطفأ", "Open": "مفتوح", "Closed": "مغلق", "Partly open": "مفتوح جزئياً", "Partly closed": "مغلق جزئياً", "Opening": "يُفتح", "Closing": "يُغلق", "Locked": "مقفل", "Unlocked": "مفتوح القفل", "Lock": "قفل", "Unlock": "فتح القفل",
   "Home": "الرئيسية", "At home": "في المنزل", "Away": "خارج المنزل", "Offline": "غير متصل", "Not found": "غير موجود", "Device not found": "الجهاز غير موجود", "Unavailable": "غير متاح", "Unknown": "غير معروف",
   "Turn on": "تشغيل", "Turn off": "إطفاء", "Start": "ابدأ", "Stop": "إيقاف", "Pause": "إيقاف مؤقت", "Play": "تشغيل", "Close": "إغلاق", "Run now": "شغّل الآن", "Press": "اضغط", "Install": "تثبيت",
-  "Swipe up for more": "اسحب للأعلى للمزيد", "More in Home Assistant": "المزيد في Home Assistant", "LATELY": "مؤخراً", "DETAILS": "التفاصيل", "Show more": "عرض المزيد", "Show less": "عرض أقل",
+  "Swipe up for more": "اسحب للأعلى للمزيد", "Drag to turn it": "اسحب لتدويره", "More": "المزيد", "More in Home Assistant": "المزيد في Home Assistant", "LATELY": "مؤخراً", "DETAILS": "التفاصيل", "Show more": "عرض المزيد", "Show less": "عرض أقل",
   "Cool": "تبريد", "Heat": "تدفئة", "Dry": "تجفيف", "Fan": "مروحة", "Auto": "تلقائي", "Heat & cool": "تبريد وتدفئة", "Cooling": "يبرّد", "Heating": "يدفّئ", "Idle": "خامل", "Fan only": "مروحة فقط",
   "Set to": "مضبوط على", "Room": "الغرفة", "Low": "منخفض", "Medium": "متوسط", "High": "مرتفع", "Quiet": "هادئ", "Normal": "عادي", "Strong": "قوي", "Max": "أقصى",
   "Lights off": "إطفاء الأنوار", "Good night": "تصبح على خير", "Arm away": "حماية", "Leave home": "مغادرة", "Cool house": "تبريد المنزل", "Movie time": "وقت الفيلم",
@@ -9932,9 +9932,9 @@ const RoostSheet = {
         ${vol != null ? bar(vol, `linear-gradient(90deg,${g[0]},${g[1]})`, `Volume ${vol}%`, "vol") : ""}`;
     }
     if (dom === "sensor" && num(s.state) != null) {
-      const h = this.el.hist;
+      const h = this.el?.hist;
       return `<div class="sens"><div class="big num">${fmt(num(s.state), decOf(s.state))}<small>${esc(a.unit_of_measurement || "")}</small></div>${h && h.length > 2 ? this.spark(h, g[1]) : ""}</div>
-        ${h && h.length > 2 && !this.el.full && this.el.lo != null ? `<div class="note">Lowest ${fmt(this.el.lo, decOf(s.state))} · Highest ${fmt(this.el.hi, decOf(s.state))} in the last day</div>` : ""}`;
+        ${h && h.length > 2 && !this.el?.full && this.el?.lo != null ? `<div class="note">Lowest ${fmt(this.el.lo, decOf(s.state))} · Highest ${fmt(this.el.hi, decOf(s.state))} in the last day</div>` : ""}`;
     }
     if (dom === "camera") {
       const pic = a.entity_picture;
@@ -10024,7 +10024,18 @@ const RoostSheet = {
         if (list.length > 1) out.push(`<div class="sec">LATELY</div><div class="tl">${list.map((c, k) => { const end = k ? list[k - 1].at : now; return `<div><i style="background:${active(c.state) ? g[1] : p.knob}"></i><span>${esc(word(c.state))}<small> · ${esc(dur(end - c.at))}</small></span><span>${esc(clock(c.at))}</span></div>`; }).join("")}</div>`);
       }
     }
-    // extra controls the small view leaves out
+    out.push(...this.extras(s));
+    const shown = new Set(["brightness", "color_temp", "color_temp_kelvin", "effect", "fan_mode", "preset_mode", "swing_mode", "source", "is_volume_muted", "oscillating", "temperature", "current_temperature", "current_position", "media_title", "media_artist", "volume_level", "percentage", "options", "min", "max", "step", "mode", "last_triggered", "battery_level", "latest_version", "installed_version"]);
+    const nice = (v) => v === true ? "Yes" : v === false ? "No" : typeof v === "number" ? fmt(v, Number.isInteger(v) ? 0 : 1) : /^\d{4}-\d\d-\d\dT/.test(String(v)) ? ago(v) : String(v).replace(/_/g, " ");
+    const left = attrs.filter(([k]) => !shown.has(k));
+    if (left.length) out.push(`<div class="sec">DETAILS</div><div class="kv">${left.map(([k, v]) => `<div><span>${esc(k.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase()))}</span><span>${esc(nice(v))}</span></div>`).join("")}</div>`);
+    out.push(`<button class="wb" data-act="ha"><ha-icon icon="mdi:cog-outline"></ha-icon>More in Home Assistant</button>`);
+    return out.filter(Boolean).join("");
+  },
+  // extra controls the small view leaves out: colours, effects, fan and swing modes, inputs
+  extras(s) {
+    const dom = s.entity_id.split(".")[0], a = s.attributes, out = [];
+    const chips = (title, list, cur, key) => list && list.length > 1 ? `<div class="sec">${esc(title)}</div><div class="chips">${list.slice(0, 12).map((o) => `<button class="${String(cur) === String(o) ? "on" : ""}" data-act="${key}:${esc(o)}">${esc(String(o).replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase()))}</button>`).join("")}</div>` : "";
     if (dom === "light" && s.state === "on") {
       if ((a.supported_color_modes || []).some((m) => ["rgb", "rgbw", "rgbww", "hs", "xy"].includes(m))) out.push(`<div class="sec">COLOUR</div><div class="row">${[[255, 80, 60], [255, 150, 40], [255, 220, 90], [80, 210, 120], [70, 140, 255], [150, 90, 255], [255, 90, 190]].map((c) => `<button class="sw" style="background:rgb(${c})" data-act="rgb:${c}" aria-label="Colour"></button>`).join("")}</div>`);
       out.push(chips("EFFECT", a.effect_list, a.effect, "fx"));
@@ -10032,12 +10043,7 @@ const RoostSheet = {
     if (dom === "climate") { out.push(chips("FAN", a.fan_modes, a.fan_mode, "fanm")); out.push(chips("PRESET", a.preset_modes, a.preset_mode, "pre")); out.push(chips("SWING", a.swing_modes, a.swing_mode, "swg")); }
     if (dom === "fan") { out.push(chips("MODE", a.preset_modes, a.preset_mode, "fpre")); if (a.oscillating != null) out.push(`<button class="wb${a.oscillating ? " pr" : ""}" data-act="osc"><ha-icon icon="mdi:arrow-oscillating"></ha-icon>Swing ${a.oscillating ? "on" : "off"}</button>`); }
     if (dom === "media_player") { out.push(chips("SOURCE", a.source_list, a.source, "src")); if (a.is_volume_muted != null) out.push(`<button class="wb" data-act="mute"><ha-icon icon="${a.is_volume_muted ? "mdi:volume-off" : "mdi:volume-high"}"></ha-icon>${a.is_volume_muted ? "Sound off" : "Sound on"}</button>`); }
-    const shown = new Set(["brightness", "color_temp", "color_temp_kelvin", "effect", "fan_mode", "preset_mode", "swing_mode", "source", "is_volume_muted", "oscillating", "temperature", "current_temperature", "current_position", "media_title", "media_artist", "volume_level", "percentage", "options", "min", "max", "step", "mode", "last_triggered", "battery_level", "latest_version", "installed_version"]);
-    const nice = (v) => v === true ? "Yes" : v === false ? "No" : typeof v === "number" ? fmt(v, Number.isInteger(v) ? 0 : 1) : /^\d{4}-\d\d-\d\dT/.test(String(v)) ? ago(v) : String(v).replace(/_/g, " ");
-    const left = attrs.filter(([k]) => !shown.has(k));
-    if (left.length) out.push(`<div class="sec">DETAILS</div><div class="kv">${left.map(([k, v]) => `<div><span>${esc(k.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase()))}</span><span>${esc(nice(v))}</span></div>`).join("")}</div>`);
-    out.push(`<button class="wb" data-act="ha"><ha-icon icon="mdi:cog-outline"></ha-icon>More in Home Assistant</button>`);
-    return out.filter(Boolean).join("");
+    return out.filter(Boolean);
   },
   spark(pts, colour) {
     const w = 300, h = 60, mn = Math.min(...pts), mx = Math.max(...pts);
@@ -10164,6 +10170,55 @@ const RoostSheet = {
     this.wire(s, g);
     try { RoostLang.apply(el.host, el.root, {}); } catch (e) { /* words stay */ }
   },
+  // what a control does, by its data-act (the sheet and the Home Tour's side panel share these)
+  act(act, s) {
+    const id = s.entity_id, dom = id.split(".")[0], a = s.attributes;
+    if (act === "close_cover") return this.call("cover", "close_cover", { entity_id: id });
+    if (act === "toggle") return this.call("homeassistant", "toggle", { entity_id: id });
+    if (act.startsWith("ct:")) return this.call("light", "turn_on", { entity_id: id, color_temp_kelvin: Number(act.slice(3)) });
+    if (act.startsWith("t:")) { const t = Math.round(((a.temperature ?? 22) + Number(act.slice(2))) * 2) / 2; return this.call("climate", "set_temperature", { entity_id: id, temperature: t }); }
+    if (act.startsWith("mode:")) return this.call("climate", "set_hvac_mode", { entity_id: id, hvac_mode: act.slice(5) });
+    if (act === "open") return this.call("cover", "open_cover", { entity_id: id });
+    if (act === "lock" || act === "unlock") return this.call("lock", act, { entity_id: id });
+    if (act === "play") return this.call("media_player", "media_play_pause", { entity_id: id });
+    if (act === "prev") return this.call("media_player", "media_previous_track", { entity_id: id });
+    if (act === "next") return this.call("media_player", "media_next_track", { entity_id: id });
+    if (act === "run") return this.call(dom, "turn_on", { entity_id: id });
+    if (act === "trigger") return this.call("automation", "trigger", { entity_id: id });
+    if (act === "press") return this.call(dom, "press", { entity_id: id });
+    if (act === "stop") return this.call("cover", "stop_cover", { entity_id: id });
+    if (act.startsWith("alarm:")) {
+      const m = act.slice(6);
+      if (a.code_format && (m === "disarm" || a.code_arm_required !== false)) { this.close(); this.ha()?.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true })); return undefined; }
+      return this.call("alarm_control_panel", m === "disarm" ? "alarm_disarm" : `alarm_${m}`, { entity_id: id });
+    }
+    if (act.startsWith("vac:")) return this.call("vacuum", act.slice(4), { entity_id: id });
+    if (act.startsWith("wt:")) return this.call("water_heater", "set_temperature", { entity_id: id, temperature: (a.temperature ?? 50) + Number(act.slice(3)) });
+    if (act.startsWith("op:")) return this.call("water_heater", "set_operation_mode", { entity_id: id, operation_mode: act.slice(3) });
+    if (act.startsWith("sel:")) return this.call(dom, "select_option", { entity_id: id, option: act.slice(4) });
+    if (act === "install") return this.call("update", "install", { entity_id: id });
+    if (act.startsWith("dev:")) { const d = act.slice(4); return this.call(d.startsWith("cover.") ? "cover" : "homeassistant", d.startsWith("cover.") ? "toggle" : "toggle", { entity_id: d }); }
+    if (act.startsWith("rgb:")) return this.call("light", "turn_on", { entity_id: id, rgb_color: act.slice(4).split(",").map(Number) });
+    if (act.startsWith("fx:")) return this.call("light", "turn_on", { entity_id: id, effect: act.slice(3) });
+    if (act.startsWith("fanm:")) return this.call("climate", "set_fan_mode", { entity_id: id, fan_mode: act.slice(5) });
+    if (act.startsWith("pre:")) return this.call("climate", "set_preset_mode", { entity_id: id, preset_mode: act.slice(4) });
+    if (act.startsWith("swg:")) return this.call("climate", "set_swing_mode", { entity_id: id, swing_mode: act.slice(4) });
+    if (act.startsWith("fpre:")) return this.call("fan", "set_preset_mode", { entity_id: id, preset_mode: act.slice(5) });
+    if (act === "osc") return this.call("fan", "oscillate", { entity_id: id, oscillating: !a.oscillating });
+    if (act.startsWith("src:")) return this.call("media_player", "select_source", { entity_id: id, source: act.slice(4) });
+    if (act === "mute") return this.call("media_player", "volume_mute", { entity_id: id, is_volume_muted: !a.is_volume_muted });
+    return undefined;
+  },
+  // what letting go of a bar sends
+  slide(k, v, s, lights) {
+    const id = s?.entity_id, dom = id?.split(".")[0], a = s?.attributes || {};
+    if (k === "light") this.call("light", v ? "turn_on" : "turn_off", v ? { entity_id: id, brightness_pct: v } : { entity_id: id });
+    if (k === "cover") this.call("cover", "set_cover_position", { entity_id: id, position: v });
+    if (k === "vol") this.call("media_player", "volume_set", { entity_id: id, volume_level: v / 100 });
+    if (k === "fan") this.call("fan", v ? "set_percentage" : "turn_off", v ? { entity_id: id, percentage: v } : { entity_id: id });
+    if (k === "num") { const mn = Number(a.min ?? 0), mx = Number(a.max ?? 100), st = Number(a.step || 1); this.call(dom, "set_value", { entity_id: id, value: Math.round((mn + (mx - mn) * v / 100) / st) * st }); }
+    if (k === "rlights") this.call("light", v ? "turn_on" : "turn_off", v ? { entity_id: lights, brightness_pct: v } : { entity_id: lights });
+  },
   wire(s, g) {
     const el = this.el, root = el.root, id = s.entity_id, dom = id.split(".")[0], a = s.attributes;
     root.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", (ev) => {
@@ -10172,41 +10227,8 @@ const RoostSheet = {
       if (act === "close") return this.close();
       if (act === "grow") { const b4 = root.querySelector(".sh")?.getBoundingClientRect().height; el.full = !el.full; this.draw(); const n = root.querySelector(".sh"); if (n && b4) this.glide(n, [{ height: `${b4}px` }, { height: `${n.getBoundingClientRect().height}px` }]); return undefined; }
       if (act === "ha") { this.close(); this.ha()?.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true })); return undefined; }
-      if (act === "toggle") return this.call("homeassistant", "toggle", { entity_id: id });
-      if (act.startsWith("ct:")) return this.call("light", "turn_on", { entity_id: id, color_temp_kelvin: Number(act.slice(3)) });
-      if (act.startsWith("t:")) { const t = Math.round(((a.temperature ?? 22) + Number(act.slice(2))) * 2) / 2; return this.call("climate", "set_temperature", { entity_id: id, temperature: t }); }
-      if (act.startsWith("mode:")) return this.call("climate", "set_hvac_mode", { entity_id: id, hvac_mode: act.slice(5) });
-      if (act === "open") return this.call("cover", "open_cover", { entity_id: id });
-      if (act === "lock" || act === "unlock") return this.call("lock", act, { entity_id: id });
-      if (act === "play") return this.call("media_player", "media_play_pause", { entity_id: id });
-      if (act === "prev") return this.call("media_player", "media_previous_track", { entity_id: id });
-      if (act === "next") return this.call("media_player", "media_next_track", { entity_id: id });
-      if (act === "run") return this.call(dom, "turn_on", { entity_id: id });
-      if (act === "trigger") return this.call("automation", "trigger", { entity_id: id });
-      if (act === "press") return this.call(dom, "press", { entity_id: id });
-      if (act === "stop") return this.call("cover", "stop_cover", { entity_id: id });
-      if (act.startsWith("alarm:")) {
-        const m = act.slice(6);
-        if (a.code_format && (m === "disarm" || a.code_arm_required !== false)) { this.close(); this.ha()?.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: id }, bubbles: true, composed: true })); return undefined; }
-        return this.call("alarm_control_panel", m === "disarm" ? "alarm_disarm" : `alarm_${m}`, { entity_id: id });
-      }
-      if (act.startsWith("vac:")) return this.call("vacuum", act.slice(4), { entity_id: id });
-      if (act.startsWith("wt:")) return this.call("water_heater", "set_temperature", { entity_id: id, temperature: (a.temperature ?? 50) + Number(act.slice(3)) });
-      if (act.startsWith("op:")) return this.call("water_heater", "set_operation_mode", { entity_id: id, operation_mode: act.slice(3) });
-      if (act.startsWith("sel:")) return this.call(dom, "select_option", { entity_id: id, option: act.slice(4) });
-      if (act === "install") return this.call("update", "install", { entity_id: id });
-      if (act.startsWith("dev:")) { const d = act.slice(4); return this.call(d.startsWith("cover.") ? "cover" : "homeassistant", d.startsWith("cover.") ? "toggle" : "toggle", { entity_id: d }); }
       if (act.startsWith("open:")) { this.open(act.slice(5)); return undefined; }
-      if (act.startsWith("rgb:")) return this.call("light", "turn_on", { entity_id: id, rgb_color: act.slice(4).split(",").map(Number) });
-      if (act.startsWith("fx:")) return this.call("light", "turn_on", { entity_id: id, effect: act.slice(3) });
-      if (act.startsWith("fanm:")) return this.call("climate", "set_fan_mode", { entity_id: id, fan_mode: act.slice(5) });
-      if (act.startsWith("pre:")) return this.call("climate", "set_preset_mode", { entity_id: id, preset_mode: act.slice(4) });
-      if (act.startsWith("swg:")) return this.call("climate", "set_swing_mode", { entity_id: id, swing_mode: act.slice(4) });
-      if (act.startsWith("fpre:")) return this.call("fan", "set_preset_mode", { entity_id: id, preset_mode: act.slice(5) });
-      if (act === "osc") return this.call("fan", "oscillate", { entity_id: id, oscillating: !a.oscillating });
-      if (act.startsWith("src:")) return this.call("media_player", "select_source", { entity_id: id, source: act.slice(4) });
-      if (act === "mute") return this.call("media_player", "volume_mute", { entity_id: id, is_volume_muted: !a.is_volume_muted });
-      return undefined;
+      return this.act(act, s);
     }));
     // "Close" on a curtain uses its own name so it does not shut the sheet
     root.querySelectorAll('.g2 [data-act="close"]').forEach((b) => { b.dataset.act = "close_cover"; b.replaceWith(b.cloneNode(true)); });
@@ -10221,12 +10243,7 @@ const RoostSheet = {
       bar.addEventListener("pointermove", (e) => { if (v == null) return; v = at(e); fill.style.width = `${v}%`; label.textContent = word(v); });
       bar.addEventListener("pointerup", () => {
         if (v == null) return; const k = bar.dataset.bar; el.busy = false;
-        if (k === "light") this.call("light", v ? "turn_on" : "turn_off", v ? { entity_id: id, brightness_pct: v } : { entity_id: id });
-        if (k === "cover") this.call("cover", "set_cover_position", { entity_id: id, position: v });
-        if (k === "vol") this.call("media_player", "volume_set", { entity_id: id, volume_level: v / 100 });
-        if (k === "fan") this.call("fan", v ? "set_percentage" : "turn_off", v ? { entity_id: id, percentage: v } : { entity_id: id });
-        if (k === "num") { const mn = Number(a.min ?? 0), mx = Number(a.max ?? 100), st = Number(a.step || 1); this.call(dom, "set_value", { entity_id: id, value: Math.round((mn + (mx - mn) * v / 100) / st) * st }); }
-        if (k === "rlights") this.call("light", v ? "turn_on" : "turn_off", v ? { entity_id: el.room.lights, brightness_pct: v } : { entity_id: el.room.lights });
+        this.slide(k, v, s, el.room?.lights);
         v = null;
       });
     });
@@ -11756,7 +11773,7 @@ const Tour = {
   // where a device's button goes: its real height in the room
   point(dv, floor) {
     const H = floor.height || 2.8, kind = dv.kind || "light", look = dv.look || "flush";
-    if (kind === "light") return [dv.x, look === "floor" ? 1.45 : look === "pendant" ? H - 0.85 : look === "chandelier" ? H - 0.9 : H - 0.04, dv.y];
+    if (kind === "light") return [dv.x, look === "floor" ? 1.45 : look === "wall" ? dv.z ?? (dv.style === "reading" ? 1.1 : 1.8) : look === "step" ? dv.z ?? 0.3 : look === "flood" ? dv.z ?? Math.min(2.6, H - 0.2) : look === "table" ? (dv.z ?? 0.55) + 0.4 : look === "bollard" ? 0.75 : look === "uplight" ? 0.05 : look === "linear" && dv.style === "washer" ? 0.1 : look === "linear" && dv.style === "pendant" ? H - (dv.drop ?? 0.7) : look === "pendant" ? H - 0.85 : look === "chandelier" ? H - 0.9 : H - 0.04, dv.y];
     if (kind === "ac") return [dv.x, H - 0.45, dv.y];
     if (kind === "fan") return [dv.x, H - 0.4, dv.y];
     if (kind === "curtain" || kind === "door" || kind === "lock") {
@@ -11766,6 +11783,22 @@ const Tour = {
     }
     if (kind === "tv") return [dv.x, 1.2, dv.y];
     return [dv.x, dv.z ?? 1.0, dv.y];
+  },
+  // how big a device is in the room, in metres (its outline on the pictures)
+  size(dv, floor) {
+    const kind = dv.kind || "light", look = dv.look || "flush";
+    if (kind === "light") return ["pendant", "chandelier"].includes(look) ? [0.6, 0.6] : look === "linear" ? [Math.max(0.6, dv.len || dv.w || 1.2), 0.25] : look === "floor" ? [0.45, 0.5] : look === "table" ? [0.4, 0.45] : look === "bollard" ? [0.25, 0.8] : [0.32, 0.32];
+    if (kind === "ac") return [0.95, 0.36];
+    if (kind === "fan") return [1.2, 0.45];
+    if (kind === "tv") return [dv.w || 1.25, (dv.w || 1.25) * 0.6];
+    if (kind === "curtain" || kind === "door" || kind === "lock") {
+      const o = (floor.openings || []).filter((x) => (kind === "curtain" ? x.type !== "door" : x.type === "door")).sort((a, b) => Math.hypot(a.x - dv.x, a.y - dv.y) - Math.hypot(b.x - dv.x, b.y - dv.y))[0];
+      if (o && Math.hypot(o.x - dv.x, o.y - dv.y) < 1.5) return kind === "curtain" ? [o.width || 1.4, o.height || 1.4] : [0.3, 0.4];
+      return [1.2, 1.4];
+    }
+    if (kind === "vacuum") return [0.45, 0.2];
+    if (kind === "speaker") return [0.3, 0.4];
+    return [0.25, 0.25];
   },
   // the rooms a door leads to from a room
   doors(floor, room) {
@@ -11784,6 +11817,96 @@ const Tour = {
     if (t <= 66) { r = 255; g = 99.47 * Math.log(t) - 161.12; b = t <= 19 ? 0 : 138.52 * Math.log(t - 10) - 305.04; } else { r = 329.7 * (t - 60) ** -0.1332; g = 288.12 * (t - 60) ** -0.0755; b = 255; }
     const c = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
     return `#${c(r)}${c(g)}${c(b)}`;
+  },
+};
+
+// A small 3D model of a device for the Home Tour's side panel, drawn with CSS 3D (no 3D engine needed).
+// Sizes are in pixels; y grows downwards. Moving parts carry data-m so the panel can move them each frame.
+const TourModel = {
+  face(w, h, t, cls, extra = "") { return `<i class="f ${cls}" style="width:${w}px;height:${h}px;margin:${-h / 2}px 0 0 ${-w / 2}px;transform:${t}"${extra}></i>`; },
+  // a box centred on (x, y, z)
+  box(w, h, d, x, y, z, cls = "", attrs = "") {
+    const f = (W, H, t, c) => this.face(W, H, t, `${cls} ${c}`);
+    return `<b class="g" style="transform:translate3d(${x}px,${y}px,${z}px)"${attrs}>${f(w, h, `translateZ(${d / 2}px)`, "fr")}${f(w, h, `rotateY(180deg) translateZ(${d / 2}px)`, "bk")}${f(d, h, `rotateY(90deg) translateZ(${w / 2}px)`, "sd")}${f(d, h, `rotateY(-90deg) translateZ(${w / 2}px)`, "sd")}${f(w, d, `rotateX(90deg) translateZ(${h / 2}px)`, "tp")}${f(w, d, `rotateX(-90deg) translateZ(${h / 2}px)`, "bt")}</b>`;
+  },
+  // an upright cylinder (or a cone when r2 differs) centred on (x, y, z)
+  cyl(r, h, x, y, z, cls = "", n = 12, r2 = r, caps = true) {
+    let out = "";
+    const slant = Math.atan2(r2 - r, h), side = Math.hypot(h, r2 - r), w = 2 * Math.max(r, r2) * Math.tan(Math.PI / n) + 1;
+    for (let i = 0; i < n; i++) out += this.face(w, side, `rotateY(${(360 / n) * i}deg) translateZ(${(r + r2) / 2}px) rotateX(${(-slant * 180) / Math.PI}deg)`, `${cls} sd`, r2 !== r ? ` data-cone="${r}:${r2}"` : "");
+    if (caps) out += this.face(2 * r, 2 * r, `rotateX(90deg) translateZ(${h / 2}px)`, `${cls} tp disc`) + this.face(2 * r2, 2 * r2, `rotateX(-90deg) translateZ(${h / 2}px)`, `${cls} bt disc`);
+    return `<b class="g" style="transform:translate3d(${x}px,${y}px,${z}px)">${out}</b>`;
+  },
+  // a round glow that looks the same from every side (three crossed discs)
+  ball(r, x, y, z, cls) { return `<b class="g" style="transform:translate3d(${x}px,${y}px,${z}px)">${[0, 60, 120].map((a) => this.face(2 * r, 2 * r, `rotateY(${a}deg)`, `${cls} disc`)).join("")}${this.face(2 * r, 2 * r, "rotateX(90deg)", `${cls} disc`)}</b>`; },
+  // a flat disc lying on the floor or the ceiling
+  flat(r, x, y, z, cls) { return `<b class="g" style="transform:translate3d(${x}px,${y}px,${z}px)">${this.face(2 * r, 2 * r, "rotateX(90deg)", `${cls} disc`)}</b>`; },
+  // a cone of light coming down from (x, y, z): crossed see-through planes
+  beam(top, bottom, h, x, y, z, cls) { return `<b class="g" style="transform:translate3d(${x}px,${y + h / 2}px,${z}px)">${[0, 45, 90, 135].map((a) => this.face(2 * bottom, h, `rotateY(${a}deg);clip-path:polygon(${50 - (50 * top) / bottom}% 0,${50 + (50 * top) / bottom}% 0,100% 100%,0 100%)`, `${cls} beam`)).join("")}</b>`; },
+
+  // which model a device gets, from its kind and look in the Atelier
+  of(d, dom) {
+    const kind = d.kind || (dom === "climate" ? "ac" : dom === "cover" ? "curtain" : dom === "fan" ? "fan" : dom === "media_player" ? "tv" : dom === "lock" ? "lock" : dom === "vacuum" ? "vacuum" : "light"), look = d.look || "";
+    if (kind === "light") return ["pendant", "chandelier"].includes(look) || (look === "linear" && d.style === "pendant") ? "hang" : ["floor", "table", "wall", "bollard", "step", "uplight", "flood"].includes(look) ? "stand" : "ceiling";
+    return { ac: "ac", curtain: "curtain", fan: "fan", tv: "tv", lock: "lock", door: "lock", vacuum: "vacuum", speaker: "speaker" }[kind] || "thing";
+  },
+
+  html(type) {
+    const B = this;
+    if (type === "hang") return B.box(3, 70, 3, 0, -95, 0, "cord") + B.cyl(10, 8, 0, -58, 0, "metal") + B.cyl(26, 46, 0, -32, 0, "shade", 14, 54, false) + B.ball(17, 0, -4, 0, "bulb") + `<b class="g" data-m="pool">${B.flat(90, 0, 70, 0, "pool")}</b>`;
+    if (type === "ceiling") return B.box(170, 6, 170, 0, -70, 0, "ceil") + B.cyl(30, 14, 0, -60, 0, "metal", 16) + B.flat(24, 0, -52, 0, "lens") + `<b class="g" data-m="beam">${B.beam(24, 80, 120, 0, -52, 0, "ray")}</b>` + `<b class="g" data-m="pool">${B.flat(85, 0, 70, 0, "pool")}</b>`;
+    if (type === "stand") return B.flat(36, 0, 70, 0, "metal") + B.box(5, 120, 5, 0, 10, 0, "metal") + B.cyl(24, 40, 0, -60, 0, "shade", 14, 38, false) + B.ball(15, 0, -36, 0, "bulb") + `<b class="g" data-m="pool">${B.flat(80, 0, 71, 0, "pool")}</b>`;
+    if (type === "ac") return B.box(210, 62, 52, 0, -30, 0, "ac") + B.box(150, 6, 2, 0, -46, 27, "vent") + `<b class="g" style="transform:translate3d(0,1px,24px)"><b class="g" data-m="flap">${B.face(196, 12, "translateY(6px)", "ac fr")}</b></b>` + `<b class="g" data-m="air" style="transform:translate3d(0,24px,40px)">${[-60, -20, 20, 60].map((x, i) => B.face(26, 70, `translate3d(${x}px,0,0) rotateX(-30deg)`, `air a${i}`)).join("")}</b>` + `<b class="g" style="transform:translate3d(64px,-36px,26.5px)">${B.face(46, 18, "", "lcd", ' data-m="lcd"')}</b>`;
+    if (type === "curtain") return B.box(220, 160, 4, 0, 0, -16, "win") + B.box(236, 5, 5, 0, -84, 0, "metal") + `<b class="g" data-m="cl">${[0, 1, 2, 3, 4, 5].map((i) => B.face(20, 160, `translate3d(${i * 18 - 45}px,0,${i % 2 ? 4 : -4}px) rotateY(${i % 2 ? 28 : -28}deg)`, "cloth")).join("")}</b><b class="g" data-m="cr">${[0, 1, 2, 3, 4, 5].map((i) => B.face(20, 160, `translate3d(${45 - i * 18}px,0,${i % 2 ? 4 : -4}px) rotateY(${i % 2 ? -28 : 28}deg)`, "cloth")).join("")}</b>`;
+    if (type === "fan") return B.box(150, 6, 150, 0, -90, 0, "ceil") + B.box(5, 40, 5, 0, -66, 0, "metal") + B.cyl(18, 18, 0, -38, 0, "metal", 14) + `<b class="g" data-m="spin" style="transform:translate3d(0,-36px,0)">${[0, 90, 180, 270].map((a) => `<b class="g" style="transform:rotateY(${a}deg)">${B.box(80, 3, 22, 52, 0, 0, "blade")}</b>`).join("")}</b>` + B.flat(14, 0, -27, 0, "lens");
+    if (type === "tv") return B.box(230, 132, 8, 0, -30, 0, "tv") + `<b class="g" style="transform:translate3d(0,-30px,4.5px)">${B.face(220, 122, "", "screen", ' data-m="screen"')}</b>` + B.box(8, 34, 8, 0, 50, -2, "metal") + B.box(90, 4, 40, 0, 68, -2, "metal");
+    if (type === "lock") return B.box(110, 170, 10, 0, 0, 0, "door") + B.box(30, 50, 8, 34, 0, 8, "metal") + B.cyl(6, 4, 34, -8, 13, "lens", 10) + `<b class="g" data-m="bolt">${B.box(26, 8, 8, 58, 14, 4, "bolt")}</b>`;
+    if (type === "vacuum") return `<b class="g" data-m="roam">${B.cyl(62, 22, 0, 40, 0, "vac", 20)}${B.cyl(14, 8, 0, 26, -20, "metal", 12)}${B.flat(6, 0, 28, 24, "led")}<b class="g" data-m="brush" style="transform:translate3d(-44px,52px,40px)">${[0, 60, 120].map((a) => B.face(34, 3, `rotateX(90deg) rotateZ(${a}deg)`, "metal")).join("")}</b></b>` + B.flat(110, 0, 52, 0, "rug");
+    if (type === "speaker") return B.box(80, 130, 70, 0, 0, 0, "spk") + `<b class="g" style="transform:translate3d(0,22px,35.5px)">${B.face(52, 52, "", "cone disc", ' data-m="cone"')}</b>` + `<b class="g" style="transform:translate3d(0,-34px,35.5px)">${B.face(22, 22, "", "cone disc")}</b>`;
+    return B.box(90, 90, 90, 0, 0, 0, "thing");
+  },
+
+  css(p, dark) {
+    const lit = "var(--glow,#FFD9A0)";
+    return `
+      .st{position:relative;height:210px;border-radius:24px;overflow:hidden;background:radial-gradient(ellipse at 50% 30%,${dark ? "#262B57" : "#EEF0FF"},${dark ? "#0E1026" : "#D9DDF5"});perspective:760px;touch-action:none;cursor:grab;flex:none}
+      .st:active{cursor:grabbing}
+      .sc,.g{position:absolute;left:50%;top:54%;transform-style:preserve-3d}.g{left:0;top:0}
+      .f{position:absolute;left:0;top:0;display:block;backface-visibility:visible;box-sizing:border-box}
+      .disc{border-radius:50%}
+      .metal{background:${dark ? "#8D93B8" : "#A5ABCB"}}.metal.tp,.metal.bt{background:${dark ? "#6E7499" : "#8F95B8"}}.metal.sd{background:${dark ? "#7A80A6" : "#9BA1C2"}}
+      .cord{background:#2A2E4A}
+      .ceil{background:${dark ? "rgba(255,255,255,.08)" : "rgba(255,255,255,.7)"};border:1px solid ${dark ? "rgba(255,255,255,.12)" : "rgba(30,34,80,.08)"}}
+      .shade{background:${dark ? "#D8CBB6" : "#E9DDC8"};opacity:.94}
+      .shade.sd:nth-child(odd){background:${dark ? "#CDBFA8" : "#DED1BA"}}
+      .bulb{background:radial-gradient(circle,#FFFFFF 0%,${lit} 45%,transparent 72%);opacity:var(--on,0)}
+      .lens{background:radial-gradient(circle,#FFFFFF,${lit});opacity:calc(.35 + .65 * var(--on,0))}
+      .ray{background:linear-gradient(${lit},transparent);opacity:calc(.28 * var(--on,0))}
+      .pool{background:radial-gradient(circle,${lit} 0%,transparent 70%);opacity:calc(.6 * var(--on,0))}
+      .ac{background:${dark ? "#E9ECF8" : "#FFFFFF"};border:1px solid rgba(30,34,80,.08)}.ac.sd,.ac.bt{background:${dark ? "#C9CDE2" : "#E5E8F5"}}
+      .vent{background:repeating-linear-gradient(90deg,#B9BED8 0 3px,transparent 3px 7px)}
+      .lcd{font-size:12px;font-weight:700;color:var(--ac,#2EC4B6);display:flex;align-items:center;justify-content:center;font-style:normal;text-shadow:0 0 6px var(--ac,#2EC4B6)}
+      .air{border-radius:50% 50% 0 0;border-top:3px dashed var(--ac,#2EC4B6);opacity:0}
+      .on .air{animation:tour-air 1.6s linear infinite}.on .a1{animation-delay:.4s}.on .a2{animation-delay:.8s}.on .a3{animation-delay:1.2s}
+      @keyframes tour-air{0%{opacity:0;translate:0 -10px}30%{opacity:.9}100%{opacity:0;translate:0 50px}}
+      .win{background:linear-gradient(${dark ? "#1E2A5E,#3B4C8F" : "#8EC5FF,#D8ECFF"});border:4px solid ${dark ? "#AEB4D6" : "#FFFFFF"}}.win.sd,.win.tp,.win.bt,.win.bk{background:${dark ? "#AEB4D6" : "#FFFFFF"};border:0}
+      .cloth{background:linear-gradient(90deg,${dark ? "#6C5BC4,#8B7BE0" : "#C9B8F5,#E2D8FF"})}
+      .blade{background:${dark ? "#C8B89C" : "#B89A70"}}
+      .tv,.spk{background:#15172A}.tv.fr{background:#0A0B14}
+      .screen{background:#050610}
+      .on .screen{background:linear-gradient(120deg,#6D4BFF,#2EC4B6,#FF7A59,#6D4BFF);background-size:300% 300%;animation:tour-tv 6s linear infinite;box-shadow:0 0 40px rgba(109,75,255,.5)}
+      @keyframes tour-tv{to{background-position:300% 0}}
+      .door{background:${dark ? "#8A6A4E" : "#B98B62"}}.door.sd,.door.tp,.door.bt{background:${dark ? "#6E533C" : "#9C7350"}}
+      .bolt{background:#D8DBEB}
+      .vac{background:${dark ? "#2A2E4A" : "#3A3F63"}}.vac.tp{background:radial-gradient(circle,#4B5180,#2A2E4A)}
+      .led{background:var(--vc,#5FBF77);box-shadow:0 0 8px var(--vc,#5FBF77)}
+      .rug{background:radial-gradient(circle,${dark ? "rgba(255,255,255,.08)" : "rgba(30,34,80,.08)"},transparent 70%)}
+      .cone{background:radial-gradient(circle,#3A3F63 0 30%,#22253D 32% 60%,#30345A 62%)}
+      .on .cone[data-m]{animation:tour-thump .5s ease-in-out infinite}
+      @keyframes tour-thump{50%{scale:1.08}}
+      .thing{background:${dark ? "#3A3F72" : "#C9CDEF"}}
+      .hint{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-size:12px;color:${p.muted};pointer-events:none}
+    `;
   },
 };
 
@@ -11822,7 +11945,7 @@ class TourSphere {
 }
 
 class RoostTour extends RoostBase {
-  static get defaults() { return { plan: "", floor: 0, room: "", height: 420, tap: "details", devices: true, nav: true, theme: "auto" }; }
+  static get defaults() { return { plan: "", floor: 0, room: "", height: 420, tap: "panel", devices: true, nav: true, theme: "auto" }; }
 
   static getConfigForm() {
     return {
@@ -11833,7 +11956,7 @@ class RoostTour extends RoostBase {
           { name: "room", label: "Start in this room (its id, empty = the whole home)", selector: { text: {} } },
         ] },
         { name: "height", label: "Height", selector: slider(240, 1200, 20, "px") },
-        { name: "tap", label: "Tapping a device", selector: pick([["details", "Shows its controls"], ["toggle", "Turns it on or off"]]) },
+        { name: "tap", label: "Tapping a device", selector: pick([["panel", "Shows it in 3D with its controls beside the picture"], ["details", "Shows its controls"], ["toggle", "Turns it on or off"]]) },
         { type: "grid", name: "", schema: [
           { name: "devices", label: "Device buttons on the pictures", selector: { boolean: {} } },
           { name: "nav", label: "Room buttons along the bottom", selector: { boolean: {} } },
@@ -11867,7 +11990,7 @@ class RoostTour extends RoostBase {
 
   connectedCallback() { if (this._hass && this._config && !this._ro && this.shadowRoot?.querySelector(".tour")) this.render(); }
   disconnectedCallback() { this.teardown(); }
-  teardown() { this._ro?.disconnect(); this._ro = null; this.sphere?.dispose(); this.sphere = null; for (const v of (this._pics || new Map()).values()) v.then((x) => x && URL.revokeObjectURL(x.url)); this._pics = new Map(); }
+  teardown() { this.closePanel(true); this._ro?.disconnect(); this._ro = null; this.sphere?.dispose(); this.sphere = null; for (const v of (this._pics || new Map()).values()) v.then((x) => x && URL.revokeObjectURL(x.url)); this._pics = new Map(); }
 
   ws(msg) { return this._hass.connection.sendMessagePromise(msg); }
 
@@ -11924,6 +12047,13 @@ class RoostTour extends RoostBase {
       .hs.on button{background:linear-gradient(135deg,var(--c),color-mix(in srgb,var(--c) 70%,#FFFFFF));border-color:transparent;box-shadow:0 0 18px color-mix(in srgb,var(--c) 70%,transparent)}
       .hs.room button{width:auto;height:32px;padding:0 12px;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}
       .hs.door button{background:rgba(255,255,255,.9);color:#161936}
+      .hs.dev button{width:var(--w,40px);height:var(--h,40px);border-radius:var(--r,999px);background:rgba(255,255,255,.14);border:2px dotted rgba(255,255,255,.92);box-shadow:0 0 0 1px rgba(11,13,23,.18);backdrop-filter:none;-webkit-backdrop-filter:none;align-items:flex-start;justify-content:flex-end}
+      .hs.dev.on button{background:color-mix(in srgb,var(--c) 22%,rgba(255,255,255,.12));border-color:#FFFFFF;box-shadow:0 0 16px color-mix(in srgb,var(--c) 45%,transparent)}
+      .hs.dev.sel button{border-style:solid;background:rgba(255,255,255,.28)}
+      .hs.dev .ib{width:26px;height:26px;margin:-12px -12px 0 0;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(20,24,49,.72);color:#FFFFFF;--mdc-icon-size:16px;flex:none}
+      .hs.dev.on .ib{background:linear-gradient(135deg,var(--c),color-mix(in srgb,var(--c) 70%,#FFFFFF))}
+      .hs.dev.small button{align-items:center;justify-content:center}.hs.dev.small .ib{margin:0}
+      .side{position:absolute;top:0;bottom:0;inset-inline-end:0;width:min(360px,calc(100% - 48px));z-index:4;border-start-start-radius:24px;border-end-start-radius:24px;overflow:hidden;background:${this.dark ? "rgba(20,24,49,.97)" : "rgba(255,255,255,.97)"};box-shadow:0 0 50px -10px rgba(0,0,0,.55)}
       .msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:#9AA3D9;font-size:14px;line-height:1.5}
       .top{position:absolute;left:12px;top:12px;right:12px;display:flex;pointer-events:none}
       .top span{padding:6px 12px;border-radius:12px;background:rgba(11,13,23,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#FFFFFF;font-size:13px;font-weight:600}
@@ -11952,7 +12082,7 @@ class RoostTour extends RoostBase {
   // go to a room (its 360°, or its photo when there is no 360° yet) or, with null, the whole floor
   async go(roomId, again = false) {
     const token = (this._token = (this._token || 0) + 1), fl = this.floorData(); if (!fl || !this.el) return;
-    this._shown = roomId; this.closeList();
+    this._shown = roomId; this.closeList(); this.closePanel(true);
     const room = (this.room = fl.rooms.find((r) => r.id === roomId) || null);
     this.el.hot.innerHTML = ""; this.el.glow.innerHTML = ""; this.hs = new Map(); this.glows = new Map();
     this.el.tour.querySelector(".msg")?.remove();
@@ -12061,13 +12191,14 @@ class RoostTour extends RoostBase {
   }
 
   drawHot() {
+    if (this.pan && this._hass.states[this.pan.s.d.entity] !== this.pan.last) this.drawPanel(false);
     if (!this.el || !this.spots) return;
     const W = this.el.tour.clientWidth, H = this.el.tour.clientHeight, scale = this.kind === "pano" ? 75 / this.fov : 1, S = this._hass.states;
     for (const s of this.spots) {
       let el = this.hs.get(s.id);
       if (!el) {
-        el = document.createElement("div"); el.className = `hs${s.room ? " room" : ""}${s.door ? " door" : ""}`;
-        el.innerHTML = s.room ? `<button><ha-icon icon="${s.door ? "mdi:arrow-up-bold-circle-outline" : "mdi:door-open"}"></ha-icon>${esc(s.room.name || "Room")}</button>` : `<button aria-label="${esc(s.d.name || S[s.d.entity]?.attributes?.friendly_name || s.d.entity)}"><ha-icon></ha-icon></button>`;
+        el = document.createElement("div"); el.className = `hs${s.room ? " room" : " dev"}${s.door ? " door" : ""}${this.pan?.s.id === s.id ? " sel" : ""}`;
+        el.innerHTML = s.room ? `<button><ha-icon icon="${s.door ? "mdi:arrow-up-bold-circle-outline" : "mdi:door-open"}"></ha-icon>${esc(s.room.name || "Room")}</button>` : `<button aria-label="${esc(s.d.name || S[s.d.entity]?.attributes?.friendly_name || s.d.entity)}"><span class="ib"><ha-icon></ha-icon></span></button>`;
         el.firstElementChild.addEventListener("click", (e) => { e.stopPropagation(); this.tap(s); });
         this.el.hot.appendChild(el); this.hs.set(s.id, el);
       }
@@ -12077,6 +12208,13 @@ class RoostTour extends RoostBase {
       if (!show) { if (glow) glow.style.opacity = 0; continue; }
       el.style.left = `${at[0]}px`; el.style.top = `${at[1]}px`;
       if (!s.d) continue;
+      // a dotted outline as big as the device looks on the picture
+      const up = this.where([s.p[0], s.p[1] + 0.5, s.p[2]], W, H), dn = this.where([s.p[0], s.p[1] - 0.5, s.p[2]], W, H);
+      const ppm = up && dn ? Math.hypot(up[0] - dn[0], up[1] - dn[1]) : 60, [mw, mh] = Tour.size(s.d, this.floorData());
+      const bw = Math.round(Math.max(40, Math.min(W * 0.7, mw * ppm + 16))), bh = Math.round(Math.max(40, Math.min(H * 0.7, mh * ppm + 16)));
+      el.style.setProperty("--w", `${bw}px`); el.style.setProperty("--h", `${bh}px`);
+      el.style.setProperty("--r", ["light", "fan", "vacuum"].includes(s.d.kind || "light") ? "999px" : "14px");
+      el.classList.toggle("small", bw < 64 && bh < 64);
       const st = S[s.d.entity], on = !!st && !UNAVAILABLE.includes(st.state) && !OFF_STATES.includes(st.state), kind = s.d.kind || "light";
       el.classList.toggle("on", on); el.style.setProperty("--c", TOUR_COLOURS[kind] || ACTIVE[1]);
       const icon = kind === "light" ? (on ? "mdi:lightbulb-on" : "mdi:lightbulb-outline") : kind === "curtain" ? (on ? "mdi:curtains" : "mdi:curtains-closed") : TOUR_ICONS[kind] || st?.attributes?.icon || "mdi:circle-medium";
@@ -12097,7 +12235,137 @@ class RoostTour extends RoostBase {
     this.vibrate();
     if (s.room) return this.go(s.room.id);
     if (this._config.tap === "toggle") return this.call("homeassistant", "toggle", { entity_id: s.d.entity });
-    this.moreInfo(s.d.entity);
+    if (this._config.tap === "details") return this.moreInfo(s.d.entity);
+    if (this.pan?.s.id === s.id) return this.closePanel();
+    return this.openPanel(s);
+  }
+
+  // ---------------------------------------------------------------- the side panel: the device in 3D with its controls
+  openPanel(s) {
+    if (!this.el) return;
+    this.closePanel(true);
+    const side = document.createElement("div"); side.className = "side"; side.dataset.noswipe = "";
+    const root = side.attachShadow({ mode: "open" });
+    this.el.tour.appendChild(side);
+    this.pan = { s, side, root, ry: -30, rx: -14, idle: 0, open: null, bolt: null, spin: 0, roam: 0, t: performance.now(), last: null };
+    for (const [id, el] of this.hs) el.classList.toggle("sel", id === s.id);
+    this.drawPanel(true);
+    const rtl = getComputedStyle(this.el.tour).direction === "rtl";
+    RoostSheet.glide(side, [{ transform: `translateX(${rtl ? -100 : 100}%)` }, { transform: "none" }], 240);
+    let still = false; try { still = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { /* old browser */ }
+    this.pan.still = still;
+    const tick = (now) => { if (!this.pan || this.pan.side !== side) return; this.spinPanel(now); this.pan.raf = requestAnimationFrame(tick); };
+    this.pan.raf = requestAnimationFrame(tick);
+  }
+
+  closePanel(now = false) {
+    const pan = this.pan; if (!pan) return;
+    this.pan = null; cancelAnimationFrame(pan.raf);
+    for (const el of (this.hs || new Map()).values()) el.classList.remove("sel");
+    if (now || !pan.side.isConnected) { pan.side.remove(); return; }
+    const rtl = this.el && getComputedStyle(this.el.tour).direction === "rtl";
+    RoostSheet.glide(pan.side, [{ transform: "none" }, { transform: `translateX(${rtl ? -100 : 100}%)` }], 200, "forwards").then(() => pan.side.remove());
+  }
+
+  drawPanel(full) {
+    const pan = this.pan; if (!pan) return;
+    const st = this._hass.states[pan.s.d.entity]; if (!st) return this.closePanel(true);
+    pan.last = st;
+    const dom = st.entity_id.split(".")[0], a = st.attributes, dark = this.dark, p = PALETTE[dark ? "dark" : "light"], { g } = RoostSheet.look(dom, st);
+    const type = TourModel.of(pan.s.d, dom), root = pan.root;
+    if (full || pan.type !== type || !root.querySelector(".pn")) {
+      pan.type = type;
+      root.innerHTML = `<style>${RoostSheet.css(p, g, dark, { full: true })}${TourModel.css(p, dark)}
+        .pn{position:absolute;inset:0;box-sizing:border-box;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:16px;display:flex;flex-direction:column;gap:16px}
+        .pn > *{flex-shrink:0}.ctl{display:flex;flex-direction:column;gap:14px}.ctl .bar{height:56px}.ctl .wb{height:48px}.ctl .sw{height:44px}
+      </style><div class="pn"><div class="hdr"><span class="ic"><ha-icon></ha-icon></span><span class="nm"><b></b><span></span></span><button class="x" data-x aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button></div>
+        <div class="st" data-noswipe><div class="sc"><b class="g" data-m="obj">${TourModel.html(type)}</b></div><span class="hint">Drag to turn it</span></div><div class="ctl"></div></div>`;
+      root.querySelector("[data-x]").addEventListener("click", (e) => { e.stopPropagation(); this.vibrate(); this.closePanel(); });
+      this.turnable(root.querySelector(".st"));
+    }
+    root.querySelector(".ic ha-icon").setAttribute("icon", a.icon || (TOUR_ICONS[pan.s.d.kind] || (dom === "light" ? "mdi:lightbulb" : dom === "cover" ? "mdi:curtains" : "mdi:power")));
+    root.querySelector(".ic").style.background = `linear-gradient(135deg,${g[0]},${g[1]})`;
+    root.querySelector(".nm b").textContent = pan.s.d.name || a.friendly_name || st.entity_id;
+    root.querySelector(".nm span").textContent = RoostSheet.stateWord(st);
+    this.modelState(st);
+    if (!pan.busy) {
+      const ctl = root.querySelector(".ctl");
+      ctl.innerHTML = `${RoostSheet.main(st, g, p)}${RoostSheet.extras(st).join("")}<button class="wb" data-act="more"><ha-icon icon="mdi:dots-horizontal"></ha-icon>More</button>`;
+      this.wirePanel(ctl, st);
+    }
+    try { RoostLang.apply(this, root); } catch (e) { /* words stay */ }
+  }
+
+  // what the model shows: the light's colour and brightness, the AC's mode, how open a curtain is, how fast a fan turns
+  modelState(st) {
+    const pan = this.pan, sc = pan.root.querySelector(".sc"), dom = st.entity_id.split(".")[0], a = st.attributes;
+    const on = !UNAVAILABLE.includes(st.state) && !OFF_STATES.includes(st.state);
+    sc.classList.toggle("on", on);
+    if (dom === "light") {
+      sc.style.setProperty("--on", on ? (a.brightness != null ? (0.25 + 0.75 * (a.brightness / 255)).toFixed(2) : "1") : "0");
+      sc.style.setProperty("--glow", a.rgb_color ? `rgb(${a.rgb_color.join(",")})` : Tour.kelvin(a.color_temp_kelvin || 2900));
+    }
+    if (dom === "climate") {
+      sc.style.setProperty("--ac", { cool: "#4E8CFF", heat: "#FF7A59", dry: "#F5B041", fan_only: "#2EC4B6", auto: "#8B6CFF", heat_cool: "#8B6CFF" }[st.state] || "#7C86B8");
+      const lcd = pan.root.querySelector('[data-m="lcd"]'); if (lcd) lcd.textContent = on && a.temperature != null ? `${fmt(a.temperature, Number.isInteger(a.temperature) ? 0 : 1)}°` : "";
+    }
+    pan.want = {
+      open: dom === "cover" ? (coverView(st, RoostReversed.has(st.entity_id)).pos ?? (st.state === "open" ? 100 : 0)) / 100 : 0,
+      speed: dom === "fan" ? (on ? (a.percentage ?? 60) / 100 : 0) : on ? 1 : 0,
+      bolt: dom === "lock" ? (st.state === "locked" ? 1 : 0) : 1,
+      roam: dom === "vacuum" && st.state === "cleaning",
+      flap: on,
+    };
+    if (dom === "vacuum") sc.style.setProperty("--vc", st.state === "error" ? "#FF5A5A" : st.state === "cleaning" ? "#2EC4B6" : "#5FBF77");
+    pan.open ??= pan.want.open; pan.bolt ??= pan.want.bolt; pan.flap ??= on ? 1 : 0;
+  }
+
+  // every frame: turn the model slowly, and move its parts towards what the device is doing
+  spinPanel(now) {
+    const pan = this.pan, w = pan.want || {}, dt = Math.min(0.05, (now - pan.t) / 1000); pan.t = now;
+    const q = (k) => pan.root.querySelector(`[data-m="${k}"]`), ease = 1 - Math.exp(-dt * 6);
+    if (!pan.drag && !pan.still && now - pan.idle > 2500) pan.ry += dt * 14;
+    const obj = q("obj"); if (obj) obj.style.transform = `rotateX(${pan.rx}deg) rotateY(${pan.ry}deg)`;
+    pan.open += ((w.open ?? 0) - pan.open) * ease; pan.bolt += ((w.bolt ?? 1) - pan.bolt) * ease; pan.flap += ((w.flap ? 1 : 0) - pan.flap) * ease;
+    const cl = q("cl"), cr = q("cr");
+    if (cl) { cl.style.transform = `translateX(${-55 - pan.open * 35}px) scaleX(${1 - 0.6 * pan.open})`; cr.style.transform = `translateX(${55 + pan.open * 35}px) scaleX(${1 - 0.6 * pan.open})`; }
+    const spin = q("spin"); if (spin) { pan.spin += dt * (pan.still ? 0 : 900) * (w.speed || 0); spin.style.transform = `translate3d(0,-36px,0) rotateY(${pan.spin % 360}deg)`; }
+    const flap = q("flap"); if (flap) flap.style.transform = `rotateX(${85 - pan.flap * (45 + (pan.still ? 0 : 12 * Math.sin(now / 900)))}deg)`;
+    const bolt = q("bolt"); if (bolt) bolt.style.transform = `translateX(${(pan.bolt - 1) * 24}px)`;
+    const roam = q("roam"), brush = q("brush");
+    if (roam) { if (w.roam && !pan.still) pan.roam += dt * 0.9; roam.style.transform = `translate3d(${Math.cos(pan.roam) * 26 - 26}px,0,${Math.sin(pan.roam) * 26}px) rotateY(${(-pan.roam * 180) / Math.PI}deg)`; }
+    if (brush && w.roam && !pan.still) { pan.brush = ((pan.brush || 0) + dt * 600) % 360; brush.style.transform = `translate3d(-44px,52px,40px) rotateY(${pan.brush}deg)`; }
+  }
+
+  // drag the model to look at it from any side
+  turnable(stage) {
+    let at = null;
+    stage.addEventListener("pointerdown", (e) => { e.stopPropagation(); at = [e.clientX, e.clientY]; this.pan.drag = true; try { stage.setPointerCapture(e.pointerId); } catch (x) { /* a pointer that already ended */ } });
+    stage.addEventListener("pointermove", (e) => {
+      if (!at || !this.pan) return;
+      this.pan.ry += (e.clientX - at[0]) * 0.6; this.pan.rx = Math.max(-60, Math.min(20, this.pan.rx - (e.clientY - at[1]) * 0.4)); at = [e.clientX, e.clientY];
+    });
+    const up = () => { at = null; if (this.pan) { this.pan.drag = false; this.pan.idle = performance.now(); } };
+    stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
+  }
+
+  wirePanel(ctl, st) {
+    const id = st.entity_id;
+    ctl.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", (e) => {
+      e.stopPropagation(); const act = b.dataset.act;
+      if (act === "more") { this.closePanel(true); return window.RoostSheet ? RoostSheet.open(id) : this.moreInfo(id); }
+      return RoostSheet.act(act === "close" ? "close_cover" : act, this._hass.states[id] || st);
+    }));
+    ctl.querySelectorAll("[data-bar]").forEach((bar) => {
+      const fill = bar.querySelector("i"), label = bar.querySelector("b"), a = st.attributes; let v = null;
+      const pos = (e) => { const r = bar.getBoundingClientRect(), x = (e.clientX - r.left) / bar.clientWidth; return Math.max(0, Math.min(100, Math.round((getComputedStyle(bar).direction === "rtl" ? 1 - x : x) * 100))); };
+      const word = (x) => (bar.dataset.bar === "num" ? `${fmt(Number(a.min ?? 0) + (Number(a.max ?? 100) - Number(a.min ?? 0)) * x / 100, 0)}${unitGap(a.unit_of_measurement || "")}` : `${x}%`);
+      const show = () => { fill.style.width = `${v}%`; label.textContent = word(v); if (this.pan && bar.dataset.bar === "light") this.pan.root.querySelector(".sc").style.setProperty("--on", v ? (0.25 + 0.75 * v / 100).toFixed(2) : "0"); if (this.pan && bar.dataset.bar === "cover") this.pan.want.open = v / 100; };
+      bar.addEventListener("pointerdown", (e) => { e.stopPropagation(); if (this.pan) this.pan.busy = true; try { bar.setPointerCapture(e.pointerId); } catch (x) { /* a pointer that already ended */ } v = pos(e); show(); });
+      bar.addEventListener("pointermove", (e) => { if (v == null) return; v = pos(e); show(); });
+      const done = () => { if (v == null) return; if (this.pan) this.pan.busy = false; RoostSheet.slide(bar.dataset.bar, v, this._hass.states[id] || st); v = null; };
+      bar.addEventListener("pointerup", done); bar.addEventListener("pointercancel", done);
+    });
   }
 }
 
@@ -12166,7 +12434,7 @@ const CARDS = [
   ["roost-page", RoostPage, "Roost Page", "A phone page laid out like the original dashboard: even spacing, the night-sky background and room for the bottom bar."],
   ["roost-panel", RoostPanel, "Roost Panel", "A rounded panel with a title that holds other cards, such as a list of rooms."],
   ["roost-now", RoostNow, "Roost Now", "What matters right now, most urgent first: the alarm, a leak, the doorbell, the next prayer or iftar, a door open in the heat, lights left on. One calm line when all is well."],
-  ["roost-tour", RoostTour, "Roost Home Tour", "Your home as realistic pictures from Roost Atelier: the whole floor and every room in 360°. Tap a room to step in and any light, AC, curtain or TV to control it."],
+  ["roost-tour", RoostTour, "Roost Home Tour", "Your home as realistic pictures from Roost Atelier: the whole floor and every room in 360°. Tap a room to step in; tap a light, AC, curtain or TV to see it in 3D beside the picture with all its controls."],
   ["roost-3d-home", RoostHome3d, "Roost 3D Home", "Your home from Roost Atelier: what is going on, the live 3D view and realistic photos of every room."],
   ["roost-fullscreen", RoostFullscreen, "Roost Full Screen", "Full screen without Home Assistant's top bar and sidebar: by itself, or as a button that maximizes and minimizes."],
 ];
