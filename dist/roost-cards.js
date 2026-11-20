@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.25.1";
+const ROOST_VERSION = "1.26.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -1153,7 +1153,7 @@ class RoostTile extends RoostBase {
 // air conditioners into one snowflake, people into one row of bubbles (colour = home, grey = away).
 // Tap a group to see its list.
 class RoostChips extends RoostBase {
-  static get defaults() { return { entities: [], theme: "auto", align: "stretch", size: "medium", chip_shape: "pill", background: "solid" }; }
+  static get defaults() { return { entities: [], theme: "auto", style: "classic", align: "stretch", size: "medium", chip_shape: "pill", background: "solid" }; }
 
   validate(c) { if ((!Array.isArray(c.entities) || !c.entities.length) && !c.show_fullscreen && !c.show_theme && !c.show_language) throw new Error("Choose at least one device"); }
 
@@ -1167,6 +1167,7 @@ class RoostChips extends RoostBase {
     return {
       schema: [
         { name: "entities", selector: { entity: { multiple: true } } },
+        { name: "style", label: "Look", selector: pick([["classic", "Pills (classic)"], ["bar", "One status bar with words"], ["alert", "Pills, plus a line for anything that needs you"], ["rings", "Rings that fill (how many are on)"], ["grouped", "Grouped: safe, comfort, who"], ["dock", "Glass dock"]]) },
         { type: "grid", name: "", schema: [{ name: "show_fullscreen", label: "A full screen chip", selector: { boolean: {} } }, { name: "show_theme", label: "A light and dark mode chip", selector: { boolean: {} } }] },
         { name: "fullscreen_users", label: "Full screen chip only for (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
         { name: "theme_users", label: "Light and dark chip only for (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
@@ -1212,25 +1213,25 @@ class RoostChips extends RoostBase {
     const d = id.split(".")[0];
     const un = !s || UNAVAILABLE.includes(s.state);
     const cls = s?.attributes.device_class;
-    if (un) return { icon: "mdi:help-circle-outline", colour: this.p.muted, text: "" };
+    if (un) return { icon: "mdi:help-circle-outline", colour: this.p.muted, text: "", say: "Offline", frac: 0 };
     if (d === "alarm_control_panel") {
       const armed = s.state.startsWith("armed") || s.state === "triggered";
-      return { icon: armed ? "mdi:shield-check" : "mdi:shield-off", colour: s.state === "triggered" ? "#F43F6B" : armed ? "#34D399" : "#F43F6B", text: "" };
+      return { icon: armed ? "mdi:shield-check" : "mdi:shield-off", colour: s.state === "triggered" ? "#F43F6B" : armed ? "#34D399" : "#F43F6B", text: "", say: s.state === "triggered" ? "Alarm!" : armed ? "Armed" : "Off", frac: armed ? 1 : 0 };
     }
-    if (d === "lock") return { icon: s.state === "locked" ? "mdi:lock" : "mdi:lock-open-variant", colour: s.state === "locked" ? "#3DD68C" : "#FF9A3D", text: "" };
+    if (d === "lock") return { icon: s.state === "locked" ? "mdi:lock" : "mdi:lock-open-variant", colour: s.state === "locked" ? "#3DD68C" : "#FF9A3D", text: "", say: s.state === "locked" ? "Locked" : "Open", frac: s.state === "locked" ? 1 : 0 };
     if (d === "binary_sensor" && ["door", "window", "garage_door", "opening"].includes(cls)) {
       const open = s.state === "on";
       const icon = cls === "window" ? (open ? "mdi:window-open-variant" : "mdi:window-closed-variant") : (open ? "mdi:door-open" : "mdi:door-closed");
-      return { icon, colour: open ? "#FF9F6B" : "#34D399", text: this._config.show_words ? (open ? "Open" : "Closed") : "", word: true };
+      return { icon, colour: open ? "#FF9F6B" : "#34D399", text: this._config.show_words ? (open ? "Open" : "Closed") : "", word: true, say: open ? "Open" : "Closed", frac: open ? 0 : 1 };
     }
     if (d === "climate") {
       const on = s.state !== "off";
-      return { icon: "mdi:snowflake", colour: on ? "#38BDF8" : this.p.muted, text: on && s.attributes.temperature != null ? `${s.attributes.temperature}°` : "" };
+      return { icon: "mdi:snowflake", colour: on ? "#38BDF8" : this.p.muted, text: on && s.attributes.temperature != null ? `${s.attributes.temperature}°` : "", say: on ? (s.attributes.temperature != null ? `${s.attributes.temperature}°` : "On") : "Off", frac: on ? 1 : 0 };
     }
-    if (d === "media_player") { const on = !OFF_STATES.includes(s.state); return { icon: "mdi:television", colour: on ? "#B794FF" : this.p.muted, text: "" }; }
-    if (d === "sensor" && s.attributes.unit_of_measurement) return { icon: null, colour: this.p.text, text: `${Math.round(parseFloat(s.state) * 10) / 10 || s.state}${s.attributes.unit_of_measurement}` };
+    if (d === "media_player") { const on = !OFF_STATES.includes(s.state); return { icon: "mdi:television", colour: on ? "#B794FF" : this.p.muted, text: "", say: on ? "On" : "Off", frac: on ? 1 : 0 }; }
+    if (d === "sensor" && s.attributes.unit_of_measurement) { const v = `${Math.round(parseFloat(s.state) * 10) / 10 || s.state}${s.attributes.unit_of_measurement}`; return { icon: null, colour: this.p.text, text: v, say: v, frac: 1, reading: true }; }
     const on = !OFF_STATES.includes(s.state);
-    return { icon: null, colour: on ? "#B794FF" : this.p.muted, text: "" };
+    return { icon: null, colour: on ? "#B794FF" : this.p.muted, text: "", say: on ? "On" : "Off", frac: on ? 1 : 0 };
   }
 
   render() {
@@ -1246,14 +1247,16 @@ class RoostChips extends RoostBase {
     });
     if (doors.length) {
       const open = doors.filter((id) => this.sx(id)?.state === "on").length;
-      chips.unshift({ key: "__doors", icon: open ? "mdi:door-open" : "mdi:door-closed", colour: open ? "#FF9F6B" : "#34D399", text: open ? String(open) : "", group: "doors", label: "Doors" });
+      chips.unshift({ key: "__doors", icon: open ? "mdi:door-open" : "mdi:door-closed", colour: open ? "#FF9F6B" : "#34D399", text: open ? String(open) : "", group: "doors", label: "Doors", say: open ? `${open} open` : "Closed", frac: (doors.length - open) / doors.length, of: `${doors.length - open}/${doors.length}` });
     }
-    if (lights.length) chips.push({ key: "__lights", icon: lightsOn ? "mdi:lightbulb-on" : "mdi:lightbulb-outline", colour: lightsOn ? "#F5B94A" : p.muted, text: lightsOn ? String(lightsOn) : "", group: "lights" });
+    if (lights.length) chips.push({ key: "__lights", icon: lightsOn ? "mdi:lightbulb-on" : "mdi:lightbulb-outline", colour: lightsOn ? "#F5B94A" : p.muted, text: lightsOn ? String(lightsOn) : "", group: "lights", label: "Lights", say: lightsOn ? `${lightsOn} on` : "Off", frac: lightsOn / lights.length, of: `${lightsOn}/${lights.length}` });
     if (climates.length) {
       const on = climates.filter((id) => this.sx(id) && !OFF_STATES.concat(UNAVAILABLE).includes(this.sx(id).state)).length;
-      chips.push({ key: "__climates", icon: "mdi:snowflake", colour: on ? "#38BDF8" : p.muted, text: on ? String(on) : "", group: "climates", label: "Air conditioners" });
+      const t = climates.map((id) => this.sx(id)).find((x) => x && !OFF_STATES.concat(UNAVAILABLE).includes(x.state) && x.attributes.temperature != null)?.attributes.temperature;
+      chips.push({ key: "__climates", icon: "mdi:snowflake", colour: on ? "#38BDF8" : p.muted, text: on ? String(on) : "", group: "climates", label: "Air conditioners", say: on ? (t != null ? `${t}°` : `${on} on`) : "Off", frac: on / climates.length, of: `${on}/${climates.length}` });
     }
-    if (people.length) chips.push({ key: "__people", people: true, group: "people" });
+    const homeN = people.filter((id) => this.sx(id)?.state === "home").length;
+    if (people.length) chips.push({ key: "__people", people: true, group: "people", label: "People", say: homeN ? `${homeN} home` : "Away", frac: homeN / people.length, of: `${homeN}/${people.length}` });
     if (c.show_theme && forPeople(this._hass, c.theme_users)) chips.push({ key: "__theme", icon: RoostMode.icon(), colour: this.dark ? "#FCD34D" : "#6D4BFF", text: "", special: "theme" });
     if (c.show_language) chips.push({ key: "__lang", icon: "mdi:translate", colour: p.text, text: "", special: "language" });
     if (c.show_fullscreen && forPeople(this._hass, c.fullscreen_users)) chips.push({ key: "__full", icon: specialIcon("fullscreen"), colour: RoostFull.isOn() ? "#8B6CFF" : p.text, text: "", special: "fullscreen" });
@@ -1295,12 +1298,9 @@ class RoostChips extends RoostBase {
       .tog{flex:none;width:48px;height:28px;border-radius:999px;border:0;background:${p.track};position:relative;cursor:pointer}
       .tog::after{content:"";position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:${p.knob};transition:left .12s}
       .tog.on{background:linear-gradient(135deg,#6D4BFF,#38BDF8)}.tog.on::after{left:24px;background:#fff}
+      ${this.styleCss(h)}
     </style>
-    <div class="row">${chips.map((ch) => ch.people
-      ? `<button class="chip ${open === "people" ? "on" : ""}" data-g="people" aria-label="People">${people.map(avatar).join("")}</button>`
-      : `<button class="chip ${open && open === ch.group ? "on" : ""}" data-pop="${esc(`${ch.text || ""}${ch.colour || ""}${ch.icon || ""}`)}" data-popkey="${esc(ch.key || ch.entity || ch.group || "")}" ${ch.special ? `data-sp="${ch.special}" aria-label="${esc(specialLabel(ch.special))}"` : ch.group ? `data-g="${ch.group}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(ch.entity ? this.name(ch.entity) : ch.label || "Lights")}">
-          ${ch.icon ? `<ha-icon icon="${ch.icon}" style="color:${ch.colour}"></ha-icon>` : `<span class="ent" data-icon="${esc(ch.entity)}" style="color:${ch.colour};display:flex"></span>`}
-          ${ch.text ? `<span class="${ch.word ? "word" : "cnt"}"${ch.word ? "" : ` style="color:${ch.colour}"`}>${esc(ch.text)}</span>` : ""}</button>`).join("")}</div>
+    ${this.chipsHtml(chips, people, avatar, open, h)}
     ${list.length ? `<div class="list">${list.map((id) => {
       const s = this.sx(id), isOn = s?.state === "on" || s?.state === "home";
       return `<div class="it" ${open === "climates" || open === "doors" ? `data-m="${esc(id)}" style="cursor:pointer"` : ""}><span class="n t">${esc(s?.attributes.friendly_name || id)}<br><span class="s">${esc(stateWord(id, s))}</span></span>
@@ -1312,6 +1312,117 @@ class RoostChips extends RoostBase {
       () => el.dataset.e && this.moreInfo(el.dataset.e)));
     this.shadowRoot.querySelectorAll("[data-m]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.m)));
     this.shadowRoot.querySelectorAll("[data-t]").forEach((el) => el.addEventListener("click", () => { this.vibrate(); this.call("light", "toggle", { entity_id: el.dataset.t }); }));
+    this.shadowRoot.querySelector(".need")?.addEventListener("click", (e) => { this.vibrate(); this.moreInfo(e.currentTarget.dataset.e); });
+  }
+
+  // the button's own settings: what it opens or does when tapped
+  chipAttrs(ch, open, extra = "") {
+    const label = ch.special ? specialLabel(ch.special) : ch.entity ? this.name(ch.entity) : ch.label || "Lights";
+    return `class="chip ${extra} ${open && open === ch.group ? "on" : ""}" data-pop="${esc(`${ch.text || ""}${ch.colour || ""}${ch.icon || ""}${ch.say || ""}`)}" data-popkey="${esc(ch.key || ch.entity || ch.group || "")}" ${ch.special ? `data-sp="${ch.special}"` : ch.group ? `data-g="${ch.group}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(label)}${ch.say && !ch.special ? ` · ${esc(ch.say)}` : ""}"`;
+  }
+
+  chipIcon(ch, size) {
+    return ch.icon ? `<ha-icon icon="${ch.icon}" style="color:${ch.colour}${size ? `;--mdc-icon-size:${size}px` : ""}"></ha-icon>` : `<span class="ent" data-icon="${esc(ch.entity)}" style="color:${ch.colour};display:flex"></span>`;
+  }
+
+  // Look C: what needs someone now, most urgent first (a leak or smoke, then an open door or window, an unlocked
+  // lock, the alarm off while nobody is home). The alarm being off with people at home is normal and not shown.
+  attention(people) {
+    const out = [], nobodyHome = people.length && !people.some((id) => this.sx(id)?.state === "home");
+    for (const id of this.ids()) {
+      const s = this.sx(id); if (!s || UNAVAILABLE.includes(s.state)) continue;
+      const d = id.split(".")[0], cls = s.attributes.device_class, name = s.attributes.friendly_name || id;
+      if (d === "binary_sensor" && s.state === "on" && ["moisture", "smoke", "gas", "carbon_monoxide", "safety", "problem", "heat"].includes(cls))
+        out.push({ id, rank: 0, icon: cls === "moisture" ? "mdi:water-alert" : cls === "smoke" ? "mdi:smoke-detector-alert" : "mdi:alert", text: `${name}: ${cls === "moisture" ? "leak" : cls === "smoke" ? "smoke" : cls === "gas" ? "gas" : "needs a look"}`, s });
+      else if (d === "alarm_control_panel" && s.state === "triggered") out.push({ id, rank: 0, icon: "mdi:shield-alert", text: "Alarm going off", s });
+      else if (d === "binary_sensor" && s.state === "on" && ["door", "window", "garage_door", "opening"].includes(cls)) out.push({ id, rank: 1, icon: cls === "window" ? "mdi:window-open-variant" : "mdi:door-open", text: `${name} is open`, s });
+      else if (d === "lock" && ["unlocked", "open", "jammed"].includes(s.state)) out.push({ id, rank: 2, icon: "mdi:lock-open-variant", text: `${name} is unlocked`, s });
+      else if (d === "alarm_control_panel" && s.state === "disarmed" && nobodyHome) out.push({ id, rank: 3, icon: "mdi:shield-off", text: "Alarm off, nobody home", s });
+    }
+    return out.sort((a, b) => a.rank - b.rank || new Date(a.s.last_changed) - new Date(b.s.last_changed));
+  }
+
+  chipsHtml(chips, people, avatar, open, h) {
+    const st = this._config.style || "classic";
+    const peopleInner = (size) => `<span class="ppl">${people.map(avatar).join("")}</span>`;
+    const classic = (ch) => ch.people
+      ? `<button ${this.chipAttrs(ch, open)}>${peopleInner()}</button>`
+      : `<button ${this.chipAttrs(ch, open)}>${this.chipIcon(ch)}${ch.text ? `<span class="${ch.word ? "word" : "cnt"}"${ch.word ? "" : ` style="color:${ch.colour}"`}>${esc(ch.text)}</span>` : ""}</button>`;
+    if (st === "bar") {
+      return `<div class="sbar">${chips.map((ch) => `<button ${this.chipAttrs(ch, open, "seg")}><span class="top">${ch.people ? peopleInner() : `${this.chipIcon(ch, h > 44 ? 22 : 20)}${ch.text && !ch.word && !ch.reading ? `<span class="n" style="color:${ch.colour}">${esc(ch.text)}</span>` : ""}`}</span>${ch.say ? `<span class="say t">${esc(ch.say)}</span>` : ""}</button>`).join("")}</div>`;
+    }
+    if (st === "rings") {
+      const R = h > 44 ? 26 : h < 38 ? 19 : 22, C = 2 * Math.PI * (R - 3);
+      return `<div class="rings">${chips.map((ch) => {
+        const f = Math.max(0, Math.min(1, ch.frac ?? 0)), col = ch.people ? ACTIVE[1] : ch.colour;
+        const ring = `<svg class="rg" width="${2 * R}" height="${2 * R}" viewBox="0 0 ${2 * R} ${2 * R}" aria-hidden="true"><circle cx="${R}" cy="${R}" r="${R - 3}" fill="none" stroke="${this.p.track}" stroke-width="4"/>${f > 0 ? `<circle cx="${R}" cy="${R}" r="${R - 3}" fill="none" stroke="${col}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(C * f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 ${R} ${R})"/>` : ""}</svg>`;
+        return `<button ${this.chipAttrs(ch, open, "rc")}><span class="rw" style="width:${2 * R}px;height:${2 * R}px">${ring}<span class="ri">${ch.people ? `<b class="num">${esc(ch.of || "")}</b>` : ch.reading ? `<b class="num" style="color:${ch.colour}">${esc(ch.text)}</b>` : this.chipIcon(ch, R > 24 ? 22 : 18)}</span></span>${ch.special ? "" : `<span class="say t">${esc(ch.group === "doors" || ch.people ? ch.say : ch.of ? ch.of : ch.reading ? "" : ch.say)}</span>`}</button>`;
+      }).join("")}</div>`;
+    }
+    if (st === "grouped") {
+      const safe = [], comfort = [], who = [], more = [];
+      for (const ch of chips) {
+        if (ch.special) more.push(ch);
+        else if (ch.people) who.push(ch);
+        else if (ch.group === "doors" || /^(alarm_control_panel|lock|binary_sensor)\./.test(ch.entity || "")) safe.push(ch);
+        else comfort.push(ch);
+      }
+      const cap = (title, list) => (list.length ? `<div class="cap" role="group" aria-label="${title}">${list.map((ch, i) => `${i ? '<span class="sep"></span>' : ""}<button ${this.chipAttrs(ch, open, "half")}>${ch.people ? peopleInner() : `${this.chipIcon(ch)}${ch.text ? `<span class="${ch.word ? "word" : "num"}" style="color:${ch.colour}">${esc(ch.text)}</span>` : ""}`}</button>`).join("")}</div>` : "");
+      return `<div class="caps">${cap("Safe", safe)}${cap("Comfort", comfort)}${cap("Who", who)}${cap("More", more)}</div>`;
+    }
+    if (st === "dock") {
+      return `<div class="dockw"><div class="dock">${chips.map((ch) => {
+        const wide = open && open === ch.group;
+        return `<button ${this.chipAttrs(ch, open, `dk${wide ? " wide" : ""}`)}>${ch.people ? (wide ? peopleInner() : `<span class="pc">${esc(String(people.filter((id) => this.sx(id)?.state === "home").length))}</span>`) : this.chipIcon(ch, 20)}${wide ? `<span class="t">${esc(ch.say || ch.label || "")}</span>` : !ch.people && ch.text && !ch.word ? `<span class="b">${esc(ch.text)}</span>` : ""}</button>`;
+      }).join("")}</div></div>`;
+    }
+    const row = `<div class="row">${chips.map(classic).join("")}</div>`;
+    if (st !== "alert") return row;
+    const need = this.attention(people);
+    if (!need.length) return row;
+    const top = need[0], hot = top.rank === 0;
+    return `<button class="need ${hot ? "hot" : ""}" data-e="${esc(top.id)}" aria-label="${esc(top.text)}"><span class="ni"><ha-icon icon="${top.icon}"></ha-icon></span><span class="nt"><b class="t">${esc(top.text)}</b><span class="t">${esc(since(top.s.last_changed))}${need.length > 1 ? ` · ${need.length - 1} more` : ""}</span></span></button>${row}`;
+  }
+
+  styleCss(h) {
+    const p = this.p, c = this._config;
+    return `
+      .ppl{display:flex;align-items:center}
+      .sbar{display:flex;align-items:stretch;padding:4px;border-radius:22px;background:${c.background === "none" ? "transparent" : p.panel};border:1px solid ${c.background === "none" ? "transparent" : p.border};${p.fx || ""}}
+      .sbar .chip.seg{flex:1 1 0;min-width:max-content;height:auto;min-height:${h + 12}px;padding:6px 8px;border:0;border-radius:18px;background:transparent;flex-direction:column;gap:4px}
+      .sbar .chip.seg{position:relative}
+      .sbar .chip.seg + .chip.seg::before{content:"";position:absolute;left:0;top:25%;bottom:25%;width:1px;background:${p.border}}
+      .sbar .chip.seg.on{outline:0;background:${ACTIVE[0]}2E;box-shadow:none}
+      .sbar .top{display:flex;align-items:center;gap:4px}
+      .sbar .n,.rings .num,.caps .num{font-family:${FONT_NUM};font-size:15px;font-weight:700}
+      .say{font-size:11px;font-weight:600;color:${p.muted};white-space:nowrap}
+      .rings{display:flex;justify-content:space-between;gap:6px}
+      .rings .chip.rc{height:auto;min-width:0;padding:2px;border:0;background:transparent;flex-direction:column;gap:6px;flex:1 1 0}
+      .rings .chip.rc.on{outline:0}.rings .chip.rc.on .rw{box-shadow:0 0 0 2px ${ACTIVE[1]};border-radius:50%}
+      .rw{position:relative;display:flex;align-items:center;justify-content:center;flex:none}
+      .rg{position:absolute;inset:0}
+      .ri{position:relative;display:flex;align-items:center;justify-content:center}
+      .rings .num{font-size:13px;color:${p.text}}
+      .caps{display:flex;gap:8px}
+      .cap{flex:1 1 auto;display:flex;align-items:center;min-height:${h + 8}px;padding:0 4px;border-radius:16px;background:${c.background === "none" ? "transparent" : p.panel};border:1px solid ${c.background === "none" ? "transparent" : p.border};${p.fx || ""}}
+      .cap .chip.half{flex:1 1 0;height:${h + 4}px;padding:0 8px;border:0;background:transparent;border-radius:12px}
+      .cap .chip.half.on{outline:0;background:${ACTIVE[0]}2E}
+      .cap .sep{width:1px;height:20px;background:${p.border};flex:none}
+      @container (max-width: 340px){:host .caps{gap:4px}:host .cap{padding:0 2px}:host .cap .chip.half{padding:0 4px;gap:3px}:host .sbar .chip.seg{padding:6px 4px}:host .say{font-size:11px}}
+      .dockw{display:flex;justify-content:center}
+      .dock{display:flex;align-items:center;gap:4px;padding:6px;border-radius:999px;background:${this.dark ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.8)"};border:1px solid ${this.dark ? "rgba(255,255,255,.12)" : p.border};backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 20px 40px -24px ${ACTIVE[0]};max-width:100%;overflow-x:auto;scrollbar-width:none}
+      .dock::-webkit-scrollbar{display:none}
+      .dock .chip.dk{position:relative;flex:none;width:${h + 4}px;height:${h + 4}px;min-width:0;padding:0;border:0;border-radius:999px;background:transparent}
+      .dock .chip.dk.wide{width:auto;padding:0 16px 0 12px;gap:8px;background:linear-gradient(135deg,${ACTIVE[0]},${ACTIVE[1]});color:#FFFFFF;outline:0;font-size:13px}
+      .dock .chip.dk.wide ha-icon{color:#FFFFFF!important}
+      .dock .b{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:${p.text};color:${p.bg};font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+      .dock .pc{width:${h - 10}px;height:${h - 10}px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#38BDF8,#6D4BFF);color:#FFFFFF;font-size:13px;font-weight:700}
+      .need{all:unset;box-sizing:border-box;width:100%;min-height:56px;margin-bottom:8px;padding:10px 14px;border-radius:18px;display:flex;align-items:center;gap:12px;cursor:pointer;color:#FFFFFF;background:linear-gradient(135deg,#E07B00,#F5A623);box-shadow:0 14px 28px -16px rgba(245,158,11,.6);transition:transform .12s}
+      .need.hot{background:linear-gradient(135deg,#F43F6B,#FF8F6B);box-shadow:0 14px 28px -16px rgba(255,107,107,.6)}
+      .need:active{transform:scale(.98)}
+      .need .ni{width:36px;height:36px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.22);--mdc-icon-size:20px}
+      .need .nt{display:flex;flex-direction:column;gap:2px;min-width:0}
+      .need b{font-size:14px;font-weight:600}.need .nt span{font-size:12px;opacity:.9}`;
   }
 
   getCardSize() { return this._open ? 4 : 1; }
@@ -9575,6 +9686,7 @@ class RoostCamera extends RoostBase {
 // or the choice made on this screen with the language button (Roost Theme), or the card's own "language".
 // Words are looked up in one list per language; your own device names stay as you wrote them.
 const AR_WORDS = {
+  "Armed": "مفعّل", "Alarm!": "إنذار!", "Alarm going off": "الإنذار يرن", "Alarm off, nobody home": "الإنذار مطفأ ولا أحد في المنزل", "Safe": "الأمان", "Comfort": "الراحة", "Who": "من في المنزل",
   "Whole home": "المنزل كاملاً", "Previous room": "الغرفة السابقة", "Next room": "الغرفة التالية", "Devices in this room": "أجهزة هذه الغرفة",
   "This screen can't show 360° pictures": "هذه الشاشة لا تستطيع عرض صور 360°",
   "This room's pictures aren't made yet. In Roost Atelier, open the home settings and press Make dashboard pictures.": "لم تُصنع صور هذه الغرفة بعد. في Roost Atelier افتح إعدادات المنزل واضغط اصنع صور لوحة التحكم.",
@@ -9611,7 +9723,7 @@ const AR_WORDS = {
 const AR_PATTERNS = [
   [/^for (\d+) min$/, "منذ $1 د"], [/^for (\d+)h(?: (\d+)m)?$/, (m, h, mi) => `منذ ${h} س${mi ? ` ${mi} د` : ""}`], [/^for (\d+) days?$/, "منذ $1 يوم"],
   [/^(\d+) min ago$/, "قبل $1 د"], [/^(\d+) h ago$/, "قبل $1 س"], [/^(\d+) days? ago$/, "قبل $1 يوم"], [/^Since (.+) ago$/, (m, x) => `منذ ${arWord(x)}`], [/^Since (.+)$/, (m, x) => `منذ ${arWord(x)}`],
-  [/^(\d+) lights? on$/, "$1 أضواء تعمل"], [/^(\d+) lights? are on$/, "$1 أضواء تعمل"], [/^(\d+) on$/, "$1 يعمل"], [/^(\d+) of (\d+) on$/, "$1 من $2 يعمل"],
+  [/^(\d+) lights? on$/, "$1 أضواء تعمل"], [/^(\d+) lights? are on$/, "$1 أضواء تعمل"], [/^(\d+) on$/, "$1 يعمل"], [/^(\d+) open$/, "$1 مفتوح"], [/^(\d+) home$/, "$1 في المنزل"], [/^(.+) is unlocked$/, "$1 غير مقفل"], [/^(\d+) more$/, "$1 أخرى"], [/^(\d+) of (\d+) on$/, "$1 من $2 يعمل"],
   [/^(\d+)% open$/, "مفتوح $1٪"], [/^(\d+)% open · drag$/, "مفتوح $1٪ · اسحب"], [/^Lights (\d+)%$/, "الأضواء $1٪"], [/^Lights off$/, "الأضواء مطفأة"], [/^Volume (\d+)%$/, "الصوت $1٪"], [/^Speed (\d+)%$/, "السرعة $1٪"],
   [/^Room (.+)$/, "الغرفة $1"], [/^AC (cool|heat|dry|fan|auto|off)(.*)$/, (m, a, r) => `المكيّف ${arWord(a.charAt(0).toUpperCase() + a.slice(1))}${r}`], [/^(Curtain|Blind) (open|closed|opening|closing)$/, (m, a, b) => `${arWord(a)} ${arWord(b.charAt(0).toUpperCase() + b.slice(1))}`],
   [/^Good (morning|afternoon|evening|night), (.+)$/, (m, a, n) => `${a === "morning" ? "صباح الخير" : a === "night" ? "تصبح على خير" : "مساء الخير"}، ${n}`],

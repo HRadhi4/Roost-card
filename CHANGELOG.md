@@ -2,6 +2,17 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.26.0
+
+- **Roost Chips has five new looks** (card settings → Look). The classic pills stay the default.
+  - **One status bar:** one bar split into equal parts, with a short word under each icon ("Closed", "Armed", "3 on", "22°", "2 home").
+  - **Pills, plus a line for anything that needs you:** a door or window left open, a leak or smoke, an unlocked lock, or the alarm off while nobody is home gets its own big line on top, with how long it has been like that. Tap it for the device.
+  - **Rings that fill:** each chip is a ring that shows how many are on: 3 of 9 lights, 1 of 2 ACs, who is home.
+  - **Grouped:** capsules for safe (doors, alarm, locks), comfort (lights, AC, TV) and who is home.
+  - **Glass dock:** a floating glass bar of icons; the one you tap opens in purple with its words.
+- Every look keeps one row on phones, works in light and dark, and opens the same lists (lights with switches, who is where).
+- Fixed: chips for full screen, light and dark, and language had their name read out twice by screen readers.
+
 ## 1.25.1
 
 - **While a details sheet or popup is open, your finger only moves the popup.** The page behind no longer scrolls, swipes don't change the dashboard page, and a list inside the popup scrolls only itself. Everything behind is free again the moment it closes.
