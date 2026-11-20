@@ -11898,7 +11898,7 @@ class RoostTour extends RoostBase {
     this._pics ||= new Map();
     if (!this._pics.has(key)) {
       const fl = this.floorData(), fi = fl?.index ?? (Number(this._config.floor) || 0), made = fl?.pictures;
-      this._pics.set(key, made && !(key in made) ? Promise.resolve(null) : this._hass.fetchWithAuth(`/api/roost_atelier/photo/${this._tour.id}_${fi}_${key}${made ? `?v=${made[key]}` : ""}`).then(async (r) => {
+      this._pics.set(key, made && !(key in made) ? Promise.resolve(null) : this._hass.fetchWithAuth(`/api/roost_atelier/photo/${String(this._tour.id).replace(/[^A-Za-z0-9_-]/g, "")}_${Number(fi) || 0}_${String(key).replace(/[^A-Za-z0-9_-]/g, "")}${made ? `?v=${encodeURIComponent(made[key])}` : ""}`).then(async (r) => {
         if (!r.ok) return null; const buf = await r.arrayBuffer();
         return { url: URL.createObjectURL(new Blob([buf], { type: "image/jpeg" })), camera: Tour.camera(buf) };
       }).catch(() => null));
