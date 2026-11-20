@@ -2345,7 +2345,7 @@ class RoostRooms extends RoostBase {
     return { rooms: [], columns: 2, gap: 8, color: "active", show_names: "active", active_style: "filled", background: "solid",
       pill_shape: "pill", pill_height: 40, pill_icon_size: 20, pill_align: "spread", show_count: false,
       tile_size: "large", tile_shape: "square", tile_fill: "gradient", tile_glow: "soft", tile_radius: 22, auto_colors: true,
-      swipe: true, remember: true, start_room: "", theme: "auto" };
+      swipe: true, remember: true, start_room: "", theme: "auto", follow: false, follow_pause: 2, follow_tracker: "" };
   }
 
   validate(c) { if (!Array.isArray(c.rooms) || !c.rooms.length) throw new Error("Add at least one room"); }
@@ -2402,6 +2402,7 @@ class RoostRooms extends RoostBase {
     this._hass = hass;
     if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
     (this._cards || []).flat().forEach((el) => { el.hass = hass; });
+    if (this._config?.follow) this.follow(hass);
     const counts = this._config?.show_count ? this._config.rooms.map((r) => this.onCount(r)).join(",") : "";
     const rm = this._config?.rooms?.[this._active] || {};
     const clim = [rm.temperature, rm.humidity].map((id) => (id ? hass.states?.[id]?.state : "")).join(",");
@@ -2423,7 +2424,14 @@ class RoostRooms extends RoostBase {
           humidity: { label: "Humidity sensor", selector: { entity: { domain: "sensor" } } },
           link: { label: "Opens from a link (for example #entrance, for the side rail)", selector: { text: {} } },
           hidden: { label: "No button in the bar (reached only from its link, for example an Automations page)", selector: { boolean: {} } },
+          presence: { label: "Presence sensor for Follow me (empty = any presence or motion sensor in the area with this room's name)", selector: { entity: { domain: "binary_sensor", multiple: true } } },
+          area: { label: "Home Assistant area of this room, if its name is different", selector: { area: {} } },
         } } } },
+        { type: "expandable", name: "", title: "Follow me", icon: "mdi:walk", schema: [
+          { name: "follow", label: "Open the room I am in (from presence sensors)", selector: { boolean: {} } },
+          { name: "follow_tracker", label: "Or from a Bluetooth room tracker (for example Bermuda's area sensor for your phone)", selector: { entity: { domain: "sensor" } } },
+          { name: "follow_pause", label: "After I pick a room myself, wait (minutes)", selector: slider(0, 30, 1, "min") },
+        ] },
         { type: "expandable", name: "", title: "Room buttons", icon: "mdi:gesture-tap-button", schema: [
           { name: "show_names", label: "What the room buttons show", selector: pick([["active", "Icons, and the name when chosen"], ["all", "Icons and names"], ["names", "Names only"], ["none", "Icons only"]]) },
           ...colourFields("color", "Colour of the chosen room"),
@@ -2517,7 +2525,52 @@ class RoostRooms extends RoostBase {
     this.render();
   }
 
-  go(i) {
+  // Follow me: the card opens the room you are in. A presence sensor in the room (picked for the room, or any
+  // occupancy / presence / motion sensor in the Home Assistant area with the room's name) says where you are;
+  // a Bluetooth room tracker (for example Bermuda's "area" sensor for your phone) can say it instead. After you
+  // pick a room yourself it waits a few minutes before following again.
+  presenceIds(r) {
+    if (r.presence) return [].concat(r.presence);
+    const h = this._hass, want = String(r.area || r.name || "").trim().toLowerCase();
+    if (!h?.entities || !want) return [];
+    const area = Object.values(h.areas || {}).find((a) => a.area_id === want || String(a.name).toLowerCase() === want);
+    if (!area) return [];
+    return Object.values(h.entities).filter((e) => {
+      if (!e.entity_id.startsWith("binary_sensor.") || e.hidden) return false;
+      const a = e.area_id || h.devices?.[e.device_id]?.area_id; if (a !== area.area_id) return false;
+      return ["occupancy", "presence", "motion"].includes(h.states[e.entity_id]?.attributes?.device_class);
+    }).map((e) => e.entity_id);
+  }
+
+  roomFromTracker(h) {
+    const st = this._config.follow_tracker && h.states?.[this._config.follow_tracker];
+    if (!st || UNAVAILABLE.includes(st.state)) return -1;
+    const v = String(st.state).trim().toLowerCase(), area = Object.values(h.areas || {}).find((a) => a.area_id === v || String(a.name).toLowerCase() === v);
+    const names = [v, area && String(area.name).toLowerCase(), area?.area_id].filter(Boolean);
+    return this._config.rooms.findIndex((r) => !r.hidden && names.includes(String(r.area || r.name || "").trim().toLowerCase()));
+  }
+
+  follow(h) {
+    const c = this._config, pause = Math.max(0, Number(c.follow_pause) || 0) * 60000;
+    if (this._manualAt && Date.now() - this._manualAt < pause) return;
+    let best = this.roomFromTracker(h), bestT = 0;
+    if (best < 0) c.rooms.forEach((r, i) => {
+      if (r.hidden) return;
+      for (const id of this.presenceIds(r)) {
+        const st = h.states?.[id]; if (!st || st.state !== "on") continue;
+        const t = Date.parse(st.last_changed) || 0; if (t > bestT) { bestT = t; best = i; }
+      }
+    });
+    // only move when where you are changes, so tapping a room is never undone by a sensor that was already on
+    const key = best < 0 ? "" : `${best}|${bestT}|${h.states?.[c.follow_tracker]?.state || ""}`;
+    if (key === this._followKey) return;
+    this._followKey = key;
+    if (best < 0 || best === this._active) return;
+    this.go(best, true);
+  }
+
+  go(i, auto) {
+    if (!auto) this._manualAt = Date.now();
     (this._pillMemo = this._pillMemo || {}).go = Date.now();
     const rooms = this._config.rooms, n = rooms.length, step = i >= this._active ? 1 : -1;
     let k = (i + n) % n, guard = 0;
@@ -2526,8 +2579,9 @@ class RoostRooms extends RoostBase {
     const link = rooms[k]?.link;
     if (link) { try { history.replaceState(history.state, "", `${location.pathname}${location.search}#${String(link).replace(/^#/, "")}`); window.dispatchEvent(new Event("location-changed")); } catch (e) { /* old browser */ } }
     if (this._config.remember) { try { localStorage.setItem(this.memKey(), this._config.rooms[this._active].name); } catch (e) { /* private mode */ } }
-    this.vibrate();
+    if (!auto) this.vibrate();
     this._sig = null;
+    if (auto) { this.render(); return; }
     this.hass = this._hass || {};
   }
 
