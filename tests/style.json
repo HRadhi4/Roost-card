@@ -1,0 +1,1 @@
+{"no": ["text-overflow\\s*:\\s*ellipsis", "line-clamp", "…"], "t": 0.12, "anim": "animation\\s*:\\s*[^;\"`]*\\b(rise|fade|slide)", "accent": "\"#6D4BFF\", \"#8B6CFF\"", "fonts": ["Space Grotesk", "Inter"], "sizes": [11, 12, 13, 14, 15, 16, 17, 20, 24, 25, 32, 40, 48]}

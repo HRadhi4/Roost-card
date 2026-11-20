@@ -36,7 +36,7 @@ const COLORS = {
   pink: ["#DB2777", "#F9A8D4", "rgba(236,72,153,.5)", "#FFFFFF"],
   slate: ["#475569", "#94A3B8", "rgba(100,116,139,.5)", "#FFFFFF"],
 };
-// The one colour for "this is the chosen / active one" (design rule 1).
+// The one colour for "this is the chosen / active one".
 const ACTIVE = ["#6D4BFF", "#8B6CFF", "rgba(109,75,255,.55)", "#FFFFFF"];
 const FONT_TEXT = "Inter, -apple-system, 'Segoe UI', Roboto, sans-serif";
 // Load Inter and Space Grotesk once, the same fonts the original dashboard uses.

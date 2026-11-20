@@ -197,7 +197,7 @@ for (const dark of [true, false]) {
       const html = el.shadowRoot.innerHTML;
       if (!html || html.length < 200) throw new Error("rendered nothing");
       const text = html.replace(/<style>[\s\S]*?<\/style>/g, "");
-      if (/undefined|NaN|\bnull\b|—|\[object Object\]/.test(text)) throw new Error(`bad text in output (design rule 7): ${text.match(/.{40}(undefined|NaN|\bnull\b|—|\[object Object\]).{20}/)?.[0]}`);
+      if (/undefined|NaN|\bnull\b|—|\[object Object\]/.test(text)) throw new Error(`bad text in output : ${text.match(/.{40}(undefined|NaN|\bnull\b|—|\[object Object\]).{20}/)?.[0]}`);
       const form = customElements.get(tag).getConfigForm();
       if (!form.schema?.length) throw new Error("no editor");
       el.remove();

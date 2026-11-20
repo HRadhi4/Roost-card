@@ -4,7 +4,7 @@
   "private": true,
   "description": "Beautiful, fully customisable Home Assistant dashboard cards for phones and tablets",
   "type": "module",
-  "scripts": { "test": "node --check dist/roost-cards.js && node tests/design-rules.test.mjs && node tests/render.test.mjs" },
+  "scripts": { "test": "node --check dist/roost-cards.js && node tests/style.test.mjs && node tests/render.test.mjs" },
   "devDependencies": { "jsdom": "^24.0.0" },
   "license": "GPL-3.0"
 }
