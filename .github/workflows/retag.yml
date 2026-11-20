@@ -1,5 +1,5 @@
 name: Move version tags to the cleaned history
-# One-off, approved by the owner: the project history was cleaned, so each old version tag is pointed at its cleaned commit.
+# One-off (run 2), approved by the owner: the project history was cleaned, so each old version tag is pointed at its cleaned commit.
 on:
   push:
     branches: [main]
