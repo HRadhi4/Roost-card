@@ -2210,7 +2210,7 @@ class RoostNav extends RoostBase {
       ev.preventDefault();
       const mk = (c.items || []).map((x) => x.path).join("|"); ((RoostNav.memo = RoostNav.memo || {})[mk] = RoostNav.memo[mk] || {}).go = Date.now();
       this.vibrate();
-      if (it.action === "fullscreen" || it.action === "theme") { specialRun(it.action); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 120); return; }
+      if (it.action === "fullscreen" || it.action === "theme" || it.action === "language") { specialRun(it.action); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 120); return; }
       if (!it.path) return;
       if (it.path.startsWith("#")) { if (location.hash === it.path) RoostNav.jump(it.path, it.path === c.items[0]?.path); else location.hash = it.path; }
       else { history.pushState(null, "", it.path); this.fire("location-changed", { replace: false }); }
@@ -9389,12 +9389,12 @@ class RoostLock extends RoostBase {
       .n{font-size:15px;font-weight:600}
       .w{font-size:20px;font-weight:700}
       .d{font-size:13px;color:${p.muted}}
-      .track{position:relative;height:58px;border-radius:999px;background:${p.inset};border:1px solid ${p.border};overflow:hidden;touch-action:none;user-select:none}
+      .track{/*ltr*/direction:ltr;position:relative;height:58px;border-radius:999px;background:${p.inset};border:1px solid ${p.border};overflow:hidden;touch-action:none;user-select:none}
       .hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${p.muted};animation:roost-breathe 2.2s ease-in-out infinite}
-      .hint{padding-left:50px}
+      .hint{/*ltr*/padding-left:50px}
       .short{display:none}
       @container (max-width: 250px){:host .long{display:none}:host .short{display:inline}}
-      .knob{position:absolute;left:5px;top:5px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};display:flex;align-items:center;justify-content:center;cursor:grab;box-shadow:0 6px 16px -6px ${g[2]}}
+      .knob{/*ltr*/position:absolute;left:5px;top:5px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};display:flex;align-items:center;justify-content:center;cursor:grab;box-shadow:0 6px 16px -6px ${g[2]}}
       .knob ha-icon{--mdc-icon-size:24px}
       .wait{position:relative;height:58px;border-radius:999px;background:${p.inset};border:1px solid ${p.border};overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:${p.muted}}
       .wait::before{content:"";position:absolute;top:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,${ACTIVE[2]},transparent);opacity:.5;animation:roost-sweep 1.2s linear infinite}
@@ -9758,14 +9758,58 @@ const RoostLang = {
   },
   apply(el, root, cfg) {
     const lang = this.pick(el._hass || RoostSheet.hass?.(), cfg || el._config);
-    if (lang !== "ar") { if (el.style.direction === "rtl") { el.style.direction = ""; el.removeAttribute("dir"); } return; }
+    const r = root || el.shadowRoot;
+    if (lang !== "ar") { if (el.style.direction === "rtl") { el.style.direction = ""; el.removeAttribute("dir"); } if (r) this.mirror(r, false); return; }
     el.style.direction = "rtl"; el.setAttribute("dir", "rtl"); el.setAttribute("lang", "ar");
-    const r = root || el.shadowRoot; if (!r) return;
+    if (!r) return;
+    this.mirror(r, true);
     const east = this.eastern(cfg || el._config), digits = (s) => (east ? s.replace(/[0-9]/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]).replace(/%/g, "٪") : s);
     const walk = document.createTreeWalker(r, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentNode && /^(STYLE|SCRIPT)$/.test(n.parentNode.nodeName) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
     const nodes = []; while (walk.nextNode()) nodes.push(walk.currentNode);
-    for (const n of nodes) { const v = digits(this.line(n.nodeValue)); if (v !== n.nodeValue) n.nodeValue = v; }
+    // a number with its unit (1240 L, 214 km, 3 h 57 min) keeps its order inside right-to-left text
+    const iso = (v) => (/^\s*[-−+]?[\d٠-٩]/.test(v) && /[A-Za-zµ]/.test(v) && !/[\u0600-\u06FF\u2066]/.test(v) ? `\u2066${v}\u2069` : v);
+    for (const n of nodes) { const v = iso(digits(this.line(n.nodeValue))); if (v !== n.nodeValue) n.nodeValue = v; }
     r.querySelectorAll("[aria-label],[title],[placeholder]").forEach((x) => { for (const a of ["aria-label", "title", "placeholder"]) { const v = x.getAttribute(a); if (v) { const t = this.line(v); if (t !== v) x.setAttribute(a, t); } } });
+  },
+  // right to left: everything placed by a side (a corner button, a badge, a bar) moves to the other side, so the
+  // words never run under it. Things centred at 50% and fills that grow from an edge (left:0, sliders and bars,
+  // which follow the finger) stay put; flex and grid already follow the direction.
+  flipCss(css) {
+    const swap = (x) => (x === "left" ? "right" : x === "right" ? "left" : x);
+    const four = (v, f) => { const q = v.trim().split(/\s+(?![^(]*\))/); return q.length === 4 ? f(q) : null; };
+    return css.replace(/([^{}]*)\{([^{}]*)\}/g, (m, sel, body) => {
+      // marked to stay as drawn (a slide-to-unlock track, things placed by the card's own sums)
+      if (/\/\*ltr\*\//.test(sel + body)) return m;
+      const sides = [...body.matchAll(/(?:^|[;\s])(left|right)\s*:\s*([^;]+)/g)];
+      // something centred stays centred
+      if (sides.some((x) => /^50%/.test(x[2].trim()))) return m;
+      // placed by the card's own sums (no side here): leave it
+      if (!sides.length && /position\s*:\s*(absolute|fixed)/.test(body)) return m;
+      let b = body;
+      // one side only, at 0: a fill growing from that edge (bars and sliders follow the finger): it stays
+      if (!(sides.length === 1 && /^0(px)?\s*(!important)?$/.test(sides[0][2].trim())) && sides.length) {
+        b = b.replace(/(^|[;\s])(left|right)(\s*:)/g, (q, a, side, c) => a + swap(side) + c)
+          // a knob that slides along from its side slides the other way
+          .replace(/translateX\((-?)(\d+(?:\.\d+)?px)\)/g, (q, neg, v) => `translateX(${neg ? "" : "-"}${v})`);
+      }
+      // a switch that is on: its knob slides the other way
+      if (!sides.length && /\.on\b/.test(sel) && /transform\s*:\s*translateX\(\d+(?:\.\d+)?px\)\s*(;|$)/.test(b.trim() + ";")) b = b.replace(/translateX\((\d+(?:\.\d+)?px)\)/g, "translateX(-$1)");
+      b = b.replace(/(margin|padding|border)-(left|right)/g, (q, a, side) => `${a}-${swap(side)}`)
+        .replace(/border-(top|bottom)-(left|right)-radius/g, (q, v, side) => `border-${v}-${swap(side)}-radius`)
+        .replace(/(text-align|float)\s*:\s*(left|right)/g, (q, a, side) => `${a}:${swap(side)}`)
+        .replace(/(^|[;\s])(margin|padding)\s*:\s*([^;!]+?)(\s*!important)?(?=;|$)/g, (q, a, k, v, imp) => four(v, (x) => `${a}${k}:${x[0]} ${x[3]} ${x[2]} ${x[1]}${imp || ""}`) || q)
+        .replace(/(^|[;\s])inset\s*:\s*([^;]+?)(?=;|$)/g, (q, a, v) => four(v, (x) => `${a}inset:${x[0]} ${x[3]} ${x[2]} ${x[1]}`) || q)
+        .replace(/(^|[;\s])border-radius\s*:\s*([^;/]+?)(?=;|$)/g, (q, a, v) => { const x = v.trim().split(/\s+(?![^(]*\))/); return x.length === 4 ? `${a}border-radius:${x[1]} ${x[0]} ${x[3]} ${x[2]}` : x.length === 3 ? `${a}border-radius:${x[1]} ${x[0]} ${x[1]} ${x[2]}` : q; });
+      return `${sel}{${b}}`;
+    });
+  },
+  mirror(r, on) {
+    r.querySelectorAll("style").forEach((st) => {
+      const now = st.textContent;
+      if (st.__roostLtr !== undefined && now !== st.__roostRtl) st.__roostLtr = undefined; // the card wrote new styles
+      if (on) { if (st.__roostLtr === undefined) { st.__roostLtr = now; st.__roostRtl = this.flipCss(now); } if (st.textContent !== st.__roostRtl) st.textContent = st.__roostRtl; }
+      else if (st.__roostLtr !== undefined) { if (st.textContent !== st.__roostLtr) st.textContent = st.__roostLtr; st.__roostLtr = undefined; }
+    });
   },
   cards: new Set(),
   set(lang) {
