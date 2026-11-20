@@ -1,0 +1,14 @@
+name: Remove temporary branches
+# One-off, approved by the owner: removes the helper branches used to move the version tags.
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/tidy.yml]
+permissions:
+  contents: write
+jobs:
+  tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: git push origin --delete tmp-retag-1 tmp-retag-2 tmp-retag-3 tmp-retag-4
