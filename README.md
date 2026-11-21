@@ -49,7 +49,7 @@ Hold any card and Roost's own details sheet slides up: the name, the state and o
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/images/now.png" width="360" alt="Roost Now: a door open while nobody is home, lights left on, a low battery">
 
 ### Your home in 3D
-**Roost Home Tour** shows your home as the finished pictures [Roost Atelier](https://github.com/HRadhi4/Roost-Atelier) makes: the whole floor, and every room in 360°, like a street-view tour. Tap a room to step in, drag to look around, follow the arrows on the doors, and tap any light, AC, curtain or TV right on the picture to control it. Lights that are on glow. No 3D engine is loaded, so it is quick on phones and tablets.
+**Roost Home Tour** shows your home as the finished pictures [Roost Atelier](https://github.com/HRadhi4/Roost-Atelier) makes: the whole floor, and every room in 360°, like a street-view tour. Tap a room to step in, drag to look around, follow the arrows on the doors, and tap any light, AC, curtain or TV right on the picture to control it. Lights that are on glow. In the card's settings, choose what tapping a room does: go inside it in 360°, or zoom in on it from above (the whole-home picture flies in to the room so every device is close up). No 3D engine is loaded, so it is quick on phones and tablets.
 
 **Roost 3D Home** brings your home from [Roost Atelier](https://github.com/HRadhi4/Roost-Atelier) onto the dashboard: one calm line about what is going on, the live 3D view (tap a device to control it), and the realistic photos Atelier made of the whole floor and every room. Tap a photo to see it big.
 

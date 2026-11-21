@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.28.0
+
+- **Home Tour: zoom in on a room from above.** A new setting, Tapping a room: Goes inside it in 360° (as before) or Zooms in on it from above. Zooming flies the whole-home picture smoothly in to the room, then shows the room's own close-up from the same angle with every device big enough to tap. The home button flies back out. A 360° button goes inside from there.
+- **Tap anywhere on a room** on the whole-home picture to go to it (not only its name).
+
 ## 1.27.1
 
 - **Home Tour outlines sit right on each device.** With pictures made by Roost Atelier 0.19.4 or newer, every dotted outline covers the device exactly (older pictures use the old guess). Smaller outlines sit on top, so a lamp in front of a curtain can still be pressed.

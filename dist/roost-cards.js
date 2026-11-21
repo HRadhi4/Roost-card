@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.27.1";
+const ROOST_VERSION = "1.28.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -9741,7 +9741,7 @@ class RoostCamera extends RoostBase {
 // Words are looked up in one list per language; your own device names stay as you wrote them.
 const AR_WORDS = {
   "Armed": "مفعّل", "Alarm!": "إنذار!", "Alarm going off": "الإنذار يرن", "Alarm off, nobody home": "الإنذار مطفأ ولا أحد في المنزل", "Safe": "الأمان", "Comfort": "الراحة", "Who": "من في المنزل",
-  "Whole home": "المنزل كاملاً", "Previous room": "الغرفة السابقة", "Next room": "الغرفة التالية", "Devices in this room": "أجهزة هذه الغرفة",
+  "Whole home": "المنزل كاملاً", "Previous room": "الغرفة السابقة", "Next room": "الغرفة التالية", "Devices in this room": "أجهزة هذه الغرفة", "Go inside in 360°": "الدخول بزاوية 360°", "See it from above": "مشاهدتها من الأعلى",
   "This screen can't show 360° pictures": "هذه الشاشة لا تستطيع عرض صور 360°",
   "This room's pictures aren't made yet. In Roost Atelier, open the home settings and press Make dashboard pictures.": "لم تُصنع صور هذه الغرفة بعد. في Roost Atelier افتح إعدادات المنزل واضغط اصنع صور لوحة التحكم.",
   "The pictures of this home aren't made yet. In Roost Atelier, open the home settings and press Make dashboard pictures.": "لم تُصنع صور هذا المنزل بعد. في Roost Atelier افتح إعدادات المنزل واضغط اصنع صور لوحة التحكم.",
@@ -12043,7 +12043,7 @@ class TourSphere {
 }
 
 class RoostTour extends RoostBase {
-  static get defaults() { return { plan: "", floor: 0, room: "", height: 420, tap: "panel", devices: true, nav: true, theme: "auto" }; }
+  static get defaults() { return { plan: "", floor: 0, room: "", height: 420, tap: "panel", room_view: "360", devices: true, nav: true, theme: "auto" }; }
 
   static getConfigForm() {
     return {
@@ -12054,6 +12054,7 @@ class RoostTour extends RoostBase {
           { name: "room", label: "Start in this room (its id, empty = the whole home)", selector: { text: {} } },
         ] },
         { name: "height", label: "Height", selector: slider(240, 1200, 20, "px") },
+        { name: "room_view", label: "Tapping a room", selector: pick([["360", "Goes inside it in 360°"], ["zoom", "Zooms in on it from above"]]) },
         { name: "tap", label: "Tapping a device", selector: pick([["panel", "Shows it in 3D with its controls beside the picture"], ["details", "Shows its controls"], ["toggle", "Turns it on or off"]]) },
         { type: "grid", name: "", schema: [
           { name: "devices", label: "Device buttons on the pictures", selector: { boolean: {} } },
@@ -12174,31 +12175,43 @@ class RoostTour extends RoostBase {
     this.el = { tour, stage: tour.querySelector(".stage"), glow: tour.querySelector(".glow"), hot: tour.querySelector(".hot"), bar: tour.querySelector(".bar"), top: tour.querySelector(".top"), list: tour.querySelector(".list") };
     this.bind();
     this._ro?.disconnect(); this._ro = new ResizeObserver(() => this.draw()); this._ro.observe(tour);
-    if (st === "ok" && this._shown !== undefined) this.go(this._shown, true);
+    if (st === "ok" && this._shown !== undefined) this.go(this._shown, true, this.mode === "home" ? null : this.mode);
   }
 
-  // go to a room (its 360°, or its photo when there is no 360° yet) or, with null, the whole floor
-  async go(roomId, again = false) {
+  // go to a room or, with null, the whole floor. A room is seen inside (its 360°, or its photo when there is no 360°
+  // yet) or close up from above ("top": the whole-home picture flies in to it, then its own close-up takes over)
+  async go(roomId, again = false, how = null) {
     const token = (this._token = (this._token || 0) + 1), fl = this.floorData(); if (!fl || !this.el) return;
+    const prevMode = this.mode, prevRoom = this.room;
+    const fromHome = !this.room && this.kind === "flat" && this.img?.naturalWidth && this.cam ? { img: this.img, cam: this.cam } : null;
     this._shown = roomId; this.closeList(); this.closePanel(true);
     const room = (this.room = fl.rooms.find((r) => r.id === roomId) || null);
+    const mode = (this.mode = room ? how || (this._config.room_view === "zoom" ? "top" : "inside") : "home");
     // the last room's buttons go at once (a state change while the next picture loads must not bring them back)
     this.spots = null; this.cam = null;
     this.el.hot.innerHTML = ""; this.el.glow.innerHTML = ""; this.hs = new Map(); this.glows = new Map();
     this.el.tour.querySelector(".msg")?.remove();
     this.drawBar();
+    // zooming in: the whole-home picture flies to the room first
+    if (mode === "top" && fromHome && !again) { this.cam = fromHome.cam; await this.flyTo(this.rectFor(room, fromHome.cam, fromHome.img), 650, token); this.cam = null; if (token !== this._token) return; }
     const devices = this._config.devices === false ? [] : (fl.devices || []).filter((d) => d.entity);
-    let pic, kind = "flat";
-    if (room) { pic = await this.picture(`pano_${room.id}`); kind = "pano"; if (!pic) { pic = await this.picture(room.id); kind = "flat"; } }
+    let pic, kind = "flat", closeUp = false;
+    if (mode === "inside") { pic = await this.picture(`pano_${room.id}`); kind = "pano"; if (!pic) { pic = await this.picture(room.id); kind = "flat"; } }
+    else if (mode === "top") { pic = await this.picture(`top_${room.id}`); if (!pic) { pic = await this.picture("all"); closeUp = true; } }
     else pic = await this.picture("all");
     if (token !== this._token || !this.el) return;
     this.kind = kind; this.cam = pic?.camera || null;
     this.spots = devices.filter((d) => !room || Tour.inside([d.x, d.y], room.pts)).map((d) => ({ id: d.id, d, p: Tour.point(d, fl) }));
     if (!room) for (const r of fl.rooms) { const [x, y] = Tour.centroid(r.pts); this.spots.push({ id: `room_${r.id}`, room: r, p: [x, 0.9, y] }); }
-    else for (const { room: r, at } of Tour.doors(fl, room)) this.spots.push({ id: `door_${r.id}`, room: r, door: true, p: [at[0], 1.1, at[1]] });
-    this.sphere?.dispose(); this.sphere = null; this.img = null; this.el.stage.innerHTML = ""; this.el.stage.className = "stage";
-    if (!pic) return this.message(room ? "This room's pictures aren't made yet. In Roost Atelier, open the home settings and press Make dashboard pictures." : "The pictures of this home aren't made yet. In Roost Atelier, open the home settings and press Make dashboard pictures.");
+    else if (mode === "inside") for (const { room: r, at } of Tour.doors(fl, room)) this.spots.push({ id: `door_${r.id}`, room: r, door: true, p: [at[0], 1.1, at[1]] });
+    this.sphere?.dispose(); this.sphere = null;
+    // the picture that was showing stays a moment under the new one, which fades in over it
+    const old = kind === "flat" ? [...this.el.stage.querySelectorAll("img")] : [];
+    if (kind !== "flat") this.el.stage.innerHTML = ""; else this.el.stage.querySelectorAll("canvas").forEach((c) => c.remove());
+    this.el.stage.className = "stage"; this.img = null;
+    if (!pic) { this.el.stage.innerHTML = ""; return this.message(room ? "This room's pictures aren't made yet. In Roost Atelier, open the home settings and press Make dashboard pictures." : "The pictures of this home aren't made yet. In Roost Atelier, open the home settings and press Make dashboard pictures."); }
     if (kind === "pano") {
+      this.view = null;
       this.el.stage.classList.add("pano");
       const canvas = document.createElement("canvas"); this.el.stage.appendChild(canvas);
       try { this.sphere = new TourSphere(canvas); } catch (e) { return this.message("This screen can't show 360° pictures"); }
@@ -12209,8 +12222,73 @@ class RoostTour extends RoostBase {
         this.pitch = 0; this.fov = 75;
       }
       const img = new Image(); img.onload = () => { if (token === this._token && this.sphere) { this.sphere.image(img); this.draw(); } }; img.src = pic.url;
-    } else { const img = (this.img = new Image()); img.alt = ""; img.onload = () => this.draw(); img.src = pic.url; this.el.stage.appendChild(img); }
+    } else {
+      const img = (this.img = new Image()); img.alt = ""; img.style.opacity = old.length ? "0" : "1"; img.style.transition = "opacity .3s ease";
+      this.view = null; this.el.hot.style.opacity = "0";
+      img.onload = async () => {
+        if (token !== this._token) return;
+        const back = mode === "home" && prevMode === "top" && prevRoom && !again;
+        // no close-up of this room yet: the whole-home picture stays zoomed in on it
+        if (closeUp) this.view = this.rectFor(room, this.cam, img);
+        else if (back) this.view = this.rectFor(prevRoom, this.cam, img);
+        this.applyView(); img.style.opacity = "1";
+        setTimeout(() => old.forEach((o) => o.remove()), 320);
+        // zooming out: from the room back to the whole home
+        if (back) await this.flyTo({ s: 1, x: 0, y: 0 }, 600, token);
+        if (token !== this._token) return;
+        this.el.hot.style.transition = "opacity .25s"; this.el.hot.style.opacity = "1"; this.draw();
+      };
+      img.src = pic.url; this.el.stage.appendChild(img);
+    }
     this.draw();
+  }
+
+  // the move of a flat picture (zoomed in on a room): {s: how much bigger, x, y: where its corner is}, in pixels
+  applyView() {
+    const v = this.view; if (!this.img) return;
+    this.img.style.transformOrigin = "0 0";
+    this.img.style.transform = v && (v.s !== 1 || v.x || v.y) ? `translate(${v.x}px,${v.y}px) scale(${v.s})` : "";
+  }
+  // how far to zoom a flat picture so a room fills the card
+  rectFor(room, cam, img) {
+    const W = this.el.tour.clientWidth, H = this.el.tour.clientHeight, iw = img.naturalWidth, ih = img.naturalHeight; if (!W || !H || !iw) return { s: 1, x: 0, y: 0 };
+    const k = Math.max(W / iw, H / ih);
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [px, pz] of room.pts) for (const y of [0, 2.4]) {
+      const q = Tour.flat(cam, [px, y, pz]); if (!q) continue;
+      const sx = (W - iw * k) / 2 + q[0] * iw * k, sy = (H - ih * k) / 2 + q[1] * ih * k;
+      x0 = Math.min(x0, sx); y0 = Math.min(y0, sy); x1 = Math.max(x1, sx); y1 = Math.max(y1, sy);
+    }
+    if (!isFinite(x0)) return { s: 1, x: 0, y: 0 };
+    const s = Math.max(1, Math.min(5, Math.min(W / ((x1 - x0) * 1.2), (H - 60) / ((y1 - y0) * 1.2))));
+    // the picture always fills the card (no empty edge shows while zoomed)
+    const cl = (v, lo) => Math.min(0, Math.max(lo, v));
+    return { s, x: cl(W / 2 - s * (x0 + x1) / 2, W - s * W), y: cl((H - 40) / 2 - s * (y0 + y1) / 2, H - s * H) };
+  }
+  // a smooth flight of the picture to a new zoom
+  flyTo(to, ms, token) {
+    const from = this.view || { s: 1, x: 0, y: 0 }, t0 = performance.now(), ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+    this.el.hot.style.opacity = "0";
+    return new Promise((done) => {
+      const step = (now) => {
+        if (token !== this._token) return done();
+        const t = Math.min(1, (now - t0) / ms), e = ease(t);
+        this.view = { s: from.s + (to.s - from.s) * e, x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e }; this.applyView();
+        if (t < 1) requestAnimationFrame(step); else done();
+      };
+      requestAnimationFrame(step);
+    });
+  }
+  // the room under a spot on the whole-home picture
+  roomAt(x, y) {
+    const fl = this.floorData(), W = this.el.tour.clientWidth, H = this.el.tour.clientHeight; let best = null, bestA = Infinity;
+    for (const r of fl.rooms) {
+      const poly = r.pts.map(([px, pz]) => this.where([px, 0, pz], W, H)); if (poly.some((q) => !q)) continue;
+      if (!Tour.inside([x, y], poly)) continue;
+      const a = Math.abs(poly.reduce((s, p, i) => { const q = poly[(i + 1) % poly.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0));
+      if (a < bestA) { bestA = a; best = r; }
+    }
+    return best;
   }
 
   message(text) { const m = document.createElement("div"); m.className = "msg"; m.textContent = text; this.el.tour.insertBefore(m, this.el.top); RoostLang.apply(this); }
@@ -12221,13 +12299,15 @@ class RoostTour extends RoostBase {
     this.el.top.innerHTML = `<span>${esc(title)}</span>`;
     if (this._config.nav === false) { this.el.bar.innerHTML = ""; RoostLang.apply(this); return; }
     this.el.bar.innerHTML = room
-      ? `<button data-b="home" aria-label="Whole home"><ha-icon icon="mdi:home-outline"></ha-icon></button><button data-b="prev" aria-label="Previous room"><ha-icon icon="mdi:chevron-left"></ha-icon></button><button class="nm" data-b="list">${esc(room.name || "Room")}</button><button data-b="next" aria-label="Next room"><ha-icon icon="mdi:chevron-right"></ha-icon></button><button data-b="devs" aria-label="Devices in this room"><ha-icon icon="mdi:view-grid-outline"></ha-icon></button>`
+      ? `<button data-b="home" aria-label="Whole home"><ha-icon icon="mdi:home-outline"></ha-icon></button><button data-b="prev" aria-label="Previous room"><ha-icon icon="mdi:chevron-left"></ha-icon></button><button class="nm" data-b="list">${esc(room.name || "Room")}</button><button data-b="next" aria-label="Next room"><ha-icon icon="mdi:chevron-right"></ha-icon></button>${this.mode === "top" ? `<button data-b="inside" aria-label="Go inside in 360°"><ha-icon icon="mdi:rotate-360"></ha-icon></button>` : this._config.room_view === "zoom" ? `<button data-b="above" aria-label="See it from above"><ha-icon icon="mdi:axis-arrow"></ha-icon></button>` : ""}<button data-b="devs" aria-label="Devices in this room"><ha-icon icon="mdi:view-grid-outline"></ha-icon></button>`
       : `<button class="nm" data-b="list"><ha-icon icon="mdi:door-open"></ha-icon>Rooms</button>`;
     this.el.bar.querySelectorAll("button").forEach((b) => b.addEventListener("click", (e) => {
       e.stopPropagation(); this.vibrate(); const k = b.dataset.b;
       if (k === "home") this.go(null);
-      else if (k === "prev") this.go(rooms[(i - 1 + rooms.length) % rooms.length].id);
-      else if (k === "next") this.go(rooms[(i + 1) % rooms.length].id);
+      else if (k === "prev") this.go(rooms[(i - 1 + rooms.length) % rooms.length].id, false, this.mode);
+      else if (k === "next") this.go(rooms[(i + 1) % rooms.length].id, false, this.mode);
+      else if (k === "inside") this.go(room.id, false, "inside");
+      else if (k === "above") this.go(room.id, false, "top");
       else if (k === "devs") this.roomSheet();
       else this.el.list.hidden ? this.openList() : this.closeList();
     }));
@@ -12266,6 +12346,12 @@ class RoostTour extends RoostBase {
     });
     const up = (e) => { ptrs.delete(e.pointerId); start = ptrs.size ? { yaw: this.yaw, pitch: this.pitch, fov: this.fov, x: [...ptrs.values()][0][0], y: [...ptrs.values()][0][1], d: 0 } : null; };
     el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+    // on the whole home, tapping anywhere on a room goes to it
+    el.addEventListener("click", (e) => {
+      if (this.mode !== "home" || this.kind !== "flat") return;
+      const b = this.el.tour.getBoundingClientRect(), r = this.roomAt(e.clientX - b.left, e.clientY - b.top);
+      if (r) { this.vibrate(); this.go(r.id); }
+    });
     el.addEventListener("wheel", (e) => { if (this.kind !== "pano") return; e.preventDefault(); this.fov = Math.max(35, Math.min(95, this.fov * (e.deltaY > 0 ? 1.08 : 0.93))); this.draw(); }, { passive: false });
   }
 
@@ -12274,8 +12360,8 @@ class RoostTour extends RoostBase {
     if (this.kind === "pano") { const q = Tour.pano(this.eye, this.yaw, this.pitch, this.fov, W / H, p); return q && [q[0] * W, q[1] * H]; }
     if (!this.cam || !this.img?.naturalWidth) return null;
     const q = Tour.flat(this.cam, p); if (!q) return null;
-    const iw = this.img.naturalWidth, ih = this.img.naturalHeight, s = Math.max(W / iw, H / ih);
-    return [(W - iw * s) / 2 + q[0] * iw * s, (H - ih * s) / 2 + q[1] * ih * s];
+    const iw = this.img.naturalWidth, ih = this.img.naturalHeight, s = Math.max(W / iw, H / ih), v = this.view || { s: 1, x: 0, y: 0 };
+    return [v.x + v.s * ((W - iw * s) / 2 + q[0] * iw * s), v.y + v.s * ((H - ih * s) / 2 + q[1] * ih * s)];
   }
 
   draw() {
@@ -12332,7 +12418,7 @@ class RoostTour extends RoostBase {
         const a = st?.attributes || {}, lit = st?.state === "on", k = lit ? (a.brightness != null ? 0.35 + 0.65 * (a.brightness / 255) : 1) : 0;
         const col = a.rgb_color ? `rgb(${a.rgb_color.join(",")})` : Tour.kelvin(a.color_temp_kelvin || 2900);
         let gi = glow; if (!gi) { gi = document.createElement("i"); this.el.glow.appendChild(gi); this.glows.set(s.id, gi); }
-        const r = (this.room ? 0.42 : 0.16) * Math.min(W, H) * scale * (0.7 + 0.3 * k);
+        const r = (this.mode === "inside" ? 0.42 : this.mode === "top" ? 0.24 : 0.16) * Math.min(W, H) * scale * (0.7 + 0.3 * k);
         gi.style.left = `${at[0]}px`; gi.style.top = `${at[1]}px`; gi.style.width = gi.style.height = `${2 * r}px`; gi.style.opacity = (0.55 * k).toFixed(2);
         if (lit) gi.style.background = `radial-gradient(circle, ${col} 0%, color-mix(in srgb, ${col} 35%, transparent) 30%, transparent 70%)`;
       }
