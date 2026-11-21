@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.27.0";
+const ROOST_VERSION = "1.27.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -12182,6 +12182,8 @@ class RoostTour extends RoostBase {
     const token = (this._token = (this._token || 0) + 1), fl = this.floorData(); if (!fl || !this.el) return;
     this._shown = roomId; this.closeList(); this.closePanel(true);
     const room = (this.room = fl.rooms.find((r) => r.id === roomId) || null);
+    // the last room's buttons go at once (a state change while the next picture loads must not bring them back)
+    this.spots = null; this.cam = null;
     this.el.hot.innerHTML = ""; this.el.glow.innerHTML = ""; this.hs = new Map(); this.glows = new Map();
     this.el.tour.querySelector(".msg")?.remove();
     this.drawBar();
@@ -12300,16 +12302,24 @@ class RoostTour extends RoostBase {
         el.firstElementChild.addEventListener("click", (e) => { e.stopPropagation(); this.tap(s); });
         this.el.hot.appendChild(el); this.hs.set(s.id, el);
       }
-      const at = W && H ? this.where(s.p, W, H) : null, show = !!at && at[0] > -20 && at[0] < W + 20 && at[1] > -20 && at[1] < H - 44;
+      // the device's real box in the home (the Atelier writes it into each picture): its outline sits right on it
+      const fit = s.d && W && H ? this.outline(s.id, W, H) : null;
+      const at = fit ? fit.c : W && H ? this.where(s.p, W, H) : null, show = !!at && at[0] > -20 && at[0] < W + 20 && at[1] > -20 && at[1] < H - 44;
       el.hidden = !show;
       const glow = this.glows.get(s.id);
       if (!show) { if (glow) glow.style.opacity = 0; continue; }
       el.style.left = `${at[0]}px`; el.style.top = `${at[1]}px`;
       if (!s.d) continue;
       // a dotted outline as big as the device looks on the picture
-      const up = this.where([s.p[0], s.p[1] + 0.5, s.p[2]], W, H), dn = this.where([s.p[0], s.p[1] - 0.5, s.p[2]], W, H);
-      const ppm = up && dn ? Math.hypot(up[0] - dn[0], up[1] - dn[1]) : 60, [mw, mh] = Tour.size(s.d, this.floorData());
-      const bw = Math.round(Math.max(40, Math.min(W * 0.7, mw * ppm + 16))), bh = Math.round(Math.max(40, Math.min(H * 0.7, mh * ppm + 16)));
+      let bw, bh;
+      if (fit) { bw = Math.round(Math.max(40, Math.min(W * 0.8, fit.w + 10))); bh = Math.round(Math.max(40, Math.min(H * 0.8, fit.h + 10))); }
+      else {
+        const up = this.where([s.p[0], s.p[1] + 0.5, s.p[2]], W, H), dn = this.where([s.p[0], s.p[1] - 0.5, s.p[2]], W, H);
+        const ppm = up && dn ? Math.hypot(up[0] - dn[0], up[1] - dn[1]) : 60, [mw, mh] = Tour.size(s.d, this.floorData());
+        bw = Math.round(Math.max(40, Math.min(W * 0.7, mw * ppm + 16))); bh = Math.round(Math.max(40, Math.min(H * 0.7, mh * ppm + 16)));
+      }
+      // smaller outlines sit on top, so a lamp in front of a big curtain can still be tapped
+      el.style.zIndex = String(Math.max(1, 10000 - Math.round(Math.sqrt(bw * bh))));
       el.style.setProperty("--w", `${bw}px`); el.style.setProperty("--h", `${bh}px`);
       el.style.setProperty("--r", ["light", "fan", "vacuum"].includes(s.d.kind || "light") ? "999px" : "14px");
       el.classList.toggle("small", bw < 64 && bh < 64);
@@ -12327,6 +12337,18 @@ class RoostTour extends RoostBase {
         if (lit) gi.style.background = `radial-gradient(circle, ${col} 0%, color-mix(in srgb, ${col} 35%, transparent) 30%, transparent 70%)`;
       }
     }
+  }
+
+  // the outline of a device on the picture from its real box: centre and size in pixels (null when the picture has no box)
+  outline(id, W, H) {
+    const b = this.cam?.boxes?.[id]; if (!b) return null;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, seen = 0;
+    for (const x of [b[0], b[3]]) for (const y of [b[1], b[4]]) for (const z of [b[2], b[5]]) {
+      const q = this.where([x, y, z], W, H); if (!q) continue; seen++;
+      x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]);
+    }
+    if (seen < 8) { if (!seen) return null; const c = this.where([(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2], W, H); if (!c) return null; }
+    return { c: [(x0 + x1) / 2, (y0 + y1) / 2], w: x1 - x0, h: y1 - y0 };
   }
 
   tap(s) {
@@ -12380,13 +12402,19 @@ class RoostTour extends RoostBase {
         <div class="st" data-noswipe><div class="sc"><b class="g" data-m="obj">${TourModel.html(type)}</b></div><span class="hint">Drag to turn it</span></div><div class="ctl"></div></div>`;
       root.querySelector("[data-x]").addEventListener("click", (e) => { e.stopPropagation(); this.vibrate(); this.closePanel(); });
       this.turnable(root.querySelector(".st"));
+      // while a finger is on a control it is never rebuilt under it (that is what made some presses do nothing)
+      const pn = root.querySelector(".pn");
+      pn.addEventListener("pointerdown", () => { pan.press = true; }, true);
+      const lift = () => setTimeout(() => { if (this.pan !== pan) return; pan.press = false; if (pan.stale) { pan.stale = false; this.drawPanel(false); } }, 80);
+      pn.addEventListener("pointerup", lift, true); pn.addEventListener("pointercancel", lift, true);
     }
     root.querySelector(".ic ha-icon").setAttribute("icon", a.icon || (TOUR_ICONS[pan.s.d.kind] || (dom === "light" ? "mdi:lightbulb" : dom === "cover" ? "mdi:curtains" : "mdi:power")));
     root.querySelector(".ic").style.background = `linear-gradient(135deg,${g[0]},${g[1]})`;
     root.querySelector(".nm b").textContent = pan.s.d.name || a.friendly_name || st.entity_id;
     root.querySelector(".nm span").textContent = RoostSheet.stateWord(st);
     this.modelState(st);
-    if (!pan.busy) {
+    if (pan.press) pan.stale = true;
+    else if (!pan.busy) {
       const ctl = root.querySelector(".ctl");
       ctl.innerHTML = `${RoostSheet.main(st, g, p)}${RoostSheet.extras(st).join("")}<button class="wb" data-act="more"><ha-icon icon="mdi:dots-horizontal"></ha-icon>More</button>`;
       this.wirePanel(ctl, st);

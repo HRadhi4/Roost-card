@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.27.1
+
+- **Home Tour outlines sit right on each device.** With pictures made by Roost Atelier 0.19.4 or newer, every dotted outline covers the device exactly (older pictures use the old guess). Smaller outlines sit on top, so a lamp in front of a curtain can still be pressed.
+- **Home Tour shows only this room's devices.** Moving to another room no longer leaves the last room's outlines behind.
+- **Every press works in the Home Tour side panel.** Its buttons are never rebuilt while your finger is on them.
+
 ## 1.27.0
 
 - **Follow me** (Roost Rooms Selector): the card opens the room you are in, from the presence or motion sensors in each room, or from a Bluetooth room tracker such as Bermuda. After you pick a room yourself it waits a couple of minutes before following again.
