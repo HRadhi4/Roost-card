@@ -2,6 +2,11 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.28.1
+
+- **Safer icons.** Every icon name, including ones that come from devices (like a robot vacuum's dock buttons), is now made safe before it is shown, so an odd value can never break the dashboard.
+- **Fully local fonts.** Inter and Space Grotesk are now built into the card, so dashboards no longer load fonts from Google (no viewer's address is sent anywhere). See docs/FONTS-LICENSE.md.
+
 ## 1.28.0
 
 - **Home Tour: zoom in on a room from above.** A new setting, Tapping a room: Goes inside it in 360° (as before) or Zooms in on it from above. Zooming flies the whole-home picture smoothly in to the room, then shows the room's own close-up from the same angle with every device big enough to tap. The home button flies back out. A 360° button goes inside from there.
