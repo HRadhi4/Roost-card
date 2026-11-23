@@ -1452,7 +1452,7 @@ class RoostChips extends RoostBase {
 // ------------------------------------------------------------------ Roost Thermostat
 class RoostThermostat extends RoostBase {
   static get defaults() {
-    return { style: "nest", color: "blue", show_power: true, show_plus_minus: true, modes: ["cool", "dry", "fan_only", "heat_cool", "auto"], theme: "auto", radius: 24 };
+    return { style: "nest", color: "blue", show_power: true, show_plus_minus: true, modes: ["cool", "dry", "fan_only", "heat_cool", "auto"], lock: "off", relock: 15, theme: "auto", radius: 24 };
   }
 
   validate(c) { if (!c.entity) throw new Error("Choose an air conditioner or thermostat"); }
@@ -1480,6 +1480,8 @@ class RoostThermostat extends RoostBase {
           { name: "compact", label: "Compact: the buttons sit in the gap of the dial (for wall panels)", selector: { boolean: {} } },
           ACTION_FIELD("power_action", "The power button runs (for an AC sent by infrared, for example a script; empty = on and off)"),
           { name: "show_plus_minus", selector: { boolean: {} } },
+          { name: "lock", label: "Lock (so it can't be changed by accident)", selector: pick([["off", "No lock"], ["temp", "Lock the temperature (tap the lock to change it)"], ["all", "Lock everything: temperature, power and modes"]]) },
+          { name: "relock", label: "Locks again after (seconds)", selector: slider(5, 120, 5, "s") },
           { name: "modes", selector: { select: { multiple: true, options: [
             { value: "cool", label: "Cool" }, { value: "heat", label: "Heat" }, { value: "dry", label: "Dry" },
             { value: "fan_only", label: "Fan" }, { value: "heat_cool", label: "Auto (heat and cool)" }, { value: "auto", label: "Auto" }] } } },
@@ -1532,6 +1534,13 @@ class RoostThermostat extends RoostBase {
       .card{${c.plain ? `padding:0;background:none;border:0;color:${p.text}` : `border-radius:${c.radius}px;padding:${c.compact ? 16 : nest ? 24 : 18}px;background:${p.panel};${p.fx || ""};border:1px solid ${p.border};color:${p.text}`}}
       .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
       .hd .n{font-size:15px;font-weight:600}
+      .hr{display:flex;align-items:center;gap:8px}
+      .lk{all:unset;cursor:pointer;width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:${p.inset};color:${p.muted};--mdc-icon-size:16px;transition:transform .12s}
+      .lk:active{transform:scale(.9)}
+      .lk.open{background:linear-gradient(135deg,#F59E0B,#FBBF24);color:#2A1800}
+      .card.locked svg{cursor:not-allowed}
+      .card.locked-all .rb,.card.locked-all .md,.card.locked .rb.mi,.card.locked .rb.pl{opacity:.45}
+      .card.shake .lk{animation:roost-wiggle .4s ease-in-out 1}
       .pill{font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;${on ? pillOn : `background:${p.inset};color:${p.muted}`}}
       svg{width:100%;max-width:${maxW}px;display:block;margin:${nest ? "10px auto 0" : "4px auto"};touch-action:none;user-select:none;-webkit-user-select:none;cursor:${noTemp || un ? "default" : "pointer"}}
       svg.on{animation:roost-arc 3s ease-in-out infinite}
@@ -1549,8 +1558,8 @@ class RoostThermostat extends RoostBase {
       .md.on{background:${nest ? "linear-gradient(135deg,#2F6BFF,#38BDF8)" : `linear-gradient(135deg,${g[0]},${g[1]})`};color:${nest ? "#fff" : g[3]}}
       ${nest ? ".md{min-height:0;padding:10px 0}" : ""}
     </style>
-    <div class="card">
-      <div class="hd"><span class="n t">${esc(this.name(c.entity))}</span><span class="pill">${esc(status)}</span></div>
+    <div class="card${this.locked() ? ` locked${this.lockKind() === "all" ? " locked-all" : ""}` : ""}">
+      <div class="hd"><span class="n t">${esc(this.name(c.entity))}</span><span class="hr">${this.lockKind() ? `<button class="lk${this.locked() ? "" : " open"}" aria-label="${this.locked() ? "Unlock to change" : "Lock"}"><ha-icon icon="${this.locked() ? "mdi:lock" : "mdi:lock-open-variant"}"></ha-icon></button>` : ""}<span class="pill">${esc(status)}</span></span></div>
       <svg viewBox="0 0 250 250" class="${on ? "on" : ""}">
         <defs><linearGradient id="gon" x1="0" y1="1" x2="1" y2="0">${nest ? '<stop offset="0" stop-color="#38BDF8"/><stop offset=".55" stop-color="#6D4BFF"/><stop offset="1" stop-color="#C084FC"/>' : `<stop offset="0" stop-color="${g[0]}"/><stop offset="1" stop-color="${g[1]}"/>`}</linearGradient>
         <linearGradient id="goff" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${p.offArc[0]}"/><stop offset="1" stop-color="${p.offArc[1]}"/></linearGradient></defs>
@@ -1599,6 +1608,19 @@ class RoostThermostat extends RoostBase {
     root.getElementById("lab").textContent = this._drag ? "LET GO TO SET" : on ? "SET TO" : "SET TO";
   }
 
+  // the lock: "temp" (the temperature) or "all" (power and modes too); open for a short while after a tap
+  lockKind() { const l = this._config.lock; return l === "temp" || l === "all" ? l : l === true ? "temp" : ""; }
+  locked() { return !!this.lockKind() && !(this._openUntil > Date.now()); }
+  unlock() {
+    if (!this.lockKind()) return;
+    const was = this.locked();
+    this._openUntil = Date.now() + Math.max(5, Number(this._config.relock) || 15) * 1000;
+    clearTimeout(this._relockT);
+    this._relockT = setTimeout(() => { if (this._drag) return this.unlock(); this.relock(); }, this._openUntil - Date.now() + 50);
+    if (was) { this._sig = null; this.render(); }
+  }
+  relock() { clearTimeout(this._relockT); this._openUntil = 0; this._sig = null; if (this._hass) this.render(); }
+
   setTemp(v) {
     const { set } = this.info;
     if (v == null || v === set) return;
@@ -1608,9 +1630,14 @@ class RoostThermostat extends RoostBase {
 
   wire() {
     const root = this.shadowRoot, svg = root.querySelector("svg"), c = this._config;
+    // locked: a touch on the dial only points at the lock
+    const nudge = () => { const card = root.querySelector(".card"); card.classList.remove("shake"); void card.offsetWidth; card.classList.add("shake"); this.vibrate(20); };
+    root.querySelector(".lk")?.addEventListener("click", () => { this.vibrate(); if (this.locked()) this.unlock(); else this.relock(); });
     svg.addEventListener("pointerdown", (ev) => {
       const { un, set } = this.info;
       if (un || set == null) return;
+      if (this.locked()) { nudge(); return; }
+      this.unlock();
       this._drag = true;
       svg.setPointerCapture(ev.pointerId);
       this._value = this.valueAt(ev);
@@ -1625,12 +1652,14 @@ class RoostThermostat extends RoostBase {
     svg.addEventListener("pointerup", end);
     svg.addEventListener("pointercancel", end);
     root.querySelectorAll("[data-d]").forEach((b) => b.addEventListener("click", () => {
+      if (this.locked()) { nudge(); return; }
+      this.unlock();
       const { set, mn, mx, step } = this.info;
       const v = Math.max(mn, Math.min(mx, (this._value ?? set ?? 24) + Number(b.dataset.d) * step));
       this.vibrate(); this.paint(v); this.setTemp(v);
     }));
-    root.querySelector(".pw")?.addEventListener("click", () => { this.vibrate(); if (c.power_action && c.power_action.action && c.power_action.action !== "none") this.run(c.power_action); else this.call("climate", this.info.on ? "turn_off" : "turn_on", { entity_id: c.entity }); });
-    root.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => { this.vibrate(); this.call("climate", "set_hvac_mode", { entity_id: c.entity, hvac_mode: b.dataset.m }); }));
+    root.querySelector(".pw")?.addEventListener("click", () => { if (this.locked() && this.lockKind() === "all") { nudge(); return; } this.vibrate(); if (c.power_action && c.power_action.action && c.power_action.action !== "none") this.run(c.power_action); else this.call("climate", this.info.on ? "turn_off" : "turn_on", { entity_id: c.entity }); });
+    root.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => { if (this.locked() && this.lockKind() === "all") { nudge(); return; } this.vibrate(); this.call("climate", "set_hvac_mode", { entity_id: c.entity, hvac_mode: b.dataset.m }); }));
     this.press(root.querySelector(".hd"), () => this.moreInfo(c.entity), () => this.moreInfo(c.entity));
   }
 
@@ -10323,6 +10352,19 @@ const RoostSheet = {
     if (dom === "vacuum") return `${s.state.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase())}${a.battery_level != null ? ` · battery ${a.battery_level}%` : ""}`;
     return s.state.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase());
   },
+  // the line under the name: the state, unless the big number or word below already says it (then: since when)
+  headLine(s) {
+    const dom = s.entity_id.split(".")[0];
+    if (UNAVAILABLE.includes(s.state)) return "Offline";
+    const bigShows = ["sensor", "binary_sensor", "person", "device_tracker"].includes(dom) || this.genericMain(s);
+    return bigShows ? `Changed ${ago(s.last_changed)}` : this.stateWord(s);
+  },
+  // the kinds that have no control of their own, only their state in big letters
+  genericMain(s) {
+    const dom = s.entity_id.split(".")[0];
+    return !["light", "switch", "input_boolean", "fan", "climate", "cover", "media_player", "lock", "sensor", "binary_sensor", "person", "device_tracker", "alarm_control_panel", "weather", "water_heater", "vacuum", "humidifier", "siren",
+      "select", "input_select", "number", "input_number", "scene", "script", "button", "input_button", "automation", "update", "camera"].includes(dom);
+  },
   // the one main control, by kind of device
   main(s, g, p) {
     const dom = s.entity_id.split(".")[0], a = s.attributes, id = s.entity_id;
@@ -10360,7 +10402,7 @@ const RoostSheet = {
     }
     if (dom === "sensor" && num(s.state) != null) {
       const h = this.el?.hist;
-      return `<div class="sens"><div class="big num">${fmt(num(s.state), decOf(s.state))}<small>${esc(a.unit_of_measurement || "")}</small></div>${h && h.length > 2 ? this.spark(h, g[1]) : ""}</div>
+      return `<div class="sens"><div class="big num">${fmt(num(s.state), decOf(s.state))}<small>${esc(a.unit_of_measurement || "")}</small></div>${h && h.length > 2 && !this.el?.full ? this.spark(h, g[1]) : ""}</div>
         ${h && h.length > 2 && !this.el?.full && this.el?.lo != null ? `<div class="note">Lowest ${fmt(this.el.lo, decOf(s.state))} · Highest ${fmt(this.el.hi, decOf(s.state))} in the last day</div>` : ""}`;
     }
     if (dom === "camera") {
@@ -10380,11 +10422,11 @@ const RoostSheet = {
       return `${t != null ? `<div class="dial">${round("mdi:minus", "Lower", false, "wt:-1", 64)}<div class="big num">${fmt(t, 0)}°</div>${round("mdi:plus", "Raise", false, "wt:1", 64)}</div>` : ""}
         ${ops.length ? `<div class="seg" style="grid-template-columns:repeat(${ops.length},minmax(0,1fr))">${ops.map((m) => `<button class="${a.operation_mode === m || s.state === m ? "on" : ""}" data-act="op:${esc(m)}">${esc(m.replace(/_/g, " ").replace(/^./, (x) => x.toUpperCase()))}</button>`).join("")}</div>` : ""}`;
     }
-    if (dom === "binary_sensor") return `<div class="big">${esc(this.binWord(s))}</div><div class="note">Since ${esc(ago(s.last_changed))}</div>`;
+    if (dom === "binary_sensor") return `<div class="big">${esc(this.binWord(s))}</div>`;
     if (dom === "person" || dom === "device_tracker") {
       const pic = a.entity_picture, home = s.state === "home";
       return `<div class="pp"><span class="av" style="${home ? `background:linear-gradient(135deg,${g[0]},${g[1]})` : ""}">${pic ? `<img src="${esc(pic)}" alt="">` : esc((a.friendly_name || id).charAt(0).toUpperCase())}</span>
-        <span><div class="big" style="font-size:32px">${esc(this.stateWord(s))}</div><div class="note">Since ${esc(ago(s.last_changed))}${a.battery_level != null ? ` · battery ${a.battery_level}%` : ""}</div></span></div>`;
+        <span><div class="big" style="font-size:32px">${esc(this.stateWord(s))}</div>${a.battery_level != null ? `<div class="note">Battery ${a.battery_level}%</div>` : ""}</span></div>`;
     }
     if (dom === "weather") {
       return `<div class="sens"><div class="big num">${a.temperature != null ? `${fmt(a.temperature, 0)}°` : ""}</div><div class="note">${esc(s.state.replace(/-/g, " ").replace(/^./, (m) => m.toUpperCase()))}</div></div>
@@ -10407,7 +10449,7 @@ const RoostSheet = {
       const pct = dom === "fan" && a.percentage != null ? a.percentage : null;
       return `<div class="row c">${round("mdi:power", s.state === "on" ? "Turn off" : "Turn on", s.state === "on", "toggle", 88)}</div>${pct != null ? bar(pct, `linear-gradient(90deg,${g[0]},${g[1]})`, s.state === "on" ? `Speed ${pct}%` : "Off", "fan") : ""}`;
     }
-    return `<div class="big">${esc(this.stateWord(s))}</div><div class="note">Since ${esc(since(s.last_changed).replace(/^for /, ""))} ago</div>`;
+    return `<div class="big">${esc(this.stateWord(s))}</div>`;
   },
   // the part that only shows after swiping up: things the small view does not already say
   more(s, g, p, attrs) {
@@ -10433,7 +10475,8 @@ const RoostSheet = {
         out.push(tiles([["Average", `${fmt(avg, dec)}${unitGap(u)}`], ["Since yesterday", `${diff > 0 ? "+" : diff < 0 ? "−" : ""}${fmt(Math.abs(diff), dec)}${unitGap(u)}`],
           ["Highest", `${fmt(hi.v, dec)} at ${clock(hi.t)}`], ["Lowest", `${fmt(lo.v, dec)} at ${clock(lo.t)}`]]));
       } else out.push(`<div class="note">No history for the last day yet.</div>`);
-      out.push(tiles([["Last change", ago(s.last_changed)], ["Last report", ago(s.last_updated)]]));
+      // the header already says when it changed; the last report only when it is a different moment
+      if (Math.abs(new Date(s.last_updated) - new Date(s.last_changed)) > 90e3) out.push(tiles([["Last report", ago(s.last_updated)]]));
     } else if (!["camera", "weather", "scene", "script", "button", "input_button", "update"].includes(dom)) {
       // a day strip: when it was on, open or home, and for how long
       const active = (st) => !UNAVAILABLE.includes(st) && !OFF_STATES.includes(st);
@@ -10446,7 +10489,7 @@ const RoostSheet = {
       if (seg.length) {
         const onWord = word(rows.find((r) => active(r.state))?.state || s.state);
         out.push(`<div class="sec">LAST 24 HOURS</div><div class="strip">${seg.join("")}</div><div class="ax"><span>${esc(clock(from))}</span><span>${esc(clock(from + 12 * 3600e3))}</span><span>Now</span></div>`);
-        out.push(tiles([[`${onWord} for`, onMs ? dur(onMs) : "Not at all"], ["Times", String(turns + (rows.length && active(rows[0].state) && rows[0].at > from ? 1 : 0))], ["Like this since", clock(new Date(s.last_changed).getTime())], ["That is", ago(s.last_changed)]]));
+        out.push(tiles([[`${onWord} for`, onMs ? dur(onMs) : "Not at all"], ["Times", String(turns + (rows.length && active(rows[0].state) && rows[0].at > from ? 1 : 0))], ["Like this since", clock(new Date(s.last_changed).getTime())]]));
         const list = rows.slice(-6).reverse();
         if (list.length > 1) out.push(`<div class="sec">LATELY</div><div class="tl">${list.map((c, k) => { const end = k ? list[k - 1].at : now; return `<div><i style="background:${active(c.state) ? g[1] : p.knob}"></i><span>${esc(word(c.state))}<small> · ${esc(dur(end - c.at))}</small></span><span>${esc(clock(c.at))}</span></div>`; }).join("")}</div>`);
       }
@@ -10588,7 +10631,7 @@ const RoostSheet = {
     <div class="dim" data-act="close"></div>
     <div class="sh" role="dialog" aria-modal="true" aria-label="${esc(name)}">
       <button class="hd" data-act="grow" aria-label="${el.full ? "Show less" : "Show more"}"></button>
-      <div class="hdr"><span class="ic"><ha-icon icon="${esc(icon)}"></ha-icon></span><span class="nm"><b>${esc(name)}</b><span>${esc(this.stateWord(s))}</span></span>
+      <div class="hdr"><span class="ic"><ha-icon icon="${esc(icon)}"></ha-icon></span><span class="nm"><b>${esc(name)}</b><span>${esc(this.headLine(s))}</span></span>
         <button class="x" data-act="close" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button></div>
       ${this.main(s, g, p)}
       ${el.full ? this.more(s, g, p, attrs)

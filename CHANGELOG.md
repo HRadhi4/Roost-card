@@ -4,6 +4,8 @@ Every version of Roost Cards, newest first.
 
 ## 1.29.0
 
+- **Thermostat lock.** Roost Thermostat has a new **Lock** setting so it can't be changed by accident: lock the temperature only, or everything (temperature, power and modes). A small lock sits next to the status; tap it to unlock, and it locks itself again after the time you choose (15 seconds unless you change it). Touching the locked dial just wiggles the lock.
+- **Holding a sensor says each thing once.** The sheet no longer repeats itself: the line under the name says when it changed (the big number already shows the value), the small chart hides once the full 24-hour chart is open, and the "last change", "since" and "that is" lines that said the same thing are gone.
 - **New: Roost Top Bar.** The bottom bar's twin at the top of the screen, in the same frosted glass and colours: back and forward buttons that follow where you have been (dimmed when there is nowhere to go), the page's name or your own title in the middle, the time if you like, and a few buttons of your own on the right (a page, full screen, light and dark mode, Arabic and English). It leaves room so it never covers cards, and in Arabic the arrows turn round.
 - **New: Roost Scenes.** A row of round scene buttons in one card. With two, three or eight buttons they are always spread evenly and centred, and long names wrap under their own button instead of running into the next one. Choose **Stacked** to overlap them like a dock: the button under your finger (or mouse) lifts and shows its name; slide along to pick one and let go to run it.
 - **Roost Scene (round button):** a long name now wraps under its own button instead of spilling over its neighbours.
