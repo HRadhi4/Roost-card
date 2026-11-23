@@ -2399,6 +2399,166 @@ if (!window.__roostJump) {
   });
 }
 
+// ------------------------------------------------------------------ Roost Top Bar
+// The bottom bar's twin at the top of the screen, in the same frosted glass: back and forward buttons (like a
+// browser's, they follow where you have been), the page's name or your own title, an optional clock, and a few
+// buttons of your own on the right (a page, or full screen, light and dark mode, Arabic and English).
+class RoostTopBar extends RoostBase {
+  static get defaults() { return { show_back: true, show_forward: true, title: "", show_clock: false, items: [], fixed: true, push_content: true, color: "active", background: "glass", bar_height: 54, radius: 26, theme: "auto" }; }
+
+  watched() { return []; }
+
+  extraSignature() { return `${location.pathname}${location.hash}|${RoostFull.isOn() ? 1 : 0}|${this._hass?.themes?.darkMode ? 1 : 0}|${this.editing()}|${RoostNav.sideEdge()}|${RoostNav.topEdge()}|${this.canGo()}|${this._config?.show_clock ? new Date().getMinutes() : ""}`; }
+
+  editing() { return !!(this.preview || this.editMode || /[?&]edit=1/.test(location.search) || this.closest?.("hui-card-preview, hui-dialog-edit-card")); }
+  set preview(v) { this._preview = v; this._sig = null; if (this._hass) this.hass = this._hass; }
+  get preview() { return this._preview; }
+  set editMode(v) { this._editMode = v; this._sig = null; if (this._hass) this.hass = this._hass; }
+  get editMode() { return this._editMode; }
+
+  static getConfigForm() {
+    return {
+      schema: [
+        { type: "grid", name: "", schema: [{ name: "show_back", label: "Back button", selector: { boolean: {} } }, { name: "show_forward", label: "Forward button", selector: { boolean: {} } }] },
+        { name: "title", label: "Title in the middle (empty = the page's own name)", selector: { text: {} } },
+        { name: "show_clock", label: "Show the time", selector: { boolean: {} } },
+        { name: "items", label: "Buttons on the right", selector: { object: { multiple: true, label_field: "name", fields: {
+          name: { label: "Name", selector: { text: {} } },
+          icon: { label: "Icon", required: true, selector: { icon: {} } },
+          path: { label: "Opens (for example /dashboard-home/settings)", selector: { text: {} } },
+          action: { label: "Or does", selector: { select: { mode: "dropdown", options: [{ value: "navigate", label: "Open the page above" }, ...SPECIAL_DOES] } } },
+        } } } },
+        { name: "fixed", label: "Pinned to the top of the screen", selector: { boolean: {} } },
+        { name: "push_content", label: "Leave room so the bar never covers cards", selector: { boolean: {} } },
+        { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
+          ...colourFields("color", "Colour of the buttons when pressed"),
+          { type: "grid", name: "", schema: [
+            { name: "background", selector: pick([["glass", "Frosted glass"], ["solid", "Solid"], ["none", "None (clear)"]]) },
+            { name: "radius", selector: slider(0, 40, 2) },
+          ] },
+          { name: "bar_height", selector: slider(40, 76, 2) },
+          THEME_FIELD,
+        ] },
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig() { return { show_back: true, show_forward: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
+
+  getCardSize() { return this._config?.fixed && !this.editing() ? 0 : 1; }
+
+  // which way you can go: the browser knows on most screens; elsewhere back works once you have moved
+  canGo() {
+    const nav = window.navigation;
+    const back = nav && "canGoBack" in nav ? nav.canGoBack : (RoostTopBar.steps || 0) > 0 || history.length > 1;
+    const fwd = nav && "canGoForward" in nav ? nav.canGoForward : (RoostTopBar.ahead || 0) > 0;
+    return `${back ? 1 : 0}${fwd ? 1 : 0}`;
+  }
+
+  // the name of the page that is open: the view's title in the dashboard
+  pageName() {
+    try {
+      const root = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main")?.shadowRoot
+        ?.querySelector("ha-panel-lovelace")?.shadowRoot?.querySelector("hui-root");
+      const views = root?.lovelace?.config?.views || [], seg = location.pathname.split("/")[2];
+      const v = views.find((x, i) => (x.path || String(i)) === seg) || views[Number(seg)] || views[0];
+      return v?.title || "";
+    } catch (e) { return ""; }
+  }
+
+  connectedCallback() {
+    this._onLoc = () => { this._sig = null; if (this._hass) this.hass = this._hass; };
+    window.addEventListener("location-changed", this._onLoc);
+    window.addEventListener("popstate", this._onLoc);
+    window.addEventListener("hashchange", this._onLoc);
+    window.addEventListener("resize", this._onLoc);
+    if (this._config?.show_clock) this._tick = setInterval(this._onLoc, 20000);
+  }
+
+  disconnectedCallback() {
+    ["location-changed", "popstate", "hashchange", "resize"].forEach((e) => window.removeEventListener(e, this._onLoc));
+    clearInterval(this._tick);
+    if (this._room) { this._room = 0; this.makeRoom(0); }
+  }
+
+  makeRoom(px) {
+    try {
+      const root = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main")?.shadowRoot
+        ?.querySelector("ha-panel-lovelace")?.shadowRoot?.querySelector("hui-root")?.shadowRoot;
+      if (!root) return;
+      let el = root.getElementById("roost-top-room");
+      if (!px) { if (el) el.remove(); return; }
+      if (!el) { el = document.createElement("style"); el.id = "roost-top-room"; root.appendChild(el); }
+      el.textContent = `#view{padding-top:${px}px!important;box-sizing:border-box}`;
+    } catch (e) { /* nothing to move */ }
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour(), editing = this.editing(), fixed = c.fixed && !editing;
+    const edge = fixed ? RoostNav.sideEdge() : 0, top = fixed ? RoostNav.topEdge() : 0, h = Number(c.bar_height) || 54;
+    const [back, fwd] = this.canGo().split("").map((x) => x === "1");
+    const title = String(c.title || "").trim() || this.pageName();
+    const clock = c.show_clock ? new Date().toLocaleTimeString(this._hass.locale?.language || [], { hour: "numeric", minute: "2-digit" }) : "";
+    const pos = fixed ? `position:fixed;left:calc(${edge}px + (100% - ${edge}px) / 2);top:calc(${top}px + 12px + env(safe-area-inset-top));transform:translateX(-50%);z-index:8;width:calc(100% - ${edge}px - 24px)` : "position:relative;width:100%;margin:0 auto";
+    const btn = (k, icon, label, ok) => `<button class="b" data-k="${k}" aria-label="${esc(label)}"${ok ? "" : " disabled"}><ha-icon icon="${esc(icon)}"></ha-icon></button>`;
+    const rtl = RoostLang.pick(this._hass, c) === "ar";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      :host{display:block;${fixed ? "height:0;" : ""}}
+      .edit{font-size:12px;color:${p.muted};text-align:center;margin:0 0 6px}
+      .bar{/*ltr*/${pos};max-width:536px;box-sizing:border-box;min-height:${h + 12}px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,auto) minmax(0,1fr);align-items:center;gap:6px;padding:6px;border-radius:${Number(c.radius)}px;color:${p.text};
+        ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};box-shadow:0 18px 40px -16px ${this.dark ? "rgba(0,0,0,.5)" : "rgba(40,30,90,.16)"};`
+    : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);-webkit-backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);box-shadow:0 18px 40px -12px ${this.dark ? "rgba(0,0,0,.6)" : "rgba(40,30,90,.18)"}, 0 0 0 1px rgba(255,255,255,.04) inset;`}}
+      .b{all:unset;box-sizing:border-box;flex:none;width:${h}px;height:${h}px;border-radius:${Math.max(8, Number(c.radius) - 8)}px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:${p.text};--mdc-icon-size:22px;-webkit-tap-highlight-color:transparent;transition:background .12s,transform .12s}
+      .b:hover{background:${g[0]}2E}
+      .b:active{transform:scale(.92);background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]}}
+      .b[disabled]{opacity:.35;cursor:default;pointer-events:none}
+      .b.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 10px 24px -8px color-mix(in srgb, ${g[0]} 95%, transparent)}
+      .mid{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.2;padding:0 6px}
+      .mid b{font-size:16px;font-weight:600;overflow-wrap:anywhere}
+      .mid small{font-size:12px;color:${p.muted};font-family:${FONT_NUM}}
+      .start,.end{display:flex;gap:4px;min-width:0}.end{justify-content:flex-end}
+      ${rtl ? ".b.dir ha-icon{transform:scaleX(-1)}" : ""}
+    </style>
+    ${editing && c.fixed ? '<div class="edit t">Top bar · shown here while editing, pinned to the top of the screen when you are done</div>' : ""}
+    <div class="bar" role="navigation" aria-label="Top bar">
+      <div class="start">${c.show_back !== false ? btn("back", "mdi:chevron-left", "Back", back).replace('class="b"', 'class="b dir"') : ""}${c.show_forward !== false ? btn("fwd", "mdi:chevron-right", "Forward", fwd).replace('class="b"', 'class="b dir"') : ""}</div>
+      <div class="mid">${title ? `<b class="t">${esc(title)}</b>` : ""}${clock ? `<small>${esc(clock)}</small>` : ""}</div>
+      <div class="end">${(c.items || []).map((it, i) => {
+        const on = it.path && !it.action ? (it.path.startsWith("#") ? location.hash === it.path : location.pathname === it.path) : false;
+        return `<button class="b${on ? " on" : ""}" data-i="${i}" aria-label="${esc(specialLabel(it.action) || it.name || it.icon)}"><ha-icon icon="${esc(specialIcon(it.action) || it.icon || "mdi:circle")}"></ha-icon></button>`;
+      }).join("")}</div>
+    </div>`;
+    const go = (path) => { if (path.startsWith("#")) location.hash = path; else { history.pushState(null, "", path); this.fire("location-changed", { replace: false }); } RoostTopBar.steps = (RoostTopBar.steps || 0) + 1; RoostTopBar.ahead = 0; };
+    this.shadowRoot.querySelectorAll(".b").forEach((b) => b.addEventListener("click", (ev) => {
+      ev.preventDefault(); this.vibrate();
+      if (b.dataset.k === "back") { RoostTopBar.steps = Math.max(0, (RoostTopBar.steps || 0) - 1); RoostTopBar.ahead = (RoostTopBar.ahead || 0) + 1; history.back(); }
+      else if (b.dataset.k === "fwd") { RoostTopBar.ahead = Math.max(0, (RoostTopBar.ahead || 0) - 1); RoostTopBar.steps = (RoostTopBar.steps || 0) + 1; history.forward(); }
+      else {
+        const it = c.items[+b.dataset.i];
+        if (it.action === "fullscreen" || it.action === "theme" || it.action === "language") { specialRun(it.action); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 120); return; }
+        if (it.path) go(it.path);
+      }
+      setTimeout(() => { this._sig = null; if (this._hass) this.hass = this._hass; }, 150);
+    }));
+    if (fixed && c.push_content !== false) {
+      (window.requestAnimationFrame || setTimeout)(() => {
+        const bar = this.shadowRoot.querySelector(".bar"); if (!bar) return;
+        const room = Math.max(0, Math.round(bar.getBoundingClientRect().bottom - top + 12));
+        if (room !== this._room) { this._room = room; this.makeRoom(room); }
+      });
+    } else if (this._room) { this._room = 0; this.makeRoom(0); }
+  }
+}
+// moves made anywhere in the dashboard count for the top bar's back button
+if (!window.__roostTopSteps) {
+  window.__roostTopSteps = true;
+  window.addEventListener("location-changed", (e) => { if (!e.detail?.replace) { RoostTopBar.steps = (RoostTopBar.steps || 0) + 1; } });
+}
+
 // ------------------------------------------------------------------ Roost Row
 // A long row: a ring with the number (an AC's set temperature, or any sensor), a name, a short state line and an arrow.
 class RoostRow extends RoostBase {
@@ -12760,6 +12920,7 @@ const CARDS = [
   ["roost-chips", RoostChips, "Roost Chips", "Status chips in one row: doors, alarm, lights (with count), AC and people bubbles."],
   ["roost-thermostat", RoostThermostat, "Roost Thermostat", "Air conditioner with a dial you drag, power, − and +, and mode buttons."],
   ["roost-scene", RoostScene, "Roost Scene", "A coloured button that runs a scene, script or action."],
+  ["roost-top-bar", RoostTopBar, "Roost Top Bar", "A bar pinned to the top of the screen, in the bottom bar's frosted glass: back and forward buttons, the page's name, the time and buttons of your own."],
   ["roost-scenes", RoostScenes, "Roost Scenes", "A row of round scene buttons, spread evenly or stacked like a dock (the touched one lifts and shows its name)."],
   ["roost-hero", RoostHero, "Roost Hero", "A greeting with the time, date and weather."],
   ["roost-nav", RoostNav, "Roost Nav", "Icon navigation: a bar on phones and a side rail on tablets."],

@@ -4,6 +4,7 @@ Every version of Roost Cards, newest first.
 
 ## 1.29.0
 
+- **New: Roost Top Bar.** The bottom bar's twin at the top of the screen, in the same frosted glass and colours: back and forward buttons that follow where you have been (dimmed when there is nowhere to go), the page's name or your own title in the middle, the time if you like, and a few buttons of your own on the right (a page, full screen, light and dark mode, Arabic and English). It leaves room so it never covers cards, and in Arabic the arrows turn round.
 - **New: Roost Scenes.** A row of round scene buttons in one card. With two, three or eight buttons they are always spread evenly and centred, and long names wrap under their own button instead of running into the next one. Choose **Stacked** to overlap them like a dock: the button under your finger (or mouse) lifts and shows its name; slide along to pick one and let go to run it.
 - **Roost Scene (round button):** a long name now wraps under its own button instead of spilling over its neighbours.
 - **Curtain box.** Roost Curtain has a new **Top of the curtain** choice: the rail as before, a gypsum curtain box, a gypsum box with cornice, a gypsum box with hidden light, a fabric pelmet (in any of the fabrics, straight or scalloped), or a wooden pelmet (oak or walnut).
