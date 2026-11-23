@@ -2,6 +2,14 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.29.0
+
+- **New: Roost Scenes.** A row of round scene buttons in one card. With two, three or eight buttons they are always spread evenly and centred, and long names wrap under their own button instead of running into the next one. Choose **Stacked** to overlap them like a dock: the button under your finger (or mouse) lifts and shows its name; slide along to pick one and let go to run it.
+- **Roost Scene (round button):** a long name now wraps under its own button instead of spilling over its neighbours.
+- **Curtain box.** Roost Curtain has a new **Top of the curtain** choice: the rail as before, a gypsum curtain box, a gypsum box with cornice, a gypsum box with hidden light, a fabric pelmet (in any of the fabrics, straight or scalloped), or a wooden pelmet (oak or walnut).
+- **Your own background picture.** Roost Page (and Roost Panel) can show your own picture behind the whole page, staying still while you scroll, with darkening and softening sliders.
+- **Frosted glass on every card.** Choosing Frosted glass now blurs what is behind any card, the same way as the bottom bar, not only on some of them.
+
 ## 1.28.1
 
 - **Safer icons.** Every icon name, including ones that come from devices (like a robot vacuum's dock buttons), is now made safe before it is shown, so an odd value can never break the dashboard.

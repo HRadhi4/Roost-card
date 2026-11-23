@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.28.1";
+const ROOST_VERSION = "1.29.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -477,9 +477,24 @@ class RoostBase extends HTMLElement {
     this.render();
     this.motion();
     this.brokenNote();
+    this.frost();
   }
 
   get hass() { return this._hass; }
+
+  // Frosted glass on every card, the same as the bottom bar: a card whose own drawing doesn't blur what is behind
+  // it gets the blur on its outer frame (with the card's rounded corners), so the see-through background is soft.
+  frost() {
+    const c = this._config || {}, root = this.shadowRoot;
+    if (!root || this.localName === "roost-nav") return;
+    const fx = c.surface === "frosted" ? this.p.fx : "";
+    const own = fx && [...root.querySelectorAll("style")].some((st) => st.textContent.includes(fx.split(";")[0]));
+    const want = fx && !own ? `blur(${Math.max(0, Number(c.blur ?? 18))}px) saturate(150%)` : "";
+    if ((this.style.backdropFilter || "") === want) return;
+    this.style.backdropFilter = want; this.style.webkitBackdropFilter = want;
+    this.style.borderRadius = want ? `${Number.isFinite(Number(c.radius)) ? Number(c.radius) : 22}px` : "";
+    if (want && !this.style.display) this.style.display = "block";
+  }
 
   // "Not working right now": a calm note over the card with the reason, so nobody keeps tapping a broken device.
   brokenNote() {
@@ -1699,7 +1714,7 @@ class RoostScene extends RoostBase {
           border:${c.fill === "outline" || c.fill === "glass" ? `${c.fill === "outline" ? 2 : 1}px solid ${look.border}` : "0"};box-shadow:${c.glow === "none" ? "none" : c.glow === "strong" ? look.shadow : c.fill === "outline" ? look.shadow : `0 12px 24px -10px ${g[2]}`};${look.blur ? "backdrop-filter:blur(14px);" : ""}`
     : `width:34px;height:34px;border-radius:12px;background:${look.light ? "rgba(255,255,255,.22)" : `color-mix(in srgb, ${g[0]} 30%, transparent)`}`}}
       .ic ha-icon,.ic ha-state-icon{--mdc-icon-size:${round ? Math.round(bs * 0.4) : 18}px}
-      .nm{font-size:${round ? 11 : 14}px;font-weight:600;line-height:1.2;text-align:${round ? "center" : "left"}${round ? ";margin:0 -6px" : ""}}
+      .nm{font-size:${round ? 11 : 14}px;font-weight:600;line-height:1.2;text-align:${round ? "center" : "left"}${round ? ";max-width:100%;overflow-wrap:anywhere;hyphens:auto" : ""}}
       .done{position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;background:#3DD68C;display:none;align-items:center;justify-content:center;color:#fff}
       .done.show{display:flex;animation:roost-tick 1.6s ease-out forwards}
     </style>
@@ -1711,6 +1726,132 @@ class RoostScene extends RoostBase {
       const ok = await this.activate();
       if (ok !== false) { const d = this.shadowRoot.querySelector(".done"); d.classList.remove("show"); void d.offsetWidth; d.classList.add("show"); }
     }, () => this.moreInfo(c.entity));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Scenes
+// A row of round scene buttons in one card: always spread evenly and centred (two buttons or eight), names kept
+// under their own button (wrapping inside its own space, never over the next one). Or "stacked": the buttons overlap like a
+// dock; the one under your finger or mouse lifts up and shows its name (slide along to pick, let go to run it).
+class RoostScenes extends RoostBase {
+  static get defaults() { return { items: [], layout: "spread", show_names: true, shape: "rounded", button_size: 58, fill: "gradient", glow: "soft", theme: "auto" }; }
+
+  validate(c) { if (!Array.isArray(c.items) || !c.items.length) throw new Error("Add some scenes"); }
+
+  watched() { return this._config.items.map((i) => i.entity).filter(Boolean); }
+
+  static getConfigForm() {
+    const colours = [["active", "Selected purple"], ...Object.keys(COLORS).map((k) => [k, k[0].toUpperCase() + k.slice(1)])];
+    return {
+      schema: [
+        { name: "items", label: "Scenes", selector: { object: { multiple: true, label_field: "name", fields: {
+          entity: { label: "Scene, script or action", selector: { entity: { domain: ["scene", "script", "automation", "button", "input_button"] } } },
+          name: { label: "Name", selector: { text: {} } },
+          icon: { label: "Icon", selector: { icon: {} } },
+          color: { label: "Colour", selector: pick(colours) },
+          tap_action: { label: "Tap does (instead)", selector: { ui_action: {} } },
+        } } } },
+        { name: "layout", label: "Layout", selector: pick([["spread", "Spread evenly, centred"], ["stack", "Stacked (overlapping); the touched one lifts and shows its name"]]) },
+        { name: "show_names", label: "Names under the buttons (spread)", selector: { boolean: {} } },
+        { type: "grid", name: "", schema: [
+          { name: "shape", selector: pick([["rounded", "Rounded square"], ["circle", "Circle"], ["square", "Square"]]) },
+          { name: "button_size", label: "Button size", selector: slider(40, 96, 2) },
+        ] },
+        { type: "grid", name: "", schema: [{ name: "fill", selector: FILL_OPTIONS }, { name: "glow", selector: GLOW_OPTIONS }] },
+        THEME_FIELD,
+      ],
+      computeLabel,
+    };
+  }
+
+  static getStubConfig(hass) {
+    const ids = Object.keys(hass.states).filter((id) => /^(scene|script)\./.test(id)).slice(0, 4);
+    const col = ["purple", "orange", "coral", "blue"];
+    return { items: (ids.length ? ids : [""]).map((e, i) => ({ entity: e, color: col[i % 4] })) };
+  }
+
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
+
+  // each scene its own colour; without one they take turns (purple, amber, coral, blue, green, teal, pink)
+  gradientFor(name, i = 0) { if (name === "active") return ACTIVE; return COLORS[name] || COLORS[["purple", "amber", "coral", "blue", "green", "teal", "pink"][i % 7]]; }
+
+  label(it) { return it.name || (it.entity ? this.name(it.entity, "Scene") : "Scene"); }
+
+  async runItem(it) {
+    if (it.tap_action && it.tap_action.action && it.tap_action.action !== "none") return this.run(it.tap_action, it.entity);
+    if (!it.entity) return false;
+    const d = it.entity.split(".")[0];
+    this.vibrate();
+    if (d === "scene" || d === "script") return this.call(d, "turn_on", { entity_id: it.entity });
+    if (d === "automation") return this.call("automation", "trigger", { entity_id: it.entity });
+    if (d === "button" || d === "input_button") return this.call(d, "press", { entity_id: it.entity });
+    return this.moreInfo(it.entity);
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, stack = c.layout === "stack", bs = Math.max(36, Number(c.button_size) || 58);
+    const items = c.items.filter((it) => forPeople(this._hass, it.users));
+    const key = JSON.stringify([c, this.dark, items.map((it) => this.label(it))]);
+    if (key === this._key) return;
+    this._key = key;
+    const over = Math.round(bs * 0.32);
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}
+      .row{display:flex;flex-wrap:${stack ? "nowrap" : "wrap"};justify-content:${stack ? "center" : "space-evenly"};align-items:flex-start;gap:${stack ? 0 : 10}px 4px;padding:${stack ? `${Math.round(bs * 0.22) + 44}px 8px 6px ${8 + over}px` : "4px 0"};color:${p.text}}
+      .it{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:${stack ? "none" : "manipulation"};
+        ${stack ? `margin-left:-${over}px;transition:transform .12s cubic-bezier(.3,1.4,.5,1),margin .12s` : `flex:1 1 0;min-width:${bs + 8}px;max-width:${Math.round(bs * 2)}px;transition:transform .12s`}}
+      .it:active{transform:scale(.95)}
+      .ic{width:${bs}px;height:${bs}px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:${shapeRadius(c.shape, bs)};--mdc-icon-size:${Math.round(bs * 0.4)}px}
+      ${stack ? `.ic{box-shadow:0 0 0 3px ${this.dark ? "#0B0D17" : "#F5F6FB"}}` : ""}
+      .nm{font-size:11px;font-weight:600;line-height:1.2;text-align:center;max-width:100%;overflow-wrap:anywhere;hyphens:auto}
+      .tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translate(-50%,6px);opacity:0;pointer-events:none;white-space:nowrap;padding:6px 10px;border-radius:10px;font-size:12px;font-weight:600;
+        background:${this.dark ? "rgba(20,24,49,.92)" : "rgba(255,255,255,.95)"};color:${p.text};border:1px solid ${p.border};box-shadow:0 8px 18px -8px rgba(0,0,0,.45);transition:opacity .12s,transform .12s;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+      .it.up{z-index:50 !important;transform:translateY(-${Math.round(bs * 0.22)}px) scale(1.1)${stack ? "" : ""}}
+      ${stack ? `.it.up{margin-left:${Math.round(-over / 3)}px;margin-right:${Math.round(over * 0.66)}px}` : ""}
+      .it.up .tip{opacity:1;transform:translate(-50%,0)}
+      .it.done .ic{animation:roost-pulse .5s ease-out 1}
+      @media (hover:hover){.it:hover{z-index:50 !important;transform:translateY(-${Math.round(bs * 0.12)}px)${stack ? " scale(1.1)" : ""}}.it:hover .tip{opacity:1;transform:translate(-50%,0)}}
+    </style>
+    <div class="row">${items.map((it, i) => {
+      const g = this.gradientFor(it.color, i), look = fillLook(c.fill, c.glow, g, p);
+      const st = `background:${look.bg};color:${look.light ? "#fff" : g[this.dark ? 1 : 0]};border:${c.fill === "outline" || c.fill === "glass" ? `${c.fill === "outline" ? 2 : 1}px solid ${look.border}` : "0"};${c.glow === "none" ? "" : `box-shadow:${stack ? `0 0 0 3px ${this.dark ? "#0B0D17" : "#F5F6FB"},` : ""}0 12px 24px -10px ${g[2]}`};${look.blur ? "backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);" : ""}`;
+      const nm = esc(this.label(it));
+      return `<div class="it" role="button" tabindex="0" data-i="${c.items.indexOf(it)}" aria-label="${nm}" style="z-index:${stack ? i + 1 : 1}">
+        <span class="ic" style="${st}"></span>${stack ? `<span class="tip">${nm}</span>` : c.show_names ? `<span class="nm">${nm}</span>` : `<span class="tip">${nm}</span>`}</div>`;
+    }).join("")}</div>`;
+    const els = [...this.shadowRoot.querySelectorAll(".it")];
+    els.forEach((el) => { const it = c.items[+el.dataset.i]; this.icon(el.querySelector(".ic"), it.icon, it.entity); });
+    const go = async (el) => {
+      const it = c.items[+el.dataset.i];
+      el.classList.remove("done"); void el.offsetWidth; el.classList.add("done");
+      await this.runItem(it);
+    };
+    if (!stack) {
+      els.forEach((el) => {
+        const it = c.items[+el.dataset.i];
+        // pressing lifts the button and shows its name when the names are hidden
+        el.addEventListener("pointerdown", () => el.classList.add("up"));
+        ["pointerup", "pointerleave", "pointercancel"].forEach((ev) => el.addEventListener(ev, () => setTimeout(() => el.classList.remove("up"), 160)));
+        this.press(el, () => go(el), () => it.entity && this.moreInfo(it.entity));
+      });
+      return;
+    }
+    // stacked: slide along the stack, the one under the finger lifts; letting go runs it
+    const row = this.shadowRoot.querySelector(".row");
+    let cur = null, down = false, timer = null, held = false;
+    const at = (x, y) => this.shadowRoot.elementFromPoint?.(x, y)?.closest?.(".it") || null;
+    const lift = (el) => { if (el === cur) return; cur?.classList.remove("up"); cur = el; if (el) { el.classList.add("up"); this.vibrate?.(); } };
+    row.addEventListener("pointerdown", (e) => {
+      down = true; held = false; lift(at(e.clientX, e.clientY));
+      try { row.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
+      clearTimeout(timer); timer = setTimeout(() => { if (cur) { held = true; const it = c.items[+cur.dataset.i]; if (it.entity) this.moreInfo(it.entity); } }, 650);
+    });
+    row.addEventListener("pointermove", (e) => { if (!down) return; const el = at(e.clientX, e.clientY); if (el && el !== cur) { clearTimeout(timer); lift(el); } });
+    const end = (run) => { clearTimeout(timer); const el = cur; down = false; if (run && el && !held) go(el); setTimeout(() => { if (!down) lift(null); }, 260); };
+    row.addEventListener("pointerup", () => end(true));
+    row.addEventListener("pointercancel", () => end(false));
+    row.addEventListener("contextmenu", (e) => e.preventDefault());
+    els.forEach((el) => el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(el); } }));
   }
 }
 
@@ -2709,6 +2850,11 @@ class RoostCurtain extends RoostBase {
           { name: "folds", label: "How many folds (1 few and wide, 6 many and narrow)", selector: { number: { min: 1, max: 6, step: 1, mode: "slider" } } },
           { name: "fabric_image", label: "Your fabric: a picture of it (for example /local/roost/fabric.jpg)", selector: { text: {} } },
           { type: "grid", name: "", schema: [{ name: "photo_folds", label: "Add folds (off if the picture already shows folds)", selector: { boolean: {} } }, { name: "photo_band", label: "Add the bottom band", selector: { boolean: {} } }] },
+          { name: "box", label: "Top of the curtain", selector: pick([["", "Rail or rod as it is"], ["gypsum", "Gypsum curtain box"], ["cornice", "Gypsum box with cornice"], ["light", "Gypsum box with hidden light"], ["fabric", "Fabric pelmet"], ["wood", "Wooden pelmet"]]) },
+          { type: "grid", name: "", schema: [
+            { name: "box_fabric", label: "Pelmet fabric or wood", selector: pick([["linen", "Linen"], ["cream", "Cream"], ["white", "White"], ["sand", "Sand"], ["taupe", "Taupe"], ["grey", "Stone grey"], ["sage", "Sage"], ["navy", "Navy"], ["charcoal", "Charcoal"], ["blush", "Blush"], ["oak", "Oak wood"], ["walnut", "Walnut wood"]]) },
+            { name: "box_shape", label: "Pelmet edge", selector: pick([["straight", "Straight"], ["scallop", "Scalloped"]]) },
+          ] },
           { name: "blind_look", label: "Blind look", selector: pick([["classic", "Classic stripes (bright, simple)"], ["venetian", "Venetian slats that tilt"], ["roller", "Roller blind that rolls up"], ["roman", "Roman shade with soft folds"]]) },
           { name: "fabric", label: "Fabric or finish", selector: pick([["", "Card colour (below)"], ["linen", "Linen"], ["sand", "Sand"], ["sage", "Sage"], ["navy", "Navy"], ["charcoal", "Charcoal"], ["blush", "Blush"], ["white", "White"], ["cream", "Cream"], ["oak", "Oak wood"], ["walnut", "Walnut wood"], ["grey", "Stone grey"], ["black", "Black"]]) },
           ...colourFields("color", "Card colour"),
@@ -2791,13 +2937,30 @@ class RoostCurtain extends RoostBase {
     const blindBg = { venetian: `${grain}linear-gradient(180deg,${mix(0.22)} 0,${mix(0)} 40%,${mix(-0.28)} var(--sl,80%),rgba(0,0,0,0) var(--sl,80%))`,
       roller: `repeating-linear-gradient(0deg,rgba(0,0,0,.05) 0 2px,rgba(0,0,0,0) 2px 4px),repeating-linear-gradient(90deg,rgba(0,0,0,.04) 0 2px,rgba(255,255,255,.04) 2px 4px),linear-gradient(90deg,${mix(-0.08)},${mix(0.05)} 50%,${mix(-0.08)})`,
       roman: `linear-gradient(180deg,${mix(-0.14)} 0%,${mix(0.1)} 35%,${mix(0)} 70%,${mix(-0.32)} 100%)` }[look];
+    // what hides the top of the curtain: the rail as it is (default), or a curtain box in the ceiling or a pelmet
+    const box = ["gypsum", "cornice", "light", "fabric", "wood"].includes(c.box) ? c.box : "";
+    const ptone = FAB[c.box_fabric || (box === "wood" ? "oak" : "linen")] || FAB.linen, pmix = (k) => `rgb(${ptone.map((v) => Math.max(0, Math.min(255, Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k))))).join(",")})`;
+    const ceil = this.dark ? ["#E9E6E0", "#C9C4BB", "#8E897F"] : ["#FBFAF7", "#E6E2DA", "#B9B3A8"];
+    const bh = Math.round(Math.max(16, Math.min(34, (Number(c.height) || 150) * 0.14)));
+    const boxCss = !box ? "" : `
+      .box{position:absolute;left:0;right:0;top:0;height:${bh}px;z-index:4;pointer-events:none;box-shadow:0 7px 9px -5px rgba(0,0,0,.45)}
+      .box i{position:absolute;left:0;right:0}
+      .box.gypsum,.box.cornice,.box.light{background:linear-gradient(180deg,${ceil[0]},${ceil[1]})}
+      .box.gypsum i,.box.light i{bottom:0;height:4px;background:linear-gradient(180deg,${ceil[2]},${ceil[1]})}
+      .box.cornice{background:linear-gradient(180deg,#FFFFFF 0 3px,${ceil[2]} 3px 4px,${ceil[0]} 4px 7px,${ceil[2]} 7px 8px,${ceil[1]} 8px 10px,${ceil[0]} 10px)}
+      .box.cornice i{bottom:0;height:3px;background:${ceil[2]}}
+      .box.light i{bottom:-10px;height:14px;background:radial-gradient(ellipse at 50% 0,rgba(255,214,150,.75),rgba(255,214,150,0) 70%);box-shadow:0 -3px 0 ${ceil[2]} inset}
+      .box.fabric{background:repeating-linear-gradient(0deg,rgba(0,0,0,.04) 0 2px,rgba(0,0,0,0) 2px 4px),linear-gradient(180deg,${pmix(0.1)},${pmix(-0.12)});${c.box_shape === "scallop" ? `-webkit-mask:radial-gradient(${bh * 0.6}px ${bh * 0.35}px at 50% 0,#000 98%,transparent) 0 ${bh * 0.62}px/${bh * 1.6}px 100% repeat-x,linear-gradient(#000,#000) 0 0/100% ${bh * 0.66}px no-repeat;mask:radial-gradient(${bh * 0.6}px ${bh * 0.35}px at 50% 0,#000 98%,transparent) 0 ${bh * 0.62}px/${bh * 1.6}px 100% repeat-x,linear-gradient(#000,#000) 0 0/100% ${bh * 0.66}px no-repeat` : ""}}
+      .box.fabric i{bottom:${c.box_shape === "scallop" ? Math.round(bh * 0.34) : 0}px;height:3px;background:${pmix(-0.35)}}
+      .box.wood{background:repeating-linear-gradient(90deg,rgba(0,0,0,.08) 0 2px,rgba(0,0,0,0) 2px 7px,rgba(255,255,255,.06) 7px 10px,rgba(0,0,0,.05) 10px 15px),linear-gradient(180deg,${pmix(0.12)},${pmix(-0.2)})}
+      .box.wood i{bottom:0;height:3px;background:${pmix(-0.4)}}`;
     let stars = "";
     [[18, 22, 2], [62, 30, 3], [42, 58, 2], [30, 40, 2], [78, 62, 2], [8, 70, 2]].forEach((q, i) => {
       stars += `<span class="star" style="left:${q[0]}%;top:${q[1]}%;width:${q[2]}px;height:${q[2]}px;animation-duration:${3 + i * 0.5}s;animation-delay:${i * 0.4}s"></span>`;
     });
     const panels = (look === "sheer" && !blind ? '<span class="shr"></span>' : "") + (c.style === "pair" ? '<span class="cl"></span><span class="cr"></span>' : c.style === "right" ? '<span class="cr"></span>' : blind ? `<span class="bl">${look === "venetian" || look === "roller" ? '<i class="bb"></i>' : ""}</span>${look === "roller" ? '<i class="tube"></i>' : ""}` : '<span class="cl"></span>');
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      @keyframes roost-ripple{to{background-position:36px 0}}
+      @keyframes roost-ripple{to{background-position:36px 0}}${boxCss}
       @keyframes roost-ripple-v{to{background-position:0 36px}}
       @keyframes roost-sway{0%,100%{transform:skewX(0)}50%{transform:skewX(1.2deg)}}
       @keyframes roost-drift{from{transform:translateX(-40%)}to{transform:translateX(140%)}}
@@ -2872,7 +3035,7 @@ class RoostCurtain extends RoostBase {
     <div class="card">${c.show_header ? '<div class="head"><span class="nm t"></span><span class="stt t"></span></div>' : ""}
     <div class="win" role="button" tabindex="0">
       ${c.background === "picture" ? '<div class="pic"></div>' : c.background === "none" || c.show_sky === false ? "" : `<div class="sky"></div>${stars}${c.background === "weather" ? '<div class="wx"></div>' : ""}<span class="orb"></span>${c.background === "weather" && c.show_weather_text ? '<span class="temp t"></span>' : ""}`}${c.style === "pair" ? '<span class="mull"></span>' : ""}
-      <span class="rod"></span>${panels}
+      ${box ? `<span class="box ${box}"><i></i></span>` : '<span class="rod"></span>'}${panels}
       <span class="note"><ha-icon></ha-icon><span class="nt"></span></span>
     </div>
     ${c.open_at || c.close_at || c.schedule ? (() => {
@@ -11240,6 +11403,8 @@ class RoostPage extends RoostBase {
         { type: "grid", name: "", schema: [{ name: "gap", label: "Space between cards", selector: slider(0, 32) }, { name: "side", label: "Space at the sides", selector: slider(0, 32) }] },
         { type: "grid", name: "", schema: [{ name: "top", label: "Space at the top", selector: slider(0, 48) }, { name: "bottom", label: "Space at the bottom (for the bar)", selector: slider(0, 200, 10) }] },
         { type: "grid", name: "", schema: [{ name: "max_width", label: "Widest it gets", selector: slider(320, 1200, 10) }, { name: "background", label: "Night-sky background", selector: { boolean: {} } }] },
+        { name: "background_image", label: "Your own background picture (for example /local/roost/wall.jpg); frosted-glass cards blur it", selector: { text: {} } },
+        { type: "grid", name: "", schema: [{ name: "image_dim", label: "Darken the picture (%)", selector: slider(0, 90, 5, "%") }, { name: "image_blur", label: "Soften the picture", selector: slider(0, 30, 1) }] },
         THEME_FIELD,
       ],
       computeLabel,
@@ -11285,8 +11450,11 @@ class RoostPage extends RoostBase {
     const c = this._config, n = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
     const bg = this.dark ? "radial-gradient(1000px 620px at 15% -10%, #2A1F6B 0%, transparent 60%), radial-gradient(800px 600px at 100% 100%, #0E2A4A 0%, transparent 60%), #0B0D17"
       : "radial-gradient(1000px 620px at 15% -10%, #E2D9FF 0%, transparent 60%), radial-gradient(800px 600px at 100% 100%, #D6EBFF 0%, transparent 60%), #EEF1FA";
+    // your own picture stays still behind the page while it scrolls (frosted-glass cards blur it)
+    const img = String(c.background_image || "").trim().replace(/["\\()]/g, ""), dim = Math.max(0, Math.min(90, n(c.image_dim, 35))) / 100;
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
-      :host{${c.background ? `background:${bg};min-height:100vh;` : ""}--grid-card-gap:8px;--vertical-stack-card-gap:8px;--horizontal-stack-card-gap:8px}
+      :host{${c.background || img ? `background:${img ? "transparent" : bg};min-height:100vh;` : ""}--grid-card-gap:8px;--vertical-stack-card-gap:8px;--horizontal-stack-card-gap:8px;position:relative;isolation:isolate}
+      ${img ? `:host::before{content:"";position:fixed;inset:${n(c.image_blur, 0) ? -n(c.image_blur, 0) * 2 : 0}px;z-index:-1;pointer-events:none;background:linear-gradient(rgba(0,0,0,${dim}),rgba(0,0,0,${dim})),url("${img}") center/cover no-repeat;${n(c.image_blur, 0) ? `filter:blur(${n(c.image_blur, 0)}px);` : ""}}` : ""}
       .page{display:grid;grid-template-columns:minmax(0,1fr);gap:${n(c.gap, 16)}px;padding:${n(c.top, 16)}px ${n(c.side, 14)}px ${n(c.bottom, 130)}px;max-width:${n(c.max_width, 560)}px;margin:0 auto;align-content:start}
       .page > *{min-width:0}
     </style><div class="page"></div>`;
@@ -12592,6 +12760,7 @@ const CARDS = [
   ["roost-chips", RoostChips, "Roost Chips", "Status chips in one row: doors, alarm, lights (with count), AC and people bubbles."],
   ["roost-thermostat", RoostThermostat, "Roost Thermostat", "Air conditioner with a dial you drag, power, − and +, and mode buttons."],
   ["roost-scene", RoostScene, "Roost Scene", "A coloured button that runs a scene, script or action."],
+  ["roost-scenes", RoostScenes, "Roost Scenes", "A row of round scene buttons, spread evenly or stacked like a dock (the touched one lifts and shows its name)."],
   ["roost-hero", RoostHero, "Roost Hero", "A greeting with the time, date and weather."],
   ["roost-nav", RoostNav, "Roost Nav", "Icon navigation: a bar on phones and a side rail on tablets."],
   ["roost-row", RoostRow, "Roost Row", "A long row with a ring (an AC's temperature or any number), a name, a state line and an arrow."],
