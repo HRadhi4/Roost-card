@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.29.0";
+const ROOST_VERSION = "1.29.1";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -481,6 +481,18 @@ class RoostBase extends HTMLElement {
   }
 
   get hass() { return this._hass; }
+
+  // the "Use this look on every page" button of the bars
+  wireShare(tag) {
+    const b = this.shadowRoot.querySelector(".share"); if (!b) return;
+    b.addEventListener("click", async (ev) => {
+      ev.preventDefault(); ev.stopPropagation(); this.vibrate();
+      const lab = b.querySelector("span"); lab.textContent = "Copying";
+      const r = await roostShareLook(this, tag);
+      lab.textContent = r.ok ? `Done: the same look on ${r.n} page${r.n === 1 ? "" : "s"}` : r.why;
+      setTimeout(() => { if (lab.isConnected) lab.textContent = "Use this look on every page"; }, 4000);
+    });
+  }
 
   // Frosted glass on every card, the same as the bottom bar: a card whose own drawing doesn't blur what is behind
   // it gets the blur on its outer frame (with the card's rounded corners), so the see-through background is soft.
@@ -2327,6 +2339,8 @@ class RoostNav extends RoostBase {
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       :host{${fixed ? (rail || c.push_content !== false ? "height:0;" : "height:calc(76px + env(safe-area-inset-bottom));") : ""}display:block}
       .edit{font-size:12px;color:${p.muted};text-align:center;margin:0 0 6px}
+      .share{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;margin:0 auto 8px;padding:8px 14px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;background:${p.inset};color:${p.text};--mdc-icon-size:16px}
+      .share:active{transform:scale(.97)}
       nav{${pos};display:${rail ? "flex" : "grid"};${rail ? "flex-direction:column" : `grid-template-columns:repeat(${shown.length},minmax(0,1fr))`};gap:${rail ? 12 : 7}px;padding:${rail ? "14px 10px" : "8px"};border-radius:${Number(c.radius) + (rail ? 2 : 0)}px;
         ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};box-shadow:0 18px 40px -16px ${this.dark ? "rgba(0,0,0,.5)" : "rgba(40,30,90,.16)"};`
     : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);-webkit-backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);box-shadow:0 18px 40px -12px ${this.dark ? "rgba(0,0,0,.6)" : "rgba(40,30,90,.18)"}, 0 0 0 1px rgba(255,255,255,.04) inset;`}
@@ -2354,7 +2368,7 @@ class RoostNav extends RoostBase {
         background:linear-gradient(135deg,${g[0]},#38BDF8);color:#fff;font-weight:700;font-size:20px;box-shadow:0 8px 24px -6px ${g[2]}}
       .logo img{width:100%;height:100%;object-fit:cover}
     </style>
-    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}<nav aria-label="Navigation">${rail ? this.logoHtml() : ""}${shown.map(({ it, i }, k) => `${rail && it.bottom && !shown.slice(0, k).some((x) => x.it.bottom) ? '<span class="grow"></span>' : ""}<a href="${esc(it.path || "#")}" data-i="${i}" class="${this.active(it.path, it) ? "on" : ""}" aria-label="${esc(specialLabel(it.action) || it.name || it.path)}">
+    ${editing && c.fixed ? '<div class="edit t">Bottom bar · shown here while editing, pinned to the bottom of the screen when you are done</div>' : ""}${editing ? '<button class="share"><ha-icon icon="mdi:content-copy"></ha-icon><span class="t">Use this look on every page</span></button>' : ""}<nav aria-label="Navigation">${rail ? this.logoHtml() : ""}${shown.map(({ it, i }, k) => `${rail && it.bottom && !shown.slice(0, k).some((x) => x.it.bottom) ? '<span class="grow"></span>' : ""}<a href="${esc(it.path || "#")}" data-i="${i}" class="${this.active(it.path, it) ? "on" : ""}" aria-label="${esc(specialLabel(it.action) || it.name || it.path)}">
       <ha-icon icon="${esc(specialIcon(it.action) || it.icon || "mdi:circle")}"></ha-icon>${c.show_labels && it.name ? `<span class="t">${esc(it.name)}</span>` : ""}</a>`).join("")}</nav>`;
     const pillCss = { filled: `background:linear-gradient(135deg,${g[0]},${g[1]});box-shadow:0 10px 24px -8px color-mix(in srgb, ${g[0]} 95%, transparent), inset 0 1px 0 rgba(255,255,255,.35)`,
       pill: `background:linear-gradient(135deg,${g[0]},${g[1]});box-shadow:0 10px 22px -8px ${g[2]}`, soft: `background:${g[0]}2E` }[c.active_style];
@@ -2381,6 +2395,7 @@ class RoostNav extends RoostBase {
         this.makeRoom(this._room, "bottom");
       });
     } else if (this._room) { this._room = 0; this.makeRoom(0); }
+    this.wireShare("roost-nav");
     this.shadowRoot.querySelectorAll("a").forEach((a) => a.addEventListener("click", (ev) => {
       const it = c.items[+a.dataset.i];
       ev.preventDefault();
@@ -2426,6 +2441,35 @@ if (!window.__roostJump) {
   window.addEventListener("hashchange", () => {
     setTimeout(() => RoostNav.jump(location.hash, true), 60);
   });
+}
+
+// ------------------------------------------------------------------ one look for the bar on every page
+// The bottom bar (and the top bar) is a card on each page, so each page keeps its own settings. While editing, a
+// button copies this bar's look (glass, colours, size, shape...; not its buttons) to the same bar on every page of
+// the dashboard, and saves the dashboard. Only someone allowed to edit dashboards can do it.
+async function roostShareLook(card, tag) {
+  const own = card._config || {}, skip = new Set(["type", "items", "view_layout", "grid_options", "layout_options", "visibility", "title", "show_back", "show_forward"]);
+  const look = Object.fromEntries(Object.entries(own).filter(([k]) => !skip.has(k)));
+  let ll = null;
+  try {
+    ll = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main")?.shadowRoot
+      ?.querySelector("ha-panel-lovelace")?.shadowRoot?.querySelector("hui-root")?.lovelace;
+  } catch (e) { /* not in a dashboard */ }
+  if (!ll?.config || typeof ll.saveConfig !== "function") return { ok: false, why: "Open this from the dashboard's edit mode to copy the look." };
+  if (card._hass?.user && card._hass.user.is_admin === false) return { ok: false, why: "Only an administrator can change every page." };
+  let n = 0;
+  const fix = (x) => {
+    if (Array.isArray(x)) return x.map(fix);
+    if (!x || typeof x !== "object") return x;
+    const out = {};
+    for (const [k, v] of Object.entries(x)) out[k] = fix(v);
+    if (out.type === `custom:${tag}`) { n++; Object.keys(out).forEach((k) => { if (!skip.has(k)) delete out[k]; }); Object.assign(out, look); }
+    return out;
+  };
+  const next = fix(ll.config);
+  if (!n) return { ok: false, why: "There is no other bar like this one in the dashboard yet." };
+  try { await ll.saveConfig(next); } catch (e) { return { ok: false, why: "The dashboard could not be saved." }; }
+  return { ok: true, n };
 }
 
 // ------------------------------------------------------------------ Roost Top Bar
@@ -2538,6 +2582,8 @@ class RoostTopBar extends RoostBase {
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}
       :host{display:block;${fixed ? "height:0;" : ""}}
       .edit{font-size:12px;color:${p.muted};text-align:center;margin:0 0 6px}
+      .share{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;margin:0 auto 8px;padding:8px 14px;border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;background:${p.inset};color:${p.text};--mdc-icon-size:16px}
+      .share:active{transform:scale(.97)}
       .bar{/*ltr*/${pos};max-width:536px;box-sizing:border-box;min-height:${h + 12}px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,auto) minmax(0,1fr);align-items:center;gap:6px;padding:6px;border-radius:${Number(c.radius)}px;color:${p.text};
         ${c.background === "none" ? "background:transparent;border:0;" : c.background === "solid" ? `background:${this.dark ? "#141831" : "#FFFFFF"};border:1px solid ${p.border};box-shadow:0 18px 40px -16px ${this.dark ? "rgba(0,0,0,.5)" : "rgba(40,30,90,.16)"};`
     : `background:linear-gradient(180deg, ${g[0]}24, transparent 70%), ${p.panel};border:1px solid ${g[1]}47;backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);-webkit-backdrop-filter:blur(${Number(c.blur ?? 18)}px) saturate(150%);box-shadow:0 18px 40px -12px ${this.dark ? "rgba(0,0,0,.6)" : "rgba(40,30,90,.18)"}, 0 0 0 1px rgba(255,255,255,.04) inset;`}}
@@ -2552,7 +2598,7 @@ class RoostTopBar extends RoostBase {
       .start,.end{display:flex;gap:4px;min-width:0}.end{justify-content:flex-end}
       ${rtl ? ".b.dir ha-icon{transform:scaleX(-1)}" : ""}
     </style>
-    ${editing && c.fixed ? '<div class="edit t">Top bar · shown here while editing, pinned to the top of the screen when you are done</div>' : ""}
+    ${editing && c.fixed ? '<div class="edit t">Top bar · shown here while editing, pinned to the top of the screen when you are done</div>' : ""}${editing ? '<button class="share"><ha-icon icon="mdi:content-copy"></ha-icon><span class="t">Use this look on every page</span></button>' : ""}
     <div class="bar" role="navigation" aria-label="Top bar">
       <div class="start">${c.show_back !== false ? btn("back", "mdi:chevron-left", "Back", back).replace('class="b"', 'class="b dir"') : ""}${c.show_forward !== false ? btn("fwd", "mdi:chevron-right", "Forward", fwd).replace('class="b"', 'class="b dir"') : ""}</div>
       <div class="mid">${title ? `<b class="t">${esc(title)}</b>` : ""}${clock ? `<small>${esc(clock)}</small>` : ""}</div>
@@ -2561,6 +2607,7 @@ class RoostTopBar extends RoostBase {
         return `<button class="b${on ? " on" : ""}" data-i="${i}" aria-label="${esc(specialLabel(it.action) || it.name || it.icon)}"><ha-icon icon="${esc(specialIcon(it.action) || it.icon || "mdi:circle")}"></ha-icon></button>`;
       }).join("")}</div>
     </div>`;
+    this.wireShare("roost-top-bar");
     const go = (path) => { if (path.startsWith("#")) location.hash = path; else { history.pushState(null, "", path); this.fire("location-changed", { replace: false }); } RoostTopBar.steps = (RoostTopBar.steps || 0) + 1; RoostTopBar.ahead = 0; };
     this.shadowRoot.querySelectorAll(".b").forEach((b) => b.addEventListener("click", (ev) => {
       ev.preventDefault(); this.vibrate();

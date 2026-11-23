@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.29.1
+
+- **One look for the bar on every page.** The bottom bar is a card on each page, so each page kept its own look (frosted on one page, solid on another). While editing a bar, press **Use this look on every page**: its look (glass, colours, size, shape, labels) is copied to the bar on every page of the dashboard and saved, while each page keeps its own buttons. The top bar has the same button.
+
 ## 1.29.0
 
 - **Thermostat lock.** Roost Thermostat has a new **Lock** setting so it can't be changed by accident: lock the temperature only, or everything (temperature, power and modes). A small lock sits next to the status; tap it to unlock, and it locks itself again after the time you choose (15 seconds unless you change it). Touching the locked dial just wiggles the lock.
