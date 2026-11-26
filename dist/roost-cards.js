@@ -173,9 +173,11 @@ function safeHass(h) {
 // Card settings are cleaned the same way: numbers stay numbers, colours, pictures and fonts can only hold what a
 // colour, a picture address or a font name needs, and no text can open or close a tag.
 const STYLE_KEY = /(colou?r|image|picture|url|font|background|shadow|gradient|tint|accent|glow|border|_bg$|^bg)/i;
+const SIZE_KEY = /(size|radius|height|width|gap|opacity|blur|dim|padding|spacing|margin|scale|zoom|columns|rows|offset|speed|duration|delay|weight|spread|thickness|inset)$/i;
 const cleanCfg = (v, k = "", d) => {
   if (typeof v === "string") {
     if (typeof d === "number") { const n = num(v); return n == null ? d : n; }
+    if (SIZE_KEY.test(k)) { const n = num(v); return n != null ? n : v.replace(/["'\\;{}<>`]/g, ""); }
     return STYLE_KEY.test(k) ? v.replace(/["'\\;{}<>`]/g, "") : v.replace(/[<>`]/g, (c) => ({ "<": "‹", ">": "›", "`": "ʼ" }[c]));
   }
   if (typeof v === "number") return Number.isFinite(v) ? v : typeof d === "number" ? d : 0;
@@ -5440,7 +5442,7 @@ class RoostLight extends RoostBase {
       <div class="top"><span class="ic" data-more data-pop="${on ? 1 : 0}" data-popkey="ic"><ha-icon icon="${esc(c.icon || (on ? "mdi:lightbulb-on" : "mdi:lightbulb-outline"))}"></ha-icon></span>
         <span class="tx"><div class="n t">${esc(this.name(c.entity))}</div><div class="l t">${!s ? "Device not found" : un ? "Offline" : on ? "On" : "Off"}</div></span>
         ${dims ? `<span class="pc num" data-tw="pc">${pct}%</span>` : ""}<span class="sw ${on ? "on" : ""}" role="switch" aria-checked="${on}"></span></div>
-      ${dims ? `<div class="bar" role="slider" aria-valuenow="${pct}"><span class="f" data-bar="br" style="width:${pct}%"></span><ha-icon icon="mdi:brightness-6"></ha-icon></div>` : ""}
+      ${dims ? `<div class="bar" role="slider" aria-valuenow="${fin(pct)}"><span class="f" data-bar="br" style="width:${fin(pct)}%"></span><ha-icon icon="mdi:brightness-6"></ha-icon></div>` : ""}
       ${(temps && c.show_presets) || (colours && c.show_colors) ? `<div class="chips">
         ${temps && c.show_presets ? [["Warm", 2700, "#FFB45A"], ["Neutral", 4000, "#FFE7C2"], ["Cool", 6000, "#CFE6FF"]].map(([w, k, col]) => `<button data-k="${k}"><i style="background:${col}"></i>${w}</button>`).join("") : ""}
         ${colours && c.show_colors ? ["#FF5A5F", "#FFB020", "#3DD68C", "#38BDF8", "#8B6CFF", "#F472B6"].map((col) => `<button class="dotc" data-rgb="${col}" aria-label="Colour"><i style="background:${col}"></i></button>`).join("") : ""}</div>` : ""}
@@ -10683,7 +10685,7 @@ const RoostSheet = {
       <button class="hd" data-act="grow" aria-label="${el.full ? "Show less" : "Show more"}"></button>
       <div class="hdr"><span class="ic"><ha-icon icon="${esc(rm.icon || "mdi:home-outline")}"></ha-icon></span><span class="nm"><b>${esc(rm.name)}</b><span>${esc(word)}</span></span>
         <button class="x" data-act="close" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button></div>
-      ${lights.length ? `<div class="bar" data-bar="rlights"><i style="width:${pct}%;background:linear-gradient(90deg,#E07B00,#FDE68A)"></i><b>${lon.length ? `Lights ${pct}%` : "Lights off"}</b></div>` : ""}
+      ${lights.length ? `<div class="bar" data-bar="rlights"><i style="width:${fin(pct)}%;background:linear-gradient(90deg,#E07B00,#FDE68A)"></i><b>${lon.length ? `Lights ${pct}%` : "Lights off"}</b></div>` : ""}
       ${devs.length ? `<div class="tiles">${shown.map(tile).join("")}</div>` : `<div class="note">No devices picked for this room.</div>`}
       ${el.full ? (rm.path ? `<button class="wb" data-act="go">Open the room's page</button>` : "") : devs.length > 6 || rm.path ? `<button class="more" data-act="grow">Swipe up for more</button>` : ""}
     </div>`;

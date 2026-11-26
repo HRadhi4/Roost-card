@@ -444,6 +444,7 @@ if (!calls.some((x) => x[1] === "toggle")) { fails++; console.error("FAIL confir
   const im = md.shadowRoot.querySelector("img[data-fallback]");
   if (!im) { fails++; console.error("FAIL media picture has a fallback icon without an inline handler"); }
   else { im.dispatchEvent(new window.Event("error")); if (md.shadowRoot.querySelector("img[data-fallback]") || !md.shadowRoot.querySelector(".ic ha-icon")) { fails++; console.error("FAIL media picture falls back to its icon"); } }
+  const gp = document.createElement("roost-tile"); gp.setConfig({ entity: "switch.kettle", icon_gap: "4px;}:host{display:none" }); if (/[;{}]/.test(String(gp._config.icon_gap))) { fails++; console.error("FAIL size setting without a default is cleaned", gp._config.icon_gap); }
   const tc = document.createElement("roost-thermostat"); tc.setConfig({ entity: "climate.evil", size: "52" }); if (typeof RoostCardsDefaults === "undefined" && typeof tc._config.size === "string" && typeof tc.constructor.defaults?.size === "number") { fails++; console.error("FAIL numeric settings become numbers", tc._config.size); }
 }
 // Errors for missing settings
@@ -451,5 +452,5 @@ for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }],
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 42} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 43} checks passed`);
 process.exit(fails ? 1 : 0);

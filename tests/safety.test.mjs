@@ -65,6 +65,7 @@ const check = (rule, ok, msg) => { checks++; if (!ok) fail(rule, msg); };
 
 // 5. every card is cleaned
 {
+  check(5, /const SIZE_KEY = /.test(src) && /SIZE_KEY\.test\(k\)/.test(src), "size, spacing and timing settings are no longer cleaned");
   check(5, /function safeHass\(/.test(src) && /const cleanConfig = /.test(src) && /const rawHass = /.test(src), "safeHass, cleanConfig or rawHass is missing");
   check(5, /this\._config = \{ \.\.\.this\.constructor\.defaults, \.\.\.cleanConfig\(config, this\.constructor\.defaults\) \}/.test(src), "RoostBase.setConfig does not use cleanConfig");
   check(5, /hass\(\) \{ return safeHass\(this\.ha\(\)\?\.hass\); \}/.test(src), "the details sheet does not read Home Assistant through safeHass");
