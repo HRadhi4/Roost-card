@@ -1478,7 +1478,7 @@ class RoostChips extends RoostBase {
         else if (ch.group === "doors" || /^(alarm_control_panel|lock|binary_sensor)\./.test(ch.entity || "")) safe.push(ch);
         else comfort.push(ch);
       }
-      const cap = (title, list) => (list.length ? `<div class="cap" role="group" aria-label="${title}">${list.map((ch, i) => `${i ? '<span class="sep"></span>' : ""}<button ${this.chipAttrs(ch, open, "half")}>${ch.people ? peopleInner() : `${this.chipIcon(ch)}${ch.text ? `<span class="${ch.word ? "word" : "num"}" style="color:${ch.colour}">${esc(ch.text)}</span>` : ""}`}</button>`).join("")}</div>` : "");
+      const cap = (title, list) => (list.length ? `<div class="cap" role="group" aria-label="${esc(title)}">${list.map((ch, i) => `${i ? '<span class="sep"></span>' : ""}<button ${this.chipAttrs(ch, open, "half")}>${ch.people ? peopleInner() : `${this.chipIcon(ch)}${ch.text ? `<span class="${ch.word ? "word" : "num"}" style="color:${ch.colour}">${esc(ch.text)}</span>` : ""}`}</button>`).join("")}</div>` : "");
       return `<div class="caps">${cap("Safe", safe)}${cap("Comfort", comfort)}${cap("Who", who)}${cap("More", more)}</div>`;
     }
     if (st === "dock") {
@@ -4536,7 +4536,7 @@ class RoostTitle extends RoostBase {
     });
   }
 
-  set hass(h) { this._hass = h; const r = this.reading(); if (!this._drawn || this._lastDark !== this.dark || r !== this._lastR) { this._drawn = true; this._lastDark = this.dark; this._lastR = r; this.render(); } }
+  set hass(h) { this._hass = safeHass(rawHass(h)); const r = this.reading(); if (!this._drawn || this._lastDark !== this.dark || r !== this._lastR) { this._drawn = true; this._lastDark = this.dark; this._lastR = r; this.render(); } }
 
   get hass() { return this._hass; }
 }
@@ -6177,7 +6177,7 @@ class RoostPresence extends RoostBase {
   panelHtml(ids) {
     const tab = this._panel;
     const seg = `<div class="seg"><button class="${tab === "main" ? "on" : ""}" data-tab="main">Sensor</button><button class="${tab === "zones" ? "on" : ""}" data-tab="zones">Zones</button></div>`;
-    const toggle = (suffix, title, help) => { const id = findBySuffix(ids, suffix), s = this.sx(id); return s ? `<div class="row"><span><b>${title}</b>${help ? `<small>${help}</small>` : ""}</span><button class="tg ${s.state === "on" ? "on" : ""}" data-tog="${esc(id)}" role="switch" aria-checked="${s.state === "on"}" aria-label="${title}"><i></i></button></div>` : ""; };
+    const toggle = (suffix, title, help) => { const id = findBySuffix(ids, suffix), s = this.sx(id); return s ? `<div class="row"><span><b>${title}</b>${help ? `<small>${help}</small>` : ""}</span><button class="tg ${s.state === "on" ? "on" : ""}" data-tog="${esc(id)}" role="switch" aria-checked="${s.state === "on"}" aria-label="${esc(title)}"><i></i></button></div>` : ""; };
     if (tab === "main") {
       const tid = findBySuffix(ids, "_timeout"), ts = this.sx(tid);
       const timeout = ts ? `<div class="row"><span><b>Wait before "Nobody here"</b><small>After the last movement</small></span><b class="tv">${fmt(num(ts.state), 0)} s</b></div><input type="range" data-num="${esc(tid)}" min="${fin(ts.attributes.min, 0)}" max="${Math.min(fin(ts.attributes.max, 600), 600)}" step="${fin(ts.attributes.step, 1) || 1}" value="${num(ts.state) ?? 0}">` : "";
@@ -6802,7 +6802,7 @@ class RoostFan extends RoostBase {
         <span class="tx"><div class="n t">${esc(this.name(c.entity, "Fan"))}</div><div class="l t">${!s ? "Device not found" : UNAVAILABLE.includes(s.state) ? "Offline" : on ? `On${a.percentage != null ? ` · ${Math.round(pct)}%` : ""}${a.preset_mode ? ` · ${esc(nice(a.preset_mode))}` : ""}` : "Off"}</div></span></div>
       ${speeds > 1 ? `<div class="row"><button class="b ${!on ? "on" : ""}" data-p="0">Off</button>${Array.from({ length: speeds }, (_, i) => {
         const v = Math.round(Math.min(100, (i + 1) * step));
-        return `<button class="b ${on && Math.abs(pct - v) < step / 2 ? "on" : ""}" data-p="${v}">${speeds === 3 ? ["Low", "Medium", "High"][i] : i + 1}</button>`;
+        return `<button class="b ${on && Math.abs(pct - v) < step / 2 ? "on" : ""}" data-p="${fin(v)}">${speeds === 3 ? ["Low", "Medium", "High"][i] : i + 1}</button>`;
       }).join("")}</div>` : ""}
       ${oscil || modes.length ? `<div class="row">${oscil ? `<button class="b ${a.oscillating ? "on" : ""}" data-o="1"><ha-icon icon="mdi:arrow-oscillating"></ha-icon>Swing</button>` : ""}${modes.map((m) => `<button class="b ${a.preset_mode === m ? "on" : ""}" data-m="${esc(m)}">${esc(m)}</button>`).join("")}</div>` : ""}
     </div>`;
@@ -8725,7 +8725,7 @@ class RoostPet extends ticking(RoostBase, 60000) {
         <text x="245" y="192" text-anchor="middle" fill="${p.text}" font-size="13" font-weight="700">${water != null ? `${Math.round(w)}% water` : "Water"}</text></svg>`;
     } else if (c.look === "feeder") {
       body = `<div class="fd"><div class="hop"><div class="win"><i class="kib" data-glide="kib" style="height:${f}%"></i><i class="gl"></i></div><i class="led ${hungry ? "warn" : ""}"></i><i class="tray"></i></div>
-        <div class="fnt"><div class="tk"><i class="wa" data-glide="fwa" style="height:${w}%"></i></div><i class="sp"></i></div></div>
+        <div class="fnt"><div class="tk"><i class="wa" data-glide="fwa" style="height:${fin(w)}%"></i></div><i class="sp"></i></div></div>
         <div class="ml">${Array.from({ length: perDay }, (_, k) => { const st = eaten == null ? "" : k < eaten ? "done" : k === eaten ? "next" : ""; return `<div class="me ${st}"><b>${st === "done" ? "Eaten" : st === "next" ? "Next" : `Meal ${k + 1}`}</b></div>`; }).join("")}</div>`;
     } else {
       const R = 86, full = (2 * Math.PI * R * f / 100).toFixed(1);
@@ -9308,7 +9308,7 @@ class RoostValues extends RoostBase {
         const mn = Number(s.attributes.min ?? 0), mx = Number(s.attributes.max ?? 100), st = Number(s.attributes.step ?? 1), v = num(s.state) ?? mn;
         const dec = String(st).includes(".") ? String(st).split(".")[1].length : 0;
         return `<div class="v wide">${ic}<div class="nm"><b class="t">${nm}</b></div><span class="val num" data-out="${k}" data-tw="v${k}">${esc(fmt(v, dec))}<small>${esc(unit)}</small></span>
-          <input class="rng" type="range" min="${mn}" max="${mx}" step="${st}" value="${v}" data-k="${k}" aria-label="${nm}" style="--f:${(((v - mn) / (mx - mn || 1)) * 100).toFixed(1)}%" ${un ? "disabled" : ""}></div>`;
+          <input class="rng" type="range" min="${fin(mn)}" max="${fin(mx, 100)}" step="${fin(st, 1)}" value="${fin(v)}" data-k="${k}" aria-label="${nm}" style="--f:${(((v - mn) / (mx - mn || 1)) * 100).toFixed(1)}%" ${un ? "disabled" : ""}></div>`;
       }
       if (d === "input_select" || d === "select") {
         const ops = s.attributes.options || [];
@@ -10618,7 +10618,7 @@ const RoostSheet = {
         out.push(`<div class="sec">LAST 24 HOURS</div><div class="strip">${seg.join("")}</div><div class="ax"><span>${esc(clock(from))}</span><span>${esc(clock(from + 12 * 3600e3))}</span><span>Now</span></div>`);
         out.push(tiles([[`${onWord} for`, onMs ? dur(onMs) : "Not at all"], ["Times", String(turns + (rows.length && active(rows[0].state) && rows[0].at > from ? 1 : 0))], ["Like this since", clock(new Date(s.last_changed).getTime())]]));
         const list = rows.slice(-6).reverse();
-        if (list.length > 1) out.push(`<div class="sec">LATELY</div><div class="tl">${list.map((c, k) => { const end = k ? list[k - 1].at : now; return `<div><i style="background:${active(c.state) ? g[1] : p.knob}"></i><span>${esc(word(c.state))}<small> · ${esc(dur(end - c.at))}</small></span><span>${esc(clock(c.at))}</span></div>`; }).join("")}</div>`);
+        if (list.length > 1) out.push(`<div class="sec">LATELY</div><div class="tl">${list.map((c, k) => { const end = k ? list[k - 1].at : now; return `<div><i style="background:${esc(active(c.state) ? g[1] : p.knob)}"></i><span>${esc(word(c.state))}<small> · ${esc(dur(end - c.at))}</small></span><span>${esc(clock(c.at))}</span></div>`; }).join("")}</div>`);
       }
     }
     out.push(...this.extras(s));
@@ -12429,7 +12429,7 @@ const Tour = {
 // A small 3D model of a device for the Home Tour's side panel, drawn with CSS 3D (no 3D engine needed).
 // Sizes are in pixels; y grows downwards. Moving parts carry data-m so the panel can move them each frame.
 const TourModel = {
-  face(w, h, t, cls, extra = "") { return `<i class="f ${cls}" style="width:${w}px;height:${h}px;margin:${-h / 2}px 0 0 ${-w / 2}px;transform:${t}"${extra}></i>`; },
+  face(w, h, t, cls, extra = "") { w = fin(w); h = fin(h); return `<i class="f ${cls}" style="width:${fin(w)}px;height:${fin(h)}px;margin:${-h / 2}px 0 0 ${-w / 2}px;transform:${t}"${extra}></i>`; },
   // a box centred on (x, y, z)
   box(w, h, d, x, y, z, cls = "", attrs = "") {
     const f = (W, H, t, c) => this.face(W, H, t, `${cls} ${c}`);
