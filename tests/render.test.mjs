@@ -447,10 +447,23 @@ if (!calls.some((x) => x[1] === "toggle")) { fails++; console.error("FAIL confir
   const gp = document.createElement("roost-tile"); gp.setConfig({ entity: "switch.kettle", icon_gap: "4px;}:host{display:none" }); if (/[;{}]/.test(String(gp._config.icon_gap))) { fails++; console.error("FAIL size setting without a default is cleaned", gp._config.icon_gap); }
   const tc = document.createElement("roost-thermostat"); tc.setConfig({ entity: "climate.evil", size: "52" }); if (typeof RoostCardsDefaults === "undefined" && typeof tc._config.size === "string" && typeof tc.constructor.defaults?.size === "number") { fails++; console.error("FAIL numeric settings become numbers", tc._config.size); }
 }
+// Bars on other pages follow the look of the bar on the first page, unless they keep their own.
+{
+  const mk = (parent, tag) => { const el = document.createElement(tag); parent.appendChild(el); el.attachShadow({ mode: "open" }); return el.shadowRoot; };
+  const ha = mk(document.body, "home-assistant"), main = mk(ha, "home-assistant-main"), panel = mk(main, "ha-panel-lovelace");
+  const root = document.createElement("hui-root"); panel.appendChild(root);
+  const items = [{ name: "Home", icon: "mdi:home", path: "#home" }];
+  root.lovelace = { config: { views: [{ path: "home", cards: [{ type: "custom:roost-nav", items, background: "glass", blur: 10, opacity: 10, color: "purple" }] }, { path: "rooms", cards: [{ type: "custom:roost-nav", items, background: "solid" }] }] } };
+  const b2 = document.createElement("roost-nav"); b2.setConfig({ items, background: "solid", fixed: false }); document.body.appendChild(b2); b2.hass = hass(true);
+  if (b2._config.background !== "glass" || b2._config.blur !== 10 || b2._config.color !== "purple") { fails++; console.error("FAIL bar follows the first page's look", JSON.stringify(b2._config)); }
+  const b3 = document.createElement("roost-nav"); b3.setConfig({ items, background: "solid", own_look: true, fixed: false }); document.body.appendChild(b3); b3.hass = hass(true);
+  if (b3._config.background !== "solid") { fails++; console.error("FAIL bar with its own look keeps it"); }
+  ha.host.remove();
+}
 // Errors for missing settings
 for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }], ["roost-rooms", { rooms: [] }]]) {
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 43} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 45} checks passed`);
 process.exit(fails ? 1 : 0);

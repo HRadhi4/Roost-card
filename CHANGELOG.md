@@ -2,6 +2,10 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.29.3
+
+- **The bar looks the same on every page by itself.** The bottom bar and the top bar on every page now follow the look of the bar on the dashboard's first page (glass, blur, colours, size, shape), while each page keeps its own buttons. Change the first page's bar and every page changes with it. A bar that should look different can turn on **Its own look**. While editing, each bar shows its own settings.
+
 ## 1.29.2
 
 - **Safer with unusual names and values.** Everything the cards show that comes from Home Assistant (names, states, attributes such as temperatures, units, modes, colours, battery levels and positions) and every card setting is now checked before it is drawn: text is escaped, numbers must be real numbers, colours must be real colours, and pictures and fonts can only hold what an address or a font name needs. A name or value with odd characters now just shows as text.

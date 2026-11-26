@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.29.2";
+const ROOST_VERSION = "1.29.3";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -506,6 +506,7 @@ class RoostBase extends HTMLElement {
       if (this.localName === "roost-remote" && config.entity && !config.athom_remote) config = { ...config, entity: undefined, athom_remote: "Sample TV" };
     }
     this._config = { ...this.constructor.defaults, ...cleanConfig(config, this.constructor.defaults) };
+    this._ownCfg = this._config;
     if (this._config.reverse && String(this._config.entity || "").startsWith("cover.")) RoostReversed.add(this._config.entity);
     // A card that still needs a device shows a friendly "pick one" note, like Home Assistant's own cards, instead of a red error.
     this._setup = "";
@@ -561,6 +562,15 @@ class RoostBase extends HTMLElement {
   }
 
   get hass() { return this._hass; }
+
+  // bars follow the look of the bar on the dashboard's first page (see roostLeadBar)
+  followLook(tag) {
+    const own = this._ownCfg || this._config;
+    if (!own) return "";
+    const lead = own.own_look || this.editing() ? null : roostLeadBar(tag);
+    this._config = lead ? { ...own, ...cleanConfig(lead, this.constructor.defaults) } : own;
+    return lead ? JSON.stringify(lead) : "own";
+  }
 
   // the "Use this look on every page" button of the bars
   wireShare(tag) {
@@ -2247,7 +2257,7 @@ class RoostNav extends RoostBase {
 
   watched() { return []; }
 
-  extraSignature() { return `${location.pathname}${location.hash}|${RoostFull.isOn() ? 1 : 0}|${this._hass?.themes?.darkMode ? 1 : 0}|${window.innerWidth >= 768}|${this.editing()}|${RoostNav.sideEdge()}|${RoostNav.topEdge()}`; }
+  extraSignature() { return `${this.followLook("roost-nav")}|${location.pathname}${location.hash}|${RoostFull.isOn() ? 1 : 0}|${this._hass?.themes?.darkMode ? 1 : 0}|${window.innerWidth >= 768}|${this.editing()}|${RoostNav.sideEdge()}|${RoostNav.topEdge()}`; }
 
   logoHtml() {
     const l = String(this._config.logo || "").trim();
@@ -2349,6 +2359,7 @@ class RoostNav extends RoostBase {
           { name: "rail_style", label: "Rail shape", selector: pick([["floating", "Floating in the middle of the side"], ["full", "Full height, from top to bottom"]]) },
           { name: "logo", label: "At the top of the rail: a letter or word, or a person (their picture)", selector: { text: {} } },
           { name: "push_content", label: "Leave room so the bar or rail never covers cards", selector: { boolean: {} } },
+          { name: "own_look", label: "Its own look (otherwise it looks like the bar on the first page)", selector: { boolean: {} } },
         ] },
         { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
           ...colourFields("color", "Colour of the chosen button"),
@@ -2528,8 +2539,28 @@ if (!window.__roostJump) {
 // The bottom bar (and the top bar) is a card on each page, so each page keeps its own settings. While editing, a
 // button copies this bar's look (glass, colours, size, shape...; not its buttons) to the same bar on every page of
 // the dashboard, and saves the dashboard. Only someone allowed to edit dashboards can do it.
+const BAR_SKIP = new Set(["type", "items", "view_layout", "grid_options", "layout_options", "visibility", "title", "show_back", "show_forward", "own_look"]);
+// The bar on the dashboard's first page is the one the others follow, so a change there reaches every page by itself.
+// A bar with "own_look" keeps its own; while editing, every bar shows its own settings so they can be changed.
+function roostLeadBar(tag) {
+  let cfg = null;
+  try {
+    cfg = document.querySelector("home-assistant")?.shadowRoot?.querySelector("home-assistant-main")?.shadowRoot
+      ?.querySelector("ha-panel-lovelace")?.shadowRoot?.querySelector("hui-root")?.lovelace?.config;
+  } catch (e) { /* not in a dashboard */ }
+  if (!cfg) return null;
+  const memo = (roostLeadBar.memo = roostLeadBar.memo || new WeakMap());
+  const key = memo.get(cfg) || {};
+  if (tag in key) return key[tag];
+  let found = null;
+  const walk = (x) => { if (found || !x || typeof x !== "object") return; if (Array.isArray(x)) { x.forEach(walk); return; } if (x.type === `custom:${tag}`) { found = x; return; } Object.values(x).forEach(walk); };
+  (cfg.views || []).forEach(walk);
+  key[tag] = found ? Object.fromEntries(Object.entries(found).filter(([k]) => !BAR_SKIP.has(k))) : null;
+  memo.set(cfg, key);
+  return key[tag];
+}
 async function roostShareLook(card, tag) {
-  const own = card._config || {}, skip = new Set(["type", "items", "view_layout", "grid_options", "layout_options", "visibility", "title", "show_back", "show_forward"]);
+  const own = card._ownCfg || card._config || {}, skip = BAR_SKIP;
   const look = Object.fromEntries(Object.entries(own).filter(([k]) => !skip.has(k)));
   let ll = null;
   try {
@@ -2562,7 +2593,7 @@ class RoostTopBar extends RoostBase {
 
   watched() { return []; }
 
-  extraSignature() { return `${location.pathname}${location.hash}|${RoostFull.isOn() ? 1 : 0}|${this._hass?.themes?.darkMode ? 1 : 0}|${this.editing()}|${RoostNav.sideEdge()}|${RoostNav.topEdge()}|${this.canGo()}|${this._config?.show_clock ? new Date().getMinutes() : ""}`; }
+  extraSignature() { return `${this.followLook("roost-top-bar")}|${location.pathname}${location.hash}|${RoostFull.isOn() ? 1 : 0}|${this._hass?.themes?.darkMode ? 1 : 0}|${this.editing()}|${RoostNav.sideEdge()}|${RoostNav.topEdge()}|${this.canGo()}|${this._config?.show_clock ? new Date().getMinutes() : ""}`; }
 
   editing() { return !!(this.preview || this.editMode || /[?&]edit=1/.test(location.search) || this.closest?.("hui-card-preview, hui-dialog-edit-card")); }
   set preview(v) { this._preview = v; this._sig = null; if (this._hass) this.hass = this._hass; }
@@ -2584,6 +2615,7 @@ class RoostTopBar extends RoostBase {
         } } } },
         { name: "fixed", label: "Pinned to the top of the screen", selector: { boolean: {} } },
         { name: "push_content", label: "Leave room so the bar never covers cards", selector: { boolean: {} } },
+        { name: "own_look", label: "Its own look (otherwise it looks like the bar on the first page)", selector: { boolean: {} } },
         { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
           ...colourFields("color", "Colour of the buttons when pressed"),
           { type: "grid", name: "", schema: [
