@@ -422,10 +422,34 @@ calls.length = 0; const ask = tl.run({ action: "toggle", confirmation: { text: "
 if (!/Turn the kettle off\?/.test(lt())) { fails++; console.error("FAIL confirm popup"); }
 layer().shadowRoot.querySelector('[data-b="1"]').dispatchEvent(new window.Event("click")); await ask;
 if (!calls.some((x) => x[1] === "toggle")) { fails++; console.error("FAIL confirm yes runs it"); }
+// Hostile names, states, attributes and settings never become markup or script.
+{
+  const bad = '"><img src=x onerror=alert(1)>';
+  const evil = hass(true);
+  evil.states = { ...evil.states,
+    "climate.evil": st("climate.evil", "heat", { friendly_name: bad, temperature: bad, current_temperature: bad, hvac_modes: ["heat", bad], min_temp: 7, max_temp: 35 }),
+    "light.evil": st("light.evil", "on", { friendly_name: bad, brightness: 200, rgb_color: ["1);}</style><img src=x onerror=alert(1)>", 2, 3], supported_color_modes: ["rgb"] }),
+    "weather.evil": st("weather.evil", "sunny", { friendly_name: bad, temperature: 20, temperature_unit: bad, humidity: bad, wind_speed: bad, wind_speed_unit: bad }),
+    "media_player.evil": st("media_player.evil", "playing", { friendly_name: bad, entity_picture: "/x.jpg" }),
+    "fan.evil": st("fan.evil", "on", { friendly_name: bad, percentage: "50%;background:url(x)" }),
+    "person.evil": st("person.evil", "home", { friendly_name: bad, battery_level: bad }) };
+  const hostile = (root) => root.querySelector("script,img[src=x]") || [...root.querySelectorAll("*")].some((n) => [...n.attributes].some((at) => /^on/i.test(at.name))) || [...root.querySelectorAll("style")].some((x) => /<|onerror/.test(x.textContent));
+  for (const [tag, cfg] of [["roost-thermostat", { entity: "climate.evil" }], ["roost-light", { entity: "light.evil" }], ["roost-weather", { entity: "weather.evil", show_details: true }],
+    ["roost-media", { entity: "media_player.evil", icon: "mdi:tv'}));alert(1);//" }], ["roost-fan", { entity: "fan.evil" }], ["roost-tile", { entity: "person.evil", color: 'red;}</style><script>alert(1)</script>', size: "40px;}<x>" }]]) {
+    if (!customElements.get(tag)) continue;
+    const el = document.createElement(tag); el.setConfig(cfg); document.body.appendChild(el); el.hass = evil;
+    if (hostile(el.shadowRoot)) { fails++; console.error(`FAIL ${tag} lets a hostile value through`, el.shadowRoot.innerHTML.slice(0, 400)); }
+  }
+  const md = document.createElement("roost-media"); md.setConfig({ entity: "media_player.evil" }); document.body.appendChild(md); md.hass = evil;
+  const im = md.shadowRoot.querySelector("img[data-fallback]");
+  if (!im) { fails++; console.error("FAIL media picture has a fallback icon without an inline handler"); }
+  else { im.dispatchEvent(new window.Event("error")); if (md.shadowRoot.querySelector("img[data-fallback]") || !md.shadowRoot.querySelector(".ic ha-icon")) { fails++; console.error("FAIL media picture falls back to its icon"); } }
+  const tc = document.createElement("roost-thermostat"); tc.setConfig({ entity: "climate.evil", size: "52" }); if (typeof RoostCardsDefaults === "undefined" && typeof tc._config.size === "string" && typeof tc.constructor.defaults?.size === "number") { fails++; console.error("FAIL numeric settings become numbers", tc._config.size); }
+}
 // Errors for missing settings
 for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }], ["roost-rooms", { rooms: [] }]]) {
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 39} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 42} checks passed`);
 process.exit(fails ? 1 : 0);

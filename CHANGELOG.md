@@ -2,6 +2,12 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.29.2
+
+- **Safer with unusual names and values.** Everything the cards show that comes from Home Assistant (names, states, attributes such as temperatures, units, modes, colours, battery levels and positions) and every card setting is now checked before it is drawn: text is escaped, numbers must be real numbers, colours must be real colours, and pictures and fonts can only hold what an address or a font name needs. A name or value with odd characters now just shows as text.
+- **Media card picture.** When the cover picture can't load, the icon now takes its place through an event listener instead of an inline handler.
+- **Fonts.** Inter and Space Grotesk are bundled with the cards (since 1.28.1), so no dashboard loads anything from Google Fonts.
+
 ## 1.29.1
 
 - **One look for the bar on every page.** The bottom bar is a card on each page, so each page kept its own look (frosted on one page, solid on another). While editing a bar, press **Use this look on every page**: its look (glass, colours, size, shape, labels) is copied to the bar on every page of the dashboard and saved, while each page keeps its own buttons. The top bar has the same button.

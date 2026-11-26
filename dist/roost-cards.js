@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.29.1";
+const ROOST_VERSION = "1.29.2";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -119,7 +119,75 @@ function fillLook(fill, glow, g, p) {
 }
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const rgb = (v) => (Array.isArray(v) && v.length === 3 ? `rgb(${v.join(",")})` : typeof v === "string" && v ? v : null);
+const rgb = (v) => (Array.isArray(v) && v.length === 3 ? `rgb(${v.map((x) => Math.max(0, Math.min(255, Math.round(Number(x) || 0)))).join(",")})` : typeof v === "string" && v ? v.replace(/[^#a-zA-Z0-9(),.%\s-]/g, "") : null);
+// ------------------------------------------------------------------ safe values from Home Assistant
+// Names, states and attributes come from integrations and customisations, so the cards never trust them: every text
+// value has the few characters that could break out of the page's code (< > " ` \\) swapped for look-alike
+// typographic ones, and values that should be numbers are numbers (or left out). Each state is cleaned once and
+// remembered, so this costs nothing on later updates. Cards also escape everything they show; this is a second guard.
+const SAFE_NUM = new Set(["temperature", "current_temperature", "target_temp_high", "target_temp_low", "target_temp_step", "min_temp", "max_temp", "humidity", "current_humidity",
+  "wind_speed", "wind_bearing", "pressure", "visibility", "dew_point", "uv_index", "battery_level", "percentage", "percentage_step", "current_position", "current_tilt_position",
+  "brightness", "color_temp", "color_temp_kelvin", "min_mireds", "max_mireds", "min_color_temp_kelvin", "max_color_temp_kelvin", "min", "max", "step", "volume_level", "media_position", "media_duration",
+  "elevation", "azimuth", "latitude", "longitude", "gps_accuracy", "fan_speed_percentage", "precipitation", "precipitation_probability", "cloud_coverage"]);
+const safeText = (v) => String(v).replace(/[<>"`\\]/g, (c) => ({ "<": "‹", ">": "›", '"': "″", "`": "ʼ", "\\": "∖" }[c]));
+// values the cards send back to Home Assistant (a chosen option, source, effect or mode) must stay exactly as they are;
+// those are escaped where they are shown instead
+const SAFE_KEEP = new Set(["options", "source_list", "source", "sound_mode_list", "sound_mode", "effect_list", "effect", "preset_modes", "preset_mode", "fan_modes", "fan_mode",
+  "swing_modes", "swing_mode", "hvac_modes", "hvac_mode", "available_modes", "mode", "activity_list", "current_activity", "fan_speed_list", "fan_speed", "operation_list", "operation_mode", "available_tones"]);
+const safeVal = (v, k) => {
+  if (v == null || typeof v === "boolean") return v;
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (SAFE_NUM.has(k)) { const n = num(v); return n; }
+  if (k === "rgb_color" || k === "rgbw_color" || k === "rgbww_color" || k === "hs_color" || k === "xy_color") return Array.isArray(v) && v.every((x) => Number.isFinite(Number(x))) ? v.map(Number) : null;
+  if (SAFE_KEEP.has(k)) return v;
+  if (typeof v === "string") return safeText(v);
+  if (Array.isArray(v)) return v.map((x) => safeVal(x, ""));
+  if (typeof v === "object") { const o = {}; for (const [kk, vv] of Object.entries(v)) o[kk] = safeVal(vv, kk); return o; }
+  return v;
+};
+const SAFE_STATES = new WeakMap(), SAFE_HASS = new WeakMap();
+const safeState = (st) => {
+  if (!st || typeof st !== "object") return st;
+  let out = SAFE_STATES.get(st);
+  if (!out) {
+    const attrs = {};
+    for (const [k, v] of Object.entries(st.attributes || {})) { const c = k === "entity_picture" && typeof v === "string" ? v.replace(/[<>"'`\\\s]/g, "") : safeVal(v, k); if (c !== null || v === null) attrs[k] = c; }
+    out = { ...st, state: typeof st.state === "string" && !/^(input_)?select\./.test(st.entity_id || "") ? safeText(st.state) : st.state, attributes: attrs };
+    SAFE_STATES.set(st, out);
+  }
+  return out;
+};
+const rawHass = (h) => h?.__raw || h;
+const fin = (v, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+const rgbNums = (v) => (Array.isArray(v) && v.length >= 3 ? v.slice(0, 3).map((x) => Math.max(0, Math.min(255, Math.round(fin(x))))).join(",") : null);
+function safeHass(h) {
+  if (!h || typeof h !== "object" || !h.states || h.__raw) return h;
+  let out = SAFE_HASS.get(h);
+  if (!out) {
+    const states = new Proxy(h.states, { get: (t, k) => (typeof k === "string" ? safeState(t[k]) : t[k]) });
+    out = { ...h, states, __raw: h };
+    SAFE_HASS.set(h, out);
+  }
+  return out;
+}
+// Card settings are cleaned the same way: numbers stay numbers, colours, pictures and fonts can only hold what a
+// colour, a picture address or a font name needs, and no text can open or close a tag.
+const STYLE_KEY = /(colou?r|image|picture|url|font|background|shadow|gradient|tint|accent|glow|border|_bg$|^bg)/i;
+const cleanCfg = (v, k = "", d) => {
+  if (typeof v === "string") {
+    if (typeof d === "number") { const n = num(v); return n == null ? d : n; }
+    return STYLE_KEY.test(k) ? v.replace(/["'\\;{}<>`]/g, "") : v.replace(/[<>`]/g, (c) => ({ "<": "‹", ">": "›", "`": "ʼ" }[c]));
+  }
+  if (typeof v === "number") return Number.isFinite(v) ? v : typeof d === "number" ? d : 0;
+  if (Array.isArray(v)) return v.map((x) => cleanCfg(x, k));
+  if (v && typeof v === "object") { const o = {}; for (const [kk, vv] of Object.entries(v)) o[kk] = cleanCfg(vv, kk); return o; }
+  return v;
+};
+const cleanConfig = (config, defaults = {}) => {
+  const o = {};
+  for (const [k, v] of Object.entries(config || {})) o[k] = cleanCfg(v, k, defaults[k]);
+  return o;
+};
 const UNAVAILABLE = ["unavailable", "unknown"];
 const OFF_STATES = ["off", "closed", "idle", "standby", "disarmed", "not_home", "locked", "paused"];
 
@@ -435,12 +503,20 @@ class RoostBase extends HTMLElement {
       config = { ...fill, ...config };
       if (this.localName === "roost-remote" && config.entity && !config.athom_remote) config = { ...config, entity: undefined, athom_remote: "Sample TV" };
     }
-    this._config = { ...this.constructor.defaults, ...config };
+    this._config = { ...this.constructor.defaults, ...cleanConfig(config, this.constructor.defaults) };
     if (this._config.reverse && String(this._config.entity || "").startsWith("cover.")) RoostReversed.add(this._config.entity);
     // A card that still needs a device shows a friendly "pick one" note, like Home Assistant's own cards, instead of a red error.
     this._setup = "";
     try { this.validate?.(this._config); } catch (e) { this._setup = e.message || String(e); }
-    if (!this.shadowRoot) this.attachShadow({ mode: "open" });
+    if (!this.shadowRoot) {
+      this.attachShadow({ mode: "open" });
+      // a picture that fails to load is swapped for its icon; a listener, not an inline handler
+      this.shadowRoot.addEventListener("error", (e) => {
+        const img = e.target;
+        if (img?.tagName !== "IMG" || img.dataset.fallback == null) return;
+        const ic = document.createElement("ha-icon"); ic.icon = img.dataset.fallback; img.replaceWith(ic);
+      }, true);
+    }
     this._sig = null;
     if (this._setup) this.renderSetup();
     else if (this._hass) this.render();
@@ -465,8 +541,10 @@ class RoostBase extends HTMLElement {
   }
 
   set hass(hass) {
+    hass = rawHass(hass);
     if (hass && RoostPop.hass !== hass && this.localName !== "roost-popup-layer") RoostPop.setHass(hass);
     if (this._config?.sample && hass) { this._realHass = hass; hass = Sample.wrap(hass, this); }
+    hass = safeHass(hass);
     this._hass = hass;
     if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
     this._setupDrawn = false;
@@ -802,7 +880,7 @@ class RoostBase extends HTMLElement {
       container.appendChild(el);
     } else {
       const el = document.createElement("ha-state-icon");
-      el.hass = this._hass;
+      el.hass = rawHass(this._hass);
       el.stateObj = s;
       container.appendChild(el);
     }
@@ -920,7 +998,7 @@ class RoostEditor extends HTMLElement {
       });
       this.appendChild(this._form);
     }
-    this._form.hass = this._hass;
+    this._form.hass = rawHass(this._hass);
     this._form.data = this._data;
     this._form.schema = fitSchema(schema, this._data);
     this._form.computeLabel = label;
@@ -994,7 +1072,7 @@ class RoostEditor extends HTMLElement {
     }
     if (this._roomChips) this.drawRoomChips();
     if (this._stack?.setConfig) {
-      this._stack.hass = this._hass;
+      this._stack.hass = rawHass(this._hass);
       const ll = this.lovelace;
       if (ll && this._stack.lovelace !== ll) this._stack.lovelace = ll;
       const cards = (this.cardClass.roomCards ? (this._config.rooms || [])[this.roomIdx()]?.cards : this._config.cards) || [];
@@ -1351,7 +1429,7 @@ class RoostChips extends RoostBase {
   // the button's own settings: what it opens or does when tapped
   chipAttrs(ch, open, extra = "") {
     const label = ch.special ? specialLabel(ch.special) : ch.entity ? this.name(ch.entity) : ch.label || "Lights";
-    return `class="chip ${extra} ${open && open === ch.group ? "on" : ""}" data-pop="${esc(`${ch.text || ""}${ch.colour || ""}${ch.icon || ""}${ch.say || ""}`)}" data-popkey="${esc(ch.key || ch.entity || ch.group || "")}" ${ch.special ? `data-sp="${ch.special}"` : ch.group ? `data-g="${ch.group}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(label)}${ch.say && !ch.special ? ` · ${esc(ch.say)}` : ""}"`;
+    return `class="chip ${extra} ${open && open === ch.group ? "on" : ""}" data-pop="${esc(`${ch.text || ""}${ch.colour || ""}${ch.icon || ""}${ch.say || ""}`)}" data-popkey="${esc(ch.key || ch.entity || ch.group || "")}" ${ch.special ? `data-sp="${esc(ch.special)}"` : ch.group ? `data-g="${esc(ch.group)}"` : `data-e="${esc(ch.entity)}"`} aria-label="${esc(label)}${ch.say && !ch.special ? ` · ${esc(ch.say)}` : ""}"`;
   }
 
   chipIcon(ch, size) {
@@ -1582,15 +1660,15 @@ class RoostThermostat extends RoostBase {
         <circle cx="125" cy="125" r="70" fill="${p.dial}"/>
         ${breeze}
         <text id="lab" x="125" y="104" text-anchor="middle" font-size="10" letter-spacing="1.5" fill="${p.muted}">${un ? "" : noTemp ? (room != null ? "ROOM" : "") : "SET TO"}</text>
-        <text id="val" x="125" y="146" text-anchor="middle" font-size="${un || (noTemp && room == null) ? 22 : 44}" font-weight="700" fill="${p.text}">${un ? "Offline" : noTemp ? (room != null ? `${room}°` : "No setting") : `${shown}°`}</text>
-        <text x="125" y="168" text-anchor="middle" font-size="12" fill="${p.muted}">${noTemp || room == null ? "" : `Room ${room}°`}</text>
+        <text id="val" x="125" y="146" text-anchor="middle" font-size="${un || (noTemp && room == null) ? 22 : 44}" font-weight="700" fill="${p.text}">${un ? "Offline" : noTemp ? (room != null ? `${esc(room)}°` : "No setting") : `${esc(shown)}°`}</text>
+        <text x="125" y="168" text-anchor="middle" font-size="12" fill="${p.muted}">${noTemp || room == null ? "" : `Room ${esc(room)}°`}</text>
       </svg>
       ${c.show_power || (c.show_plus_minus && !noTemp) ? `<div class="ctl">
         ${c.show_plus_minus && !noTemp ? '<button class="rb mi" data-d="-1" aria-label="Lower"><ha-icon icon="mdi:minus"></ha-icon></button>' : "<span></span>"}
         ${c.show_power ? `<button class="rb pw" aria-label="${on ? "Turn off" : "Turn on"}"><ha-icon icon="mdi:power"></ha-icon></button>` : "<span></span>"}
         ${c.show_plus_minus && !noTemp ? '<button class="rb pl" data-d="1" aria-label="Higher"><ha-icon icon="mdi:plus"></ha-icon></button>' : "<span></span>"}
       </div>` : ""}
-      ${modes.length ? `<div class="modes">${modes.map((m) => `<button class="md ${s?.state === m ? "on" : ""}" data-m="${m}">${modeName[m] || m}</button>`).join("")}</div>` : ""}
+      ${modes.length ? `<div class="modes">${modes.map((m) => `<button class="md ${s?.state === m ? "on" : ""}" data-m="${esc(m)}">${esc(modeName[m] || m)}</button>`).join("")}</div>` : ""}
     </div>`;
     this.wire();
   }
@@ -1676,6 +1754,7 @@ class RoostThermostat extends RoostBase {
   }
 
   set hass(hass) {
+    hass = safeHass(rawHass(hass));
     this._hass = hass;
     if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
     if (this._drag) return;
@@ -2084,7 +2163,7 @@ class RoostHero extends RoostBase {
       <rect x="148" y="70" width="16" height="16" rx="3" fill="#A78BFA" class="win" style="animation-delay:.8s;animation-duration:4.4s"/><rect x="174" y="96" width="16" height="34" rx="3" fill="${day ? "rgba(255,255,255,.2)" : "#2A2560"}"/><rect x="58" y="104" width="22" height="26" rx="3" fill="${day ? "rgba(255,255,255,.2)" : "#2A2560"}"/></svg>` : "";
     const w = this.sx(c.weather);
     const temp = w?.attributes.temperature;
-    const unit = (w?.attributes.temperature_unit || "°C").replace(/^°?/, "°");
+    const unit = esc((w?.attributes.temperature_unit || "°C").replace(/^°?/, "°"));
     const cond = w && !UNAVAILABLE.includes(w.state) ? w.state.replace("clear-night", "clear").replace("partlycloudy", "partly cloudy").replace(/-/g, " ") : "";
     const sky = c.sky === "auto" || !c.sky ? SKIES[day ? "day" : "night"][0]
       : SKIES[c.sky] ? SKIES[c.sky][0]
@@ -2782,9 +2861,10 @@ class RoostRooms extends RoostBase {
   }
 
   set hass(hass) {
+    hass = safeHass(rawHass(hass));
     this._hass = hass;
     if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
-    (this._cards || []).flat().forEach((el) => { el.hass = hass; });
+    (this._cards || []).flat().forEach((el) => { el.hass = rawHass(hass); });
     if (this._config?.follow) this.follow(hass);
     const counts = this._config?.show_count ? this._config.rooms.map((r) => this.onCount(r)).join(",") : "";
     const rm = this._config?.rooms?.[this._active] || {};
@@ -2895,7 +2975,7 @@ class RoostRooms extends RoostBase {
         el = document.createElement("div");
         el.textContent = `Card problem: ${e.message}`;
       }
-      if (this._hass) el.hass = this._hass;
+      if (this._hass) el.hass = rawHass(this._hass);
       return el;
     };
     // every Roost tile in the rooms takes the card's tile shape, unless the tile sets its own
@@ -4632,7 +4712,7 @@ class RoostMedia extends RoostBase {
       .src button.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]};border-color:transparent}
     </style>
     <div class="card">
-      <div class="top"><span class="ic" data-more data-pop="${on ? 1 : 0}" data-popkey="ic">${art ? `<img src="${esc(art)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('ha-icon'),{icon:'${esc(c.icon || "mdi:television")}'}))">` : `<ha-icon icon="${esc(c.icon || "mdi:television")}"></ha-icon>`}</span>
+      <div class="top"><span class="ic" data-more data-pop="${on ? 1 : 0}" data-popkey="ic">${art ? `<img src="${esc(art)}" alt="" data-fallback="${esc(c.icon || "mdi:television")}">` : `<ha-icon icon="${esc(c.icon || "mdi:television")}"></ha-icon>`}</span>
         <span class="tx"><div class="n t">${esc(this.name(c.entity))}</div><div class="l t">${playing ? '<span class="eq"><i></i><i></i><i></i></span>' : ""}${esc(line)}</div></span>
         <button class="pw" data-a="power" aria-label="Power"><ha-icon icon="mdi:power"></ha-icon></button></div>
       ${on && now ? `<div class="now t">${esc(now)}</div>` : ""}
@@ -4701,14 +4781,14 @@ class RoostRoom extends RoostBase {
       let el; const cfg = withTheme(cfg0, config.theme);
       try { el = helpers ? helpers.createCardElement(cfg) : document.createElement(String(cfg.type || "").replace(/^custom:/, "")); if (!helpers) el.setConfig?.(cfg); }
       catch (e) { el = document.createElement("div"); el.textContent = `Card problem: ${e.message}`; }
-      if (this._hass) el.hass = this._hass;
+      if (this._hass) el.hass = rawHass(this._hass);
       return el;
     });
     this._sig = null;
     if (this._hass) this.hass = this._realHass || this._hass; else this.render();
   }
 
-  set hass(h) { super.hass = h; (this._kids || []).forEach((el) => { el.hass = this._hass; }); }
+  set hass(h) { super.hass = h; (this._kids || []).forEach((el) => { el.hass = rawHass(this._hass); }); }
   get hass() { return this._hass; }
 
   extraSignature() { return `${(this._kids || []).length}|${this._kidsOpen ? 1 : 0}`; }
@@ -5216,7 +5296,7 @@ class RoostAlarm extends RoostBase {
       <div class="top"><span class="sh" data-pop="${esc(s?.state || "")}" data-popkey="sh"><ha-icon icon="${esc(icon)}"></ha-icon></span>
         <span><div class="n t">${esc(this.name(c.entity, "Alarm"))}</div><div class="w t">${esc(word)}</div>${doors.length ? `<div class="d t">${open.length ? `${open.length} open: ${esc(open.map((d) => d.attributes.friendly_name).join(", "))}` : "All doors closed"}</div>` : ""}</span></div>
       ${this._pending ? `<div class="code num">${"•".repeat(this._code.length) || "&nbsp;"}</div><div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, "×", 0, "✓"].map((k) => `<button data-k="${k}">${k}</button>`).join("")}</div>` : `
-      <div class="btns">${(c.modes || []).map((m) => `<button class="b ${s?.state === m.replace("arm_", "armed_") ? "on" : ""}" data-m="${m}"><ha-icon icon="${esc(label[m]?.[1] || "mdi:shield")}"></ha-icon>${esc(label[m]?.[0] || m)}</button>`).join("")}
+      <div class="btns">${(c.modes || []).map((m) => `<button class="b ${s?.state === m.replace("arm_", "armed_") ? "on" : ""}" data-m="${esc(m)}"><ha-icon icon="${esc(label[m]?.[1] || "mdi:shield")}"></ha-icon>${esc(label[m]?.[0] || m)}</button>`).join("")}
         <button class="b ${s?.state === "disarmed" ? "on" : ""}" data-m="disarm"><ha-icon icon="mdi:shield-off-outline"></ha-icon>Off</button></div>`}
       ${doors.length ? `<div class="doors">${doors.map((d) => `<span class="dr" data-e="${esc(d.entity_id)}"><ha-icon icon="${esc(d.state === "on" ? "mdi:door-open" : "mdi:door-closed")}" style="color:${d.state === "on" ? "#FF9F6B" : "#3DD68C"}"></ha-icon>${esc(d.attributes.friendly_name || d.entity_id)}</span>`).join("")}</div>` : ""}
     </div>`;
@@ -5241,7 +5321,7 @@ class RoostAlarm extends RoostBase {
         .ps{display:grid;grid-template-columns:repeat(${PILLS.length},minmax(0,1fr));gap:8px;margin-top:8px}
         .pl{padding:10px 0;border-radius:14px;border:0;font:inherit;font-size:13px;font-weight:600;cursor:pointer;background:${p.inset};color:${p.text};-webkit-tap-highlight-color:transparent;transition:transform .12s}
         .pl:active{transform:scale(.96)}
-      </style>${c.name !== "" ? `<div class="tt t">${esc(c.name || "Alarm")}</div>` : ""}<div class="ps">${PILLS.map(([m, w, bg, st]) => `<button class="pl" data-m="${m}" style="${s?.state === st ? `background:${bg};color:#fff` : ""}">${w}</button>`).join("")}</div>`;
+      </style>${c.name !== "" ? `<div class="tt t">${esc(c.name || "Alarm")}</div>` : ""}<div class="ps">${PILLS.map(([m, w, bg, st]) => `<button class="pl" data-m="${esc(m)}" style="${s?.state === st ? `background:${esc(bg)};color:#fff` : ""}">${esc(w)}</button>`).join("")}</div>`;
     } else if (c.style === "big") this.shadowRoot.innerHTML = this.bigHtml(c, p, s, word, icon, g, armed, busy, label, doors, open);
     else {
       // The compact alarm: one row with the state, then a slim segmented switch, the same size as the other cards.
@@ -5273,7 +5353,7 @@ class RoostAlarm extends RoostBase {
       <div class="top"><span class="sh" data-pop="${esc(s?.state || "")}" data-popkey="sh"><ha-icon icon="${esc(icon)}"></ha-icon></span>
         <span class="tx"><div class="w t">${esc(c.name || this.name(c.entity, "Alarm"))} · ${esc(word.replace("Armed · ", "armed ").replace(/^Disarmed$/, "off"))}</div>${doors.length ? `<div class="d t">${open.length ? `${open.length} open: ${esc(open.map((d) => d.attributes.friendly_name).join(", "))}` : "All doors closed"}</div>` : ""}</span></div>
       ${this._pending ? `<div class="code num">${"•".repeat(this._code.length) || "&nbsp;"}</div><div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, "×", 0, "✓"].map((k) => `<button data-k="${k}">${k}</button>`).join("")}</div>`
-    : `<div class="seg" role="radiogroup">${modes.map((m) => { const on = m === "disarm" ? s?.state === "disarmed" : s?.state === m.replace("arm_", "armed_"); const [w, ic] = m === "disarm" ? ["Off", "mdi:shield-off-outline"] : label[m] || [m, "mdi:shield"]; return `<button class="b ${on ? "on" : ""}" data-m="${m}" role="radio" aria-checked="${on}" aria-label="${esc(w)}"><ha-icon icon="${esc(ic)}"></ha-icon><span>${esc(w)}</span></button>`; }).join("")}</div>`}
+    : `<div class="seg" role="radiogroup">${modes.map((m) => { const on = m === "disarm" ? s?.state === "disarmed" : s?.state === m.replace("arm_", "armed_"); const [w, ic] = m === "disarm" ? ["Off", "mdi:shield-off-outline"] : label[m] || [m, "mdi:shield"]; return `<button class="b ${on ? "on" : ""}" data-m="${esc(m)}" role="radio" aria-checked="${on}" aria-label="${esc(w)}"><ha-icon icon="${esc(ic)}"></ha-icon><span>${esc(w)}</span></button>`; }).join("")}</div>`}
       ${c.show_doors && doors.length ? `<div class="doors">${doors.map((d) => `<span class="dr" data-e="${esc(d.entity_id)}"><ha-icon icon="${esc(d.state === "on" ? "mdi:door-open" : "mdi:door-closed")}" style="color:${d.state === "on" ? "#FF9F6B" : "#3DD68C"}"></ha-icon>${esc(d.attributes.friendly_name || d.entity_id)}</span>`).join("")}</div>` : ""}
     </div>`;
     }
@@ -5335,7 +5415,7 @@ class RoostLight extends RoostBase {
     const temps = modes.includes("color_temp");
     const colours = modes.some((m) => ["hs", "rgb", "rgbw", "rgbww", "xy"].includes(m));
     const pct = on ? (a.brightness != null ? Math.round(a.brightness / 2.55) : 100) : 0;
-    const tint = on && a.rgb_color ? `rgb(${a.rgb_color.join(",")})` : g[1];
+    const tint = on && rgbNums(a.rgb_color) ? `rgb(${rgbNums(a.rgb_color)})` : g[1];
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}${switchCss(p, g)}
       .card{${panelCss(p, c.radius)};padding:16px;display:flex;flex-direction:column;gap:14px;opacity:${un ? 0.6 : 1}}
       .top{display:flex;align-items:center;gap:12px}
@@ -6084,7 +6164,7 @@ class RoostPresence extends RoostBase {
         <path d="M0 0 L${R * s60} ${R * c60} A${R} ${R} 0 0 1 ${-R * s60} ${R * c60} Z" fill="url(#fov)" stroke="${g[0]}" stroke-opacity=".35" stroke-width="25"/>
         ${grid}${walls}${zones}${trails}
         <rect x="-260" y="-200" width="520" height="200" rx="60" fill="${g[0]}"/>
-        ${targets.map((t) => `<g class="dot" data-glide="${t.n}" style="transform:translate(${t.x}px,${t.y}px)"><circle r="520" fill="url(#dg)" opacity=".55"><animate attributeName="r" values="380;620;380" dur="2s" repeatCount="indefinite"/></circle><circle r="170" fill="${g[1]}" stroke="#fff" stroke-width="45"/></g>`).join("")}
+        ${targets.map((t) => `<g class="dot" data-glide="${esc(t.n)}" style="transform:translate(${t.x}px,${t.y}px)"><circle r="520" fill="url(#dg)" opacity=".55"><animate attributeName="r" values="380;620;380" dur="2s" repeatCount="indefinite"/></circle><circle r="170" fill="${g[1]}" stroke="#fff" stroke-width="45"/></g>`).join("")}
         ${people}<rect class="draft" x="0" y="0" width="0" height="0" rx="120" fill="${ZONE_COLOURS[(this._zone || 1) - 1]}" fill-opacity=".25" stroke="${ZONE_COLOURS[(this._zone || 1) - 1]}" stroke-width="60" stroke-dasharray="160 100"/>
       </svg>
       ${chips ? `<div class="chips">${chips}</div>` : ""}
@@ -6100,7 +6180,7 @@ class RoostPresence extends RoostBase {
     const toggle = (suffix, title, help) => { const id = findBySuffix(ids, suffix), s = this.sx(id); return s ? `<div class="row"><span><b>${title}</b>${help ? `<small>${help}</small>` : ""}</span><button class="tg ${s.state === "on" ? "on" : ""}" data-tog="${esc(id)}" role="switch" aria-checked="${s.state === "on"}" aria-label="${title}"><i></i></button></div>` : ""; };
     if (tab === "main") {
       const tid = findBySuffix(ids, "_timeout"), ts = this.sx(tid);
-      const timeout = ts ? `<div class="row"><span><b>Wait before "Nobody here"</b><small>After the last movement</small></span><b class="tv">${fmt(num(ts.state), 0)} s</b></div><input type="range" data-num="${esc(tid)}" min="${ts.attributes.min ?? 0}" max="${Math.min(ts.attributes.max ?? 600, 600)}" step="${ts.attributes.step || 1}" value="${num(ts.state) ?? 0}">` : "";
+      const timeout = ts ? `<div class="row"><span><b>Wait before "Nobody here"</b><small>After the last movement</small></span><b class="tv">${fmt(num(ts.state), 0)} s</b></div><input type="range" data-num="${esc(tid)}" min="${fin(ts.attributes.min, 0)}" max="${Math.min(fin(ts.attributes.max, 600), 600)}" step="${fin(ts.attributes.step, 1) || 1}" value="${num(ts.state) ?? 0}">` : "";
       const restart = findBySuffix(ids, "ld2450_restart") || findBySuffix(ids, "restart_esp");
       return `<div class="set">${seg}${timeout}${toggle("multi_target_tracking", "Track more than one person", "Off: only the nearest person")}${toggle("status_led", "Light on the sensor")}${toggle("_bluetooth", "Bluetooth on the sensor", "Only needed for the maker's phone app")}
         ${restart ? `<div class="btns"><button data-press="${esc(restart)}">Restart the sensor</button></div>` : ""}</div>`;
@@ -6198,7 +6278,7 @@ class RoostWeather extends RoostBase {
     if (!this._hass || !this._config) return;
     const c = this._config, p = this.p, s = this.st();
     this.subscribe();
-    const a = s?.attributes || {}, cond = s?.state || "", unit = (a.temperature_unit || "°C").replace(/^°?C$/, "°").replace(/^°?F$/, "°");
+    const a = s?.attributes || {}, cond = s?.state || "", unit = esc((a.temperature_unit || "°C").replace(/^°?C$/, "°").replace(/^°?F$/, "°"));
     const day = cond !== "clear-night" && (this.sx("sun.sun")?.state ?? "above_horizon") !== "below_horizon";
     const grey = /rain|pour|light|cloudy|fog|snow|hail/.test(cond) && cond !== "partlycloudy";
     const sky = !day ? "linear-gradient(135deg,#1B1E52,#38287E)" : grey ? "linear-gradient(135deg,#64748B,#94A3B8)" : "linear-gradient(135deg,#2563EB,#60A5FA 60%,#FDBA74)";
@@ -9756,7 +9836,7 @@ class RoostGrocy extends ticking(RoostBase, 60000) {
     </style>
     <div class="card">
       ${head("mdi:fridge-outline", c.name || "Kitchen", line)}
-      ${tabs.length > 1 ? `<div class="tb" role="tablist">${tabs.map((t) => `<button role="tab" class="${t === tab ? "on" : ""}" aria-selected="${t === tab}" data-tab="${t}" aria-label="${label[t]}"><ha-icon icon="${esc(icon[t])}"></ha-icon><span class="lb">${label[t]}</span>${count[t] ? `<span class="n num">${count[t]}</span>` : ""}</button>`).join("")}</div>` : ""}
+      ${tabs.length > 1 ? `<div class="tb" role="tablist">${tabs.map((t) => `<button role="tab" class="${t === tab ? "on" : ""}" aria-selected="${t === tab}" data-tab="${esc(t)}" aria-label="${label[t]}"><ha-icon icon="${esc(icon[t])}"></ha-icon><span class="lb">${label[t]}</span>${count[t] ? `<span class="n num">${count[t]}</span>` : ""}</button>`).join("")}</div>` : ""}
       <div class="ls">${body}</div>
       <div class="menu" role="menu" hidden></div>
     </div>`;
@@ -10133,7 +10213,7 @@ class RoostCamera extends RoostBase {
     </div></div>`;
     if (live && s && !UNAVAILABLE.includes(s.state)) {
       const el = document.createElement("ha-camera-stream");
-      el.hass = this._hass; el.stateObj = s; el.muted = true; el.controls = false;
+      el.hass = rawHass(this._hass); el.stateObj = rawHass(this._hass).states[s.entity_id] || s; el.muted = true; el.controls = false;
       this.shadowRoot.querySelector(".view").prepend(el);
     }
     this.shadowRoot.querySelector(".view").addEventListener("click", () => this.moreInfo(c.entity));
@@ -10335,7 +10415,7 @@ window.RoostLayer = RoostLayer;
 
 const RoostSheet = {
   ha() { return document.querySelector("home-assistant"); },
-  hass() { return this.ha()?.hass; },
+  hass() { return safeHass(this.ha()?.hass); },
   open(entityId, room) {
     const h = this.hass();
     if (!room && (!h || !h.states[entityId])) { this.ha()?.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true })); return; }
@@ -10396,7 +10476,7 @@ const RoostSheet = {
     if (dom === "alarm_control_panel") return { disarmed: "Off", armed_home: "On · home", armed_away: "On · away", armed_night: "On · night", armed_vacation: "On · holiday", arming: "Turning on", pending: "Pending", triggered: "Alarm!" }[s.state] || s.state;
     if (dom === "weather") return `${s.state.replace(/-/g, " ").replace(/^./, (m) => m.toUpperCase())}${a.temperature != null ? ` · ${a.temperature}°` : ""}`;
     if (dom === "water_heater") return `${s.state.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase())}${a.current_temperature != null ? ` · ${a.current_temperature}°` : ""}`;
-    if (dom === "vacuum") return `${s.state.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase())}${a.battery_level != null ? ` · battery ${a.battery_level}%` : ""}`;
+    if (dom === "vacuum") return `${s.state.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase())}${a.battery_level != null ? ` · battery ${fin(a.battery_level)}%` : ""}`;
     return s.state.replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase());
   },
   // the line under the name: the state, unless the big number or word below already says it (then: since when)
@@ -10415,9 +10495,9 @@ const RoostSheet = {
   // the one main control, by kind of device
   main(s, g, p) {
     const dom = s.entity_id.split(".")[0], a = s.attributes, id = s.entity_id;
-    const bar = (pct, fill, text, key) => `<div class="bar" data-bar="${key}"><i style="width:${pct}%;background:${fill}"></i><b>${esc(text)}</b></div>`;
-    const round = (icon, label, primary, act, size = 56) => `<button class="rb${primary ? " pr" : ""}" style="width:${size}px;height:${size}px" data-act="${act}" aria-label="${esc(label)}"><ha-icon icon="${esc(icon)}"></ha-icon></button>`;
-    const wide = (text, icon, primary, act) => `<button class="wb${primary ? " pr" : ""}" data-act="${act}">${icon ? `<ha-icon icon="${esc(icon)}"></ha-icon>` : ""}${esc(text)}</button>`;
+    const bar = (pct, fill, text, key) => `<div class="bar" data-bar="${esc(key)}"><i style="width:${Math.max(0, Math.min(100, fin(pct)))}%;background:${fill}"></i><b>${esc(text)}</b></div>`;
+    const round = (icon, label, primary, act, size = 56) => `<button class="rb${primary ? " pr" : ""}" style="width:${fin(size, 56)}px;height:${fin(size, 56)}px" data-act="${esc(act)}" aria-label="${esc(label)}"><ha-icon icon="${esc(icon)}"></ha-icon></button>`;
+    const wide = (text, icon, primary, act) => `<button class="wb${primary ? " pr" : ""}" data-act="${esc(act)}">${icon ? `<ha-icon icon="${esc(icon)}"></ha-icon>` : ""}${esc(text)}</button>`;
     if (UNAVAILABLE.includes(s.state)) return `<div class="note">This device is offline right now.</div>`;
     if (dom === "light") {
       const pct = s.state === "on" ? Math.round((a.brightness ?? 255) / 2.55) : 0;
@@ -10431,7 +10511,7 @@ const RoostSheet = {
       const pref = ["cool", "heat", "dry", "fan_only", "auto", "heat_cool"];
       const modes = [...all.filter((m) => m !== "off").sort((x, y) => pref.indexOf(x) - pref.indexOf(y)).slice(0, all.includes("off") ? 3 : 4), ...(all.includes("off") ? ["off"] : [])];
       return `${t != null ? `<div class="dial">${round("mdi:minus", "Lower", false, `t:${-step}`, 64)}<div class="big num">${fmt(t, Number.isInteger(t) ? 0 : 1)}°</div>${round("mdi:plus", "Raise", false, `t:${step}`, 64)}</div>` : ""}
-        <div class="seg" style="grid-template-columns:repeat(${modes.length},minmax(0,1fr))">${modes.map((m) => `<button class="${s.state === m ? "on" : ""}" data-act="mode:${m}">${esc({ fan_only: "Fan", heat_cool: "Auto" }[m] || m.charAt(0).toUpperCase() + m.slice(1))}</button>`).join("")}</div>`;
+        <div class="seg" style="grid-template-columns:repeat(${modes.length},minmax(0,1fr))">${modes.map((m) => `<button class="${s.state === m ? "on" : ""}" data-act="mode:${esc(m)}">${esc({ fan_only: "Fan", heat_cool: "Auto" }[m] || m.charAt(0).toUpperCase() + m.slice(1))}</button>`).join("")}</div>`;
     }
     if (dom === "cover") {
       const pos = coverView(s, RoostReversed.has(s.entity_id)).pos;
@@ -10458,7 +10538,7 @@ const RoostSheet = {
     }
     if (dom === "alarm_control_panel") {
       const modes = [["arm_home", "Home", "armed_home"], ["arm_away", "Away", "armed_away"], ["disarm", "Off", "disarmed"]];
-      return `<div class="seg" style="grid-template-columns:repeat(3,minmax(0,1fr))">${modes.map(([m, w, st]) => `<button class="${s.state === st ? "on" : ""}" data-act="alarm:${m}">${w}</button>`).join("")}</div>${a.code_format ? `<div class="note">Asks for its code when you choose.</div>` : ""}`;
+      return `<div class="seg" style="grid-template-columns:repeat(3,minmax(0,1fr))">${modes.map(([m, w, st]) => `<button class="${s.state === st ? "on" : ""}" data-act="alarm:${esc(m)}">${esc(w)}</button>`).join("")}</div>${a.code_format ? `<div class="note">Asks for its code when you choose.</div>` : ""}`;
     }
     if (dom === "vacuum") {
       const busy = ["cleaning", "returning"].includes(s.state);
@@ -10473,11 +10553,11 @@ const RoostSheet = {
     if (dom === "person" || dom === "device_tracker") {
       const pic = a.entity_picture, home = s.state === "home";
       return `<div class="pp"><span class="av" style="${home ? `background:linear-gradient(135deg,${g[0]},${g[1]})` : ""}">${pic ? `<img src="${esc(pic)}" alt="">` : esc((a.friendly_name || id).charAt(0).toUpperCase())}</span>
-        <span><div class="big" style="font-size:32px">${esc(this.stateWord(s))}</div>${a.battery_level != null ? `<div class="note">Battery ${a.battery_level}%</div>` : ""}</span></div>`;
+        <span><div class="big" style="font-size:32px">${esc(this.stateWord(s))}</div>${a.battery_level != null ? `<div class="note">Battery ${fin(a.battery_level)}%</div>` : ""}</span></div>`;
     }
     if (dom === "weather") {
       return `<div class="sens"><div class="big num">${a.temperature != null ? `${fmt(a.temperature, 0)}°` : ""}</div><div class="note">${esc(s.state.replace(/-/g, " ").replace(/^./, (m) => m.toUpperCase()))}</div></div>
-        <div class="note">${[a.humidity != null ? `Humidity ${a.humidity}%` : "", a.wind_speed != null ? `Wind ${a.wind_speed} ${a.wind_speed_unit || "km/h"}` : ""].filter(Boolean).join(" · ")}</div>`;
+        <div class="note">${[a.humidity != null ? `Humidity ${fin(a.humidity)}%` : "", a.wind_speed != null ? `Wind ${fin(a.wind_speed)} ${esc(a.wind_speed_unit || "km/h")}` : ""].filter(Boolean).join(" · ")}</div>`;
     }
     if (["select", "input_select"].includes(dom)) {
       const opts = a.options || [], nice = (o) => String(o).replace(/_/g, " ").replace(/^./, (m) => m.toUpperCase());
@@ -10945,7 +11025,7 @@ const RoostPop = {
 class RoostPopupLayer extends RoostBase {
   constructor() { super(); this._config = { theme: "auto" }; this.attachShadow({ mode: "open" }); this._onKey = (e) => { if (e.key === "Escape" && this._item && this._item.dismissible !== false) RoostPop.close(); }; }
 
-  set hass(h) { this._hass = h; this._cards?.forEach((el) => { el.hass = h; }); if (this._item && !this._busy) this.refresh(); }
+  set hass(h) { h = rawHass(h); this._hass = safeHass(h); this._cards?.forEach((el) => { el.hass = h; }); if (this._item && !this._busy) this.refresh(); }
 
   get hass() { return this._hass; }
 
@@ -10979,7 +11059,7 @@ class RoostPopupLayer extends RoostBase {
       let el; const cfg = withTheme(cfg0, item.theme);
       try { el = helpers ? helpers.createCardElement(cfg) : document.createElement(String(cfg.type || "").replace(/^custom:/, "")); if (!helpers) el.setConfig?.(cfg); }
       catch (e) { el = document.createElement("div"); el.textContent = `Card problem: ${e.message}`; }
-      el.hass = this._hass; return el;
+      el.hass = rawHass(this._hass); return el;
     });
     const box = this.shadowRoot.querySelector(".cards");
     if (box) this._cards.forEach((el) => box.appendChild(el));
@@ -11069,7 +11149,7 @@ class RoostPopupLayer extends RoostBase {
     </div>`;
     const r = this.shadowRoot;
     if (it.camera && it.live && cam && !UNAVAILABLE.includes(cam.state) && customElements.get("ha-camera-stream")) {
-      const el = document.createElement("ha-camera-stream"); el.hass = this._hass; el.stateObj = cam; el.muted = true; el.controls = false;
+      const el = document.createElement("ha-camera-stream"); el.hass = rawHass(this._hass); el.stateObj = rawHass(this._hass).states[cam.entity_id] || cam; el.muted = true; el.controls = false;
       r.querySelector(".cam").prepend(el);
     }
     r.querySelector(".cam")?.addEventListener("click", () => this.moreInfo(it.camera));
@@ -11666,9 +11746,10 @@ class RoostPage extends RoostBase {
   getGridOptions() { return { columns: 12, rows: "auto" }; }
 
   set hass(hass) {
+    hass = safeHass(rawHass(hass));
     this._hass = hass;
     if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
-    (this._cards || []).forEach((el) => { el.hass = hass; });
+    (this._cards || []).forEach((el) => { el.hass = rawHass(hass); });
     const sig = `${this.dark ? 1 : 0}|${this._built ? 1 : 0}`;
     if (sig === this._sig) return;
     this._sig = sig;
@@ -11686,7 +11767,7 @@ class RoostPage extends RoostBase {
         el = helpers ? helpers.createCardElement(cfg) : document.createElement(String(cfg.type || "").replace(/^custom:/, ""));
         if (!helpers) el.setConfig?.(cfg);
       } catch (e) { el = document.createElement("div"); el.textContent = `Card problem: ${e.message}`; }
-      if (this._hass) el.hass = this._hass;
+      if (this._hass) el.hass = rawHass(this._hass);
       return el;
     });
     this._built = true;
@@ -11870,9 +11951,10 @@ class RoostPanel extends RoostPage {
   watched() { return (this._config.entities || []).map((e) => (typeof e === "string" ? e : e?.entity)).filter(Boolean); }
 
   set hass(hass) {
+    hass = safeHass(rawHass(hass));
     this._hass = hass;
     if (this._setup) { if (!this._setupDrawn) { this._setupDrawn = true; this.renderSetup(); } return; }
-    (this._cards || []).forEach((el) => { el.hass = hass; });
+    (this._cards || []).forEach((el) => { el.hass = rawHass(hass); });
     const rows = this.watched().map((id) => this.sx(id)?.state).join("|");
     const sig = `${this.dark ? 1 : 0}|${this._built ? 1 : 0}|${rows}|${this._isOpen ? 1 : 0}`;
     if (sig === this._sig) return;
@@ -12112,12 +12194,14 @@ class RoostHome3d extends RoostBase {
   setConfig(config) { this._built = false; this._plan = null; this._shots = null; super.setConfig(config); }
 
   set hass(h) {
+    h = rawHass(h);
     if (h && RoostPop.hass !== h) RoostPop.setHass(h);
+    h = safeHass(h);
     const first = !this._hass; this._hass = h;
     if (!h || !this._config) return;
     const dark = this.dark;
     if (!this._built || dark !== this._wasDark) { this._wasDark = dark; this._built = true; this.render(); if (first || !this._plan) this.load(); return; }
-    if (this._inner) this._inner.hass = h;
+    if (this._inner) this._inner.hass = rawHass(h);
     this.summary();
   }
 
@@ -12220,7 +12304,7 @@ class RoostHome3d extends RoostBase {
     const c = this._config, cfg = { plan: this._plan.id, floor: Number(c.floor) || 0, view: c.view, height: Number(c.height) || 320, toolbar: true, hotspots: true };
     const key = JSON.stringify(cfg);
     if (!this._inner || this._innerKey !== key) { this._inner = document.createElement("roost-atelier-card"); this._inner.setConfig(cfg); this._innerKey = key; }
-    box.appendChild(this._inner); this._inner.hass = this._hass;
+    box.appendChild(this._inner); this._inner.hass = rawHass(this._hass);
   }
 
   drawShots() {
@@ -12501,7 +12585,9 @@ class RoostTour extends RoostBase {
   }
 
   set hass(h) {
+    h = rawHass(h);
     if (h && RoostPop.hass !== h) RoostPop.setHass(h);
+    h = safeHass(h);
     const first = !this._hass; this._hass = h;
     if (!h || !this._config) return;
     const dark = this.dark;
@@ -12840,7 +12926,7 @@ class RoostTour extends RoostBase {
       // a light that is on glows on the picture, in its own colour and brightness
       if (kind === "light") {
         const a = st?.attributes || {}, lit = st?.state === "on", k = lit ? (a.brightness != null ? 0.35 + 0.65 * (a.brightness / 255) : 1) : 0;
-        const col = a.rgb_color ? `rgb(${a.rgb_color.join(",")})` : Tour.kelvin(a.color_temp_kelvin || 2900);
+        const col = rgbNums(a.rgb_color) ? `rgb(${rgbNums(a.rgb_color)})` : Tour.kelvin(a.color_temp_kelvin || 2900);
         let gi = glow; if (!gi) { gi = document.createElement("i"); this.el.glow.appendChild(gi); this.glows.set(s.id, gi); }
         const r = (this.mode === "inside" ? 0.42 : this.mode === "top" ? 0.24 : 0.16) * Math.min(W, H) * scale * (0.7 + 0.3 * k);
         gi.style.left = `${at[0]}px`; gi.style.top = `${at[1]}px`; gi.style.width = gi.style.height = `${2 * r}px`; gi.style.opacity = (0.55 * k).toFixed(2);
@@ -12939,7 +13025,7 @@ class RoostTour extends RoostBase {
     sc.classList.toggle("on", on);
     if (dom === "light") {
       sc.style.setProperty("--on", on ? (a.brightness != null ? (0.25 + 0.75 * (a.brightness / 255)).toFixed(2) : "1") : "0");
-      sc.style.setProperty("--glow", a.rgb_color ? `rgb(${a.rgb_color.join(",")})` : Tour.kelvin(a.color_temp_kelvin || 2900));
+      sc.style.setProperty("--glow", rgbNums(a.rgb_color) ? `rgb(${rgbNums(a.rgb_color)})` : Tour.kelvin(a.color_temp_kelvin || 2900));
     }
     if (dom === "climate") {
       sc.style.setProperty("--ac", { cool: "#4E8CFF", heat: "#FF7A59", dry: "#F5B041", fan_only: "#2EC4B6", auto: "#8B6CFF", heat_cool: "#8B6CFF" }[st.state] || "#7C86B8");
