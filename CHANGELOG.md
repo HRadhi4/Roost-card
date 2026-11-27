@@ -8,6 +8,9 @@ Every version of Roost Cards, newest first.
 
 - **Arabic and other right-to-left languages, checked card by card.** The big room icon of the halo room card sits bottom right; every bar fills from the right and its slider follows the finger the right way; prayer and day timelines and good-range bars start on the right; graphs and small trend lines run from the right; the lock slides to the left; swiping between rooms goes the other way. A TV remote's direction pad and the thermostat and fan dials stay as they are, like real ones. Many more words are in Arabic: dates, sunset, "See all", "in 4 h 35 min", room summaries, graphs, the lock, the light's Warm / Neutral / Cool, and more. These rules now run with every test.
 
+- **Fixes found while filming on a real Home Assistant.** Tapping the thermostat's lock no longer also opens the details sheet. The details sheet now uses the name and icon you gave the card ("Living room AC", not the device's own "Hvac"). In Arabic, the thermostat's − and + and a media player's previous / play / next stay where they are, like the dial; the alarm says "arming", "armed away" and "off" the same way; the prayer card shows Arabic names and the Hijri month when the dashboard is in Arabic (unless English names were chosen); and "last ran 9 d ago", "in 43 min", the curtain's "Tap to stop" and the prayer calculation methods are in Arabic.
+- **Every GIF recorded on a real Home Assistant** with its own fonts, icons and theme.
+
 ## 1.29.2
 
 - **Safer with unusual names and values.** Everything the cards show that comes from Home Assistant (names, states, attributes such as temperatures, units, modes, colours, battery levels and positions) and every card setting is now checked before it is drawn: text is escaped, numbers must be real numbers, colours must be real colours, and pictures and fonts can only hold what an address or a font name needs. A name or value with odd characters now just shows as text.

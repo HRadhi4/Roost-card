@@ -506,7 +506,7 @@ class RoostBase extends HTMLElement {
       if (this.localName === "roost-remote" && config.entity && !config.athom_remote) config = { ...config, entity: undefined, athom_remote: "Sample TV" };
     }
     this._config = { ...this.constructor.defaults, ...cleanConfig(config, this.constructor.defaults) };
-    this._ownCfg = this._config;
+    this._ownCfg = this._config; this._given = config || {};
     if (this._config.reverse && String(this._config.entity || "").startsWith("cover.")) RoostReversed.add(this._config.entity);
     // A card that still needs a device shows a friendly "pick one" note, like Home Assistant's own cards, instead of a red error.
     this._setup = "";
@@ -822,8 +822,12 @@ class RoostBase extends HTMLElement {
     if (!entityId) return;
     const d = this._config?.details || window.RoostDetails;
     if (d === "home-assistant" || !window.RoostSheet) this.fire("hass-more-info", { entityId });
-    else window.RoostSheet.open(entityId);
+    // the sheet uses the name and icon given on the card ("Living room AC"), not the device's own name ("Hvac")
+    else window.RoostSheet.open(entityId, null, entityId === this._config?.entity ? { name: this._config.name, icon: this._config.icon } : null);
   }
+
+  // text set while the card runs (not in its markup) goes through the same translation as the markup
+  say(t) { return RoostLang.pick(this._hass, this._config) === "ar" ? RoostLang.line(t) : t; }
 
   vibrate(ms = 12) { try { navigator.vibrate?.(ms); } catch (e) { /* not on this device */ } }
 
@@ -1647,7 +1651,7 @@ class RoostThermostat extends RoostBase {
       svg{width:100%;max-width:${maxW}px;display:block;margin:${nest ? "10px auto 0" : "4px auto"};touch-action:none;user-select:none;-webkit-user-select:none;cursor:${noTemp || un ? "default" : "pointer"}}
       svg.on{animation:roost-arc 3s ease-in-out infinite}
       svg.drag #val{fill:#C084FC}
-      .ctl{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-top:${c.compact ? -52 : nest ? 10 : 6}px;position:relative}
+      .ctl{/*ltr*/direction:ltr;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;margin-top:${c.compact ? -52 : nest ? 10 : 6}px;position:relative}
       @container (max-width: 260px){:host .ctl{gap:8px}}
       .rb{width:min(52px,24cqw);height:min(52px,24cqw);border-radius:50%;border:0;background:${p.inset};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer}
       .rb.pw{width:min(${nest ? 68 : 64}px,30cqw);height:min(${nest ? 68 : 64}px,30cqw);background:${on ? (nest ? "linear-gradient(135deg,#2F6BFF,#8B6CFF)" : `linear-gradient(135deg,${g[0]},${g[1]})`) : p.inset};color:${on ? "#fff" : nest ? p.muted : p.text};box-shadow:${on ? (nest ? "0 14px 30px -8px rgba(90,110,255,.9)" : `0 12px 28px -10px ${g[2]}`) : "none"}}
@@ -1734,7 +1738,9 @@ class RoostThermostat extends RoostBase {
     const root = this.shadowRoot, svg = root.querySelector("svg"), c = this._config;
     // locked: a touch on the dial only points at the lock
     const nudge = () => { const card = root.querySelector(".card"); card.classList.remove("shake"); void card.offsetWidth; card.classList.add("shake"); this.vibrate(20); };
-    root.querySelector(".lk")?.addEventListener("click", () => { this.vibrate(); if (this.locked()) this.unlock(); else this.relock(); });
+    // the lock only locks and unlocks: the tap stops here, so it never also opens the details sheet
+    root.querySelector(".lk")?.addEventListener("click", (e) => { e.stopPropagation(); this.vibrate(); if (this.locked()) this.unlock(); else this.relock(); });
+    for (const t of ["pointerdown", "pointerup", "touchstart", "touchend", "mousedown", "mouseup"]) root.querySelector(".lk")?.addEventListener(t, (e) => e.stopPropagation());
     svg.addEventListener("pointerdown", (ev) => {
       const { un, set } = this.info;
       if (un || set == null) return;
@@ -3512,7 +3518,7 @@ class RoostCurtain extends RoostBase {
       const mv = v.state === "opening" || v.state === "closing";
       trk.querySelector(".fl").style.width = `${pos}%`;
       trk.setAttribute("aria-valuenow", String(pos));
-      trk.querySelector(".tl").textContent = un ? "Not reachable" : mv ? "Tap to stop" : pos === 0 ? "Slide to open" : pos === 100 ? "Open · slide to close" : `${pos}% open`;
+      trk.querySelector(".tl").textContent = this.say(un ? "Not reachable" : mv ? "Tap to stop" : pos === 0 ? "Slide to open" : pos === 100 ? "Open · slide to close" : `${pos}% open`);
     }
     // real fabrics: folds bunch up as it opens, slats close up as a blind rises
     const look = this.kind(), H = Math.max(40, (Number(c.height) || 150) - 12);
@@ -4153,7 +4159,7 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
   }
 
   // Arabic prayer names when chosen, or when the whole dashboard is in Arabic (unless English names were chosen)
-  arNames() { const n = this._config.names; return n === "arabic" || (n !== "english" && n !== "both" && RoostLang.pick(this._hass, this._config) === "ar"); }
+  arNames() { const n = this._given?.names; if (n) return n === "arabic"; return RoostLang.pick(this._hass, this._config) === "ar"; }
   label(k, date) {
     const c = this._config, fri = c.jumuah && k === "dhuhr" && date.getDay() === 5;
     const en = fri ? "Jumu'ah" : PRAYER_NAMES[k][0], ar = fri ? "الجمعة" : PRAYER_NAMES[k][1];
@@ -4743,7 +4749,7 @@ class RoostMedia extends RoostBase {
       .vol{flex:1;position:relative;height:42px;border-radius:999px;background:${p.inset};overflow:hidden;cursor:pointer;touch-action:none}
       .vol .f{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,${g[0]},${g[1]});opacity:${muted ? 0.4 : 1}}
       .vol .v{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${p.text};mix-blend-mode:${this.dark ? "normal" : "multiply"}}
-      .ctl{display:flex;justify-content:center;gap:14px}
+      .ctl{/*ltr*/direction:ltr;display:flex;justify-content:center;gap:14px}
       .src{display:flex;flex-wrap:wrap;gap:6px}
       .src button{padding:8px 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer}
       .src button.on{background:${g[0]}2E;color:${g[this.dark ? 1 : 0]};border-color:transparent}
@@ -5388,7 +5394,7 @@ class RoostAlarm extends RoostBase {
     </style>
     <div class="card">
       <div class="top"><span class="sh" data-pop="${esc(s?.state || "")}" data-popkey="sh"><ha-icon icon="${esc(icon)}"></ha-icon></span>
-        <span class="tx"><div class="w t">${esc(c.name || this.name(c.entity, "Alarm"))} · ${esc(word.replace("Armed · ", "armed ").replace(/^Disarmed$/, "off"))}</div>${doors.length ? `<div class="d t">${open.length ? `${open.length} open: ${esc(open.map((d) => d.attributes.friendly_name).join(", "))}` : "All doors closed"}</div>` : ""}</span></div>
+        <span class="tx"><div class="w t">${esc(c.name || this.name(c.entity, "Alarm"))} · ${esc(word === "Alarm!" ? word : word.replace("Armed · ", "armed ").replace(/^Disarmed$/, "off").toLowerCase())}</div>${doors.length ? `<div class="d t">${open.length ? `${open.length} open: ${esc(open.map((d) => d.attributes.friendly_name).join(", "))}` : "All doors closed"}</div>` : ""}</span></div>
       ${this._pending ? `<div class="code num">${"•".repeat(this._code.length) || "&nbsp;"}</div><div class="pad">${[1, 2, 3, 4, 5, 6, 7, 8, 9, "×", 0, "✓"].map((k) => `<button data-k="${k}">${k}</button>`).join("")}</div>`
     : `<div class="seg" role="radiogroup">${modes.map((m) => { const on = m === "disarm" ? s?.state === "disarmed" : s?.state === m.replace("arm_", "armed_"); const [w, ic] = m === "disarm" ? ["Off", "mdi:shield-off-outline"] : label[m] || [m, "mdi:shield"]; return `<button class="b ${on ? "on" : ""}" data-m="${esc(m)}" role="radio" aria-checked="${on}" aria-label="${esc(w)}"><ha-icon icon="${esc(ic)}"></ha-icon><span>${esc(w)}</span></button>`; }).join("")}</div>`}
       ${c.show_doors && doors.length ? `<div class="doors">${doors.map((d) => `<span class="dr" data-e="${esc(d.entity_id)}"><ha-icon icon="${esc(d.state === "on" ? "mdi:door-open" : "mdi:door-closed")}" style="color:${d.state === "on" ? "#FF9F6B" : "#3DD68C"}"></ha-icon>${esc(d.attributes.friendly_name || d.entity_id)}</span>`).join("")}</div>` : ""}
@@ -10299,6 +10305,10 @@ const AR_WORDS = {
   "Too high": "مرتفع جداً", "Too low": "منخفض جداً", "same time": "التوقيت نفسه", "AM": "ص", "PM": "م", "SET TO": "مضبوط على", "Set to ": "مضبوط على", "Playing": "يعمل الآن", "Paused": "متوقف مؤقتاً",
   "yesterday": "أمس", "Add an item": "أضف عنصراً", "All day": "طوال اليوم", "Fresh": "منعش", "Stale": "خانق", "Breeze": "نسيم", "Doors and alarm": "الأبواب والإنذار", "LAST 24 HOURS": "آخر 24 ساعة",
   "Shopping list": "قائمة التسوق", "No tasks": "لا مهام", "No chores": "لا أعمال منزلية", "Slide to": "اسحب لـ", "Wind": "الرياح",
+  "arming": "جارٍ التفعيل", "pending": "قيد الانتظار", "armed away": "مفعّل خارج المنزل", "armed home": "مفعّل في المنزل", "armed night": "مفعّل ليلاً", "armed holiday": "مفعّل للسفر", "armed": "مفعّل",
+  "Umm al-Qura, Makkah": "أم القرى، مكة المكرمة", "Muslim World League": "رابطة العالم الإسلامي", "North America (ISNA)": "أمريكا الشمالية (ISNA)", "Egyptian General Authority": "الهيئة المصرية العامة للمساحة",
+  "University of Islamic Sciences, Karachi": "جامعة العلوم الإسلامية، كراتشي", "Gulf region": "منطقة الخليج", "Kuwait": "الكويت", "Qatar": "قطر", "Dubai": "دبي",
+  "Tap to stop": "اضغط للإيقاف", "Slide to open": "اسحب للفتح", "slide to close": "اسحب للإغلاق", "Not reachable": "غير متصل",
   "See all": "عرض الكل", "No history yet": "لا يوجد سجل بعد", "Power consumption": "استهلاك الطاقة", "Energy": "الطاقة", "humidity": "الرطوبة", "Sunset": "الغروب", "Room on": "الغرفة تعمل",
   "Slide to unlock ›››": "اسحب لفتح القفل ›››", "Slide to open ›››": "اسحب للفتح ›››", "Lowest": "الأدنى", "Highest": "الأعلى", "Next prayer": "الصلاة القادمة",
   "Warm": "دافئ", "Neutral": "محايد", "Cool white": "بارد", "Comfortable": "مريح", "Comfy": "مريح", "Cold": "بارد", "Hot": "حار", "Humid": "رطب",
@@ -10319,7 +10329,7 @@ const AR_PATTERNS = [
   [/^(.+) in (\d+) h (\d+) min$/, (m, p, h, mi) => `${arWord(p)} بعد ${h} س ${mi} د`], [/^(.+) in (\d+) min$/, (m, p, mi) => `${arWord(p)} بعد ${mi} دقيقة`], [/^Iftar in (.+)$/, (m, x) => `الإفطار بعد ${x}`],
   [/^Time for (.+)$/, (m, p) => `حان وقت ${arWord(p)}`], [/^At (.+)$/, "الساعة $1"], [/^Maghrib at (.+)$/, "المغرب الساعة $1"], [/^Rang (.+)$/, (m, x) => `رنّ ${arWord(x)}`],
   [/^(.+) is open$/, "$1 مفتوح"], [/^(.+) is on$/, "$1 يعمل"], [/^(\d+) doors or windows are open$/, "$1 أبواب أو نوافذ مفتوحة"], [/^(\d+) batteries are low$/, "$1 بطاريات منخفضة"], [/^(.+): battery low$/, "$1: البطارية منخفضة"],
-  [/^Last ran (.+)$/, (m, x) => `آخر تشغيل ${arWord(x)}`], [/^(\d+(?:\.\d+)?)° outside$/, "$1° في الخارج"], [/^And it is (.+) outside$/, "والحرارة $1 في الخارج"], [/^At night$/, "في الليل"],
+  [/^Last ran (.+)$/, (m, x) => `آخر تشغيل ${arWord(x) || x}`], [/^(\d+) d ago$/, "قبل $1 ي"], [/^(\d+) h ago$/, "قبل $1 س"], [/^(\d+) w ago$/, "قبل $1 أسابيع"], [/^in (\d+) min$/, "بعد $1 د"], [/^(\d+(?:\.\d+)?)° outside$/, "$1° في الخارج"], [/^And it is (.+) outside$/, "والحرارة $1 في الخارج"], [/^At night$/, "في الليل"],
   [/(\d+(?:[.,]\d+)?) ?(AM|PM)$/, (m, t, ap) => `${t} ${ap === "AM" ? "ص" : "م"}`],
   [/^([A-Z][A-Za-z ]+) (on|off|open|closed)$/, (m, x, st) => `${arWord(x) || x} ${AR_WORDS[st.charAt(0).toUpperCase() + st.slice(1)]}`],
 ];
@@ -10490,7 +10500,7 @@ window.RoostLayer = RoostLayer;
 const RoostSheet = {
   ha() { return document.querySelector("home-assistant"); },
   hass() { return safeHass(this.ha()?.hass); },
-  open(entityId, room) {
+  open(entityId, room, own) {
     const h = this.hass();
     if (!room && (!h || !h.states[entityId])) { this.ha()?.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId }, bubbles: true, composed: true })); return; }
     this.close();
@@ -10499,7 +10509,7 @@ const RoostSheet = {
     const root = host.attachShadow({ mode: "open" });
     document.body.appendChild(host);
     RoostLayer.hold(host);
-    this.el = { host, root, id: entityId, room: room || null, full: false, hist: null, last: null };
+    this.el = { host, root, id: entityId, room: room || null, full: false, hist: null, last: null, own: own || null };
     this._key = (e) => { if (e.key === "Escape") this.close(); };
     window.addEventListener("keydown", this._key);
     this._tick = setInterval(() => {
@@ -10823,8 +10833,8 @@ const RoostSheet = {
     if (el.hist === null) { el.hist = []; this.history(el.id); }
     const dark = !!h.themes?.darkMode, p = PALETTE[dark ? "dark" : "light"], dom = el.id.split(".")[0];
     const { g } = this.look(dom, s), a = s.attributes;
-    const name = a.friendly_name || el.id;
-    const icon = a.icon || { light: "mdi:lightbulb", switch: "mdi:power-socket-uk", climate: "mdi:snowflake", cover: "mdi:curtains", lock: "mdi:lock", media_player: "mdi:television", fan: "mdi:fan", sensor: "mdi:thermometer", binary_sensor: "mdi:door", scene: "mdi:palette", script: "mdi:script-text-play", automation: "mdi:robot",
+    const name = el.own?.name || a.friendly_name || el.id;
+    const icon = el.own?.icon || a.icon || { light: "mdi:lightbulb", switch: "mdi:power-socket-uk", climate: "mdi:snowflake", cover: "mdi:curtains", lock: "mdi:lock", media_player: "mdi:television", fan: "mdi:fan", sensor: "mdi:thermometer", binary_sensor: "mdi:door", scene: "mdi:palette", script: "mdi:script-text-play", automation: "mdi:robot",
       camera: "mdi:cctv", alarm_control_panel: "mdi:shield-home", vacuum: "mdi:robot-vacuum", water_heater: "mdi:water-boiler", person: "mdi:account", device_tracker: "mdi:cellphone-marker", weather: "mdi:weather-partly-cloudy",
       select: "mdi:format-list-bulleted", input_select: "mdi:format-list-bulleted", number: "mdi:ray-vertex", input_number: "mdi:ray-vertex", update: "mdi:package-up", humidifier: "mdi:air-humidifier", siren: "mdi:bullhorn" }[dom] || "mdi:information-outline";
     const attrs = Object.entries(a).filter(([k, v]) => !["friendly_name", "icon", "entity_picture", "supported_features", "supported_color_modes", "color_mode", "hvac_modes", "fan_modes", "preset_modes", "swing_modes", "effect_list", "source_list", "sound_mode_list", "entity_id", "attribution", "device_class", "state_class", "unit_of_measurement", "restored", "editable", "id", "min_mireds", "max_mireds", "min_color_temp_kelvin", "max_color_temp_kelvin", "xy_color", "hs_color", "rgb_color", "rgbw_color", "rgbww_color"].includes(k) && v != null && (typeof v !== "object")).slice(0, 14);

@@ -47,7 +47,9 @@ check(5, /rtlX\(box, 0\) === 1 \? dx > 0 : dx < 0/.test(src), "swiping between r
 
 // 6. only the listed places stay left-to-right
 {
-  const ok = [/\.bar\{\/\*ltr\*\/\$\{pos\}/, /\.pad \.(k|k:active|up|ok)\{\/\*ltr\*\//];
+  // the bottom bar's placement; a TV remote's direction pad; the thermostat's − power + row (it follows the dial,
+  // which rises clockwise); a media player's previous / play / next (the same everywhere)
+  const ok = [/\.bar\{\/\*ltr\*\/\$\{pos\}/, /\.pad \.(k|k:active|up|ok)\{\/\*ltr\*\//, /\.ctl\{\/\*ltr\*\/direction:ltr;display:grid;grid-template-columns:1fr auto 1fr/, /\.ctl\{\/\*ltr\*\/direction:ltr;display:flex;justify-content:center;gap:14px\}/];
   const bad = [];
   lines.forEach((l, i) => { if (/\/\*ltr\*\//.test(l) && !ok.some((r) => r.test(l))) bad.push(i + 1); });
   check(6, !bad.length, `kept left-to-right without a listed reason on line ${bad.join(", ")}`);
@@ -63,7 +65,7 @@ check(5, /rtlX\(box, 0\) === 1 \? dx > 0 : dx < 0/.test(src), "swiping between r
   const want = { "See all": "عرض الكل", "No history yet": "لا يوجد سجل بعد", "Power consumption": "استهلاك الطاقة", "Monday 16 November · 3:20 PM": "الاثنين 16 نوفمبر · 3:20 م",
     "Living Room on": "غرفة المعيشة يعمل", "Curtain open · Bedroom on": "الستارة مفتوح · غرفة النوم يعمل", "in 4h 35m": "بعد 4 س 35 د", "Sunset at 5:28 PM": "الغروب الساعة 5:28 م",
     "Slide to unlock ›››": "اسحب لفتح القفل ›››", "Lowest": "الأدنى", "Highest": "الأعلى", "Last 24 h": "آخر 24 س", "Too high": "مرتفع جداً", "4 devices · 2 on": "4 أجهزة · 2 يعمل",
-    "15.6°C · 54% humidity": "15.6°C · الرطوبة 54٪", "2 people here": "2 أشخاص هنا", "Wind 24 km/h": "الرياح 24 km/h", "Warm": "دافئ", "Neutral": "محايد" };
+    "15.6°C · 54% humidity": "15.6°C · الرطوبة 54٪", "2 people here": "2 أشخاص هنا", "Wind 24 km/h": "الرياح 24 km/h", "Warm": "دافئ", "Neutral": "محايد", "Tap to stop": "اضغط للإيقاف", "Last ran 9 d ago": "آخر تشغيل قبل 9 ي", "in 43 min": "بعد 43 د", "Open · slide to close": "مفتوح · اسحب للإغلاق" };
   check(7, !!L, "RoostLang is missing");
   if (L) for (const [en, ar] of Object.entries(want)) check(7, L.line(en) === ar, `"${en}" gives "${L.line(en)}", not "${ar}"`);
   check(7, /data-ar="\$\{\{ Warm: "دافئ", Neutral: "محايد", Cool: "بارد" \}\[w\]\}"/.test(src), "the light's Cool no longer has its own Arabic (بارد)");
