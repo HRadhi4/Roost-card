@@ -12,6 +12,10 @@
 
 ![The thermostat in dark, light and frosted glass](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/thermostat.gif)
 
+### Lock it so it isn't changed by mistake
+
+Open **Lock** in the card's editor. *Lock the temperature* locks the dial and − / +: tap the lock icon, then turn the dial. *Lock everything* locks the power and mode buttons too. After the seconds you choose, it locks itself again.
+
 ## Curtains that really move
 
 **Roost Curtain** draws a window with curtains that slide while they move.
@@ -21,6 +25,8 @@
 1. *Add card → Roost Curtain* and pick your curtain.
 2. **Behind the window:** the sky (follows the sun), **live weather** (rain falls, clouds drift; it only moves while the curtain is open), **your own picture** (for example `/local/view.jpg`, with an optional night picture), or nothing.
 3. **Kind:** two curtains, one curtain (left or right), or a **roller blind**.
+
+4. **Top of the curtain:** leave the rail as it is, or add a **gypsum curtain box**, a box **with a cornice**, a box **with a hidden light**, a **fabric pelmet** (pick the fabric, straight or scalloped edge) or a **wooden** one.
 
 ### My curtain says "open" when it's closed
 

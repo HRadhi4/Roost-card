@@ -152,6 +152,8 @@ power_action:            # optional: for an AC sent by infrared, the power butto
   action: perform-action
   perform_action: script.turn_on
   target: { entity_id: script.bedroom_ac_power }
+lock: temp               # temp: the dial and +/- need a tap on the lock first; all: every button does; off
+relock: 10               # seconds before it locks itself again
 ```
 Drag the knob or tap anywhere on the ring. The number follows your finger, and the temperature is sent when you let go.
 
@@ -169,6 +171,43 @@ button_size: 58       # round style, px
 fill: gradient        # gradient, solid, glass or outline
 show_name: true
 ```
+
+### Roost Scenes
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/scenes.gif" width="320" alt="Roost Scenes card in action">
+
+All your scenes as round buttons in one card. **Spread** keeps them evenly spaced and centred, however many there are, and long names wrap under their own button. **Stacked** overlaps them like a dock: the button under your finger lifts and shows its name, and letting go runs it.
+
+```yaml
+type: custom:roost-scenes
+layout: spread          # spread, or stack
+show_names: true        # spread only; stacked buttons show their name when touched
+button_size: 58
+shape: rounded          # rounded, circle or square
+fill: gradient          # gradient, solid, glass or outline
+items:
+  - { name: Good night, icon: mdi:weather-night, entity: scene.good_night, color: purple }
+  - { name: Movie time, icon: mdi:movie-open, entity: scene.movie_time, color: blue }
+  - { name: Leave home, icon: mdi:exit-run, entity: script.leave_home, color: coral }
+```
+
+### Roost Top Bar
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/top-bar.gif" width="320" alt="Roost Top Bar in action">
+
+A bar at the top of the screen in the same frosted glass as the bottom bar: back and forward buttons, the page's name (or your own title), the time, and your own buttons on the right (a page, full screen, light and dark, or Arabic and English).
+
+```yaml
+type: custom:roost-top-bar
+show_back: true
+show_forward: true
+title: ""               # empty: the page's own name
+show_clock: true
+fixed: true             # stays at the top while the page scrolls
+items:
+  - { action: theme }                       # light and dark (its icon follows)
+  - { icon: mdi:cog, name: Settings, path: /config/dashboard }
+```
+
+Like the bottom bar, the top bar on every page looks like the one on your dashboard's first page. Turn on **Its own look** to style one bar separately.
 
 ### Roost Hero
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/hero.gif" width="320" alt="Roost hero card in action">
@@ -237,6 +276,7 @@ active_style: filled  # filled, soft, pill, line, dot or icon
 background: glass     # glass, solid or none
 bar_height: 54
 icon_size: 22
+own_look: false       # the bar on every page looks like the one on the dashboard's first page; true keeps this one's own
 # a button that switches full screen on and off (its icon follows); put it on the side rail, only for you:
 #  - { name: Full screen, icon: mdi:fullscreen, action: fullscreen, bottom: true, users: [person.me] }
 ```
@@ -303,6 +343,8 @@ follow_pause: 2            # minutes to wait after you pick a room yourself
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/curtain.gif" width="320" alt="Roost curtain card in action">
 
 Looks: `look: banded` gives ripple folds with a band along the hem (`band: silver`, `band_height: 22`). For your own fabric, put a picture of it in Home Assistant's `www` folder and use `fabric_image: /local/roost/fabric.jpg`: the card adds the folds (`photo_folds: false` if the picture already shows folds) and, with `photo_band: true`, the bottom band. One curtain that opens from right to left: `style: left`.
+
+**Curtain box:** `box: gypsum` (a plain gypsum box), `cornice` (with a cornice), `light` (with a hidden light strip), `fabric` (a fabric pelmet, `box_fabric: linen` and `box_shape: scallop` for a scalloped edge) or `wood`.
 
 Drag sideways on the window to slide the curtains open or closed (up and down for a blind). With `reverse: true` every control is turned around for you: buttons, slide bar, tapping the window and the details sheet.
 
@@ -1273,6 +1315,9 @@ cards:
 gap: 16           # space between cards
 side: 14          # space at the sides
 bottom: 130       # room for the bottom bar
+background_image: /local/roost/wall.jpg   # optional: your own picture behind the page; frosted-glass cards blur it
+image_dim: 35     # darken the picture (%)
+image_blur: 0     # soften the picture
 ```
 
 ### Roost Panel

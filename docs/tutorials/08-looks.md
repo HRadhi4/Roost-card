@@ -12,7 +12,13 @@ Every card can be **solid**, **frosted glass** or **fully clear**. Open **See-th
 
 ![Frosted glass on a tile](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile.gif)
 
-The bottom bar (**Roost Nav**) is frosted glass already; the same sliders tune it.
+The bottom bar (**Roost Nav**) is frosted glass already; the same sliders tune it. Set them on the bar of your first page: the bars on every other page follow it.
+
+## Your own background picture
+
+In a **Roost Page**, put your picture in Home Assistant's `www` folder and set **Your own background picture** to `/local/roost/wall.jpg`. Darken or soften it with the sliders; frosted-glass cards blur it.
+
+![A page with its own picture](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/page.gif)
 
 ## Buttons that light up
 

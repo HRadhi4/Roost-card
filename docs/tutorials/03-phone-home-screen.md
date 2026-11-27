@@ -21,7 +21,15 @@
 4. For cards 1 to 5, open **Layout** in the card editor and choose **full width**.
 5. Tap **Done**.
 
-> **The bottom bar (Roost Nav)** floats at the bottom of the screen. While you edit, it sits in its own place with a small note, so you can tap it to change it.
+**More you can add:**
+- **Roost Scenes** puts all your scenes in one row of round buttons, spread evenly or stacked like a dock.
+
+  ![Roost Scenes](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/scenes.gif)
+- **Roost Top Bar** gives the top of the screen back and forward buttons, the page's name and the time.
+
+  ![Roost Top Bar](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/top-bar.gif)
+
+> **The bottom bar (Roost Nav)** floats at the bottom of the screen. While you edit, it sits in its own place with a small note, so you can tap it to change it. Style the bar on your first page; the bars on your other pages copy its look by themselves.
 
 ## Make it look like an app: Roost Page
 
