@@ -460,10 +460,27 @@ if (!calls.some((x) => x[1] === "toggle")) { fails++; console.error("FAIL confir
   if (b3._config.background !== "solid") { fails++; console.error("FAIL bar with its own look keeps it"); }
   ha.host.remove();
 }
+// Curtain box colour: a real colour paints the box, anything else falls back to ceiling white
+{
+  const c1 = document.createElement("roost-curtain"); c1.setConfig({ entity: "cover.curtain", box: "gypsum", box_color: "#EDE3D1" }); document.body.appendChild(c1); c1.hass = hass(true);
+  if (!c1.shadowRoot.innerHTML.includes("rgb(237,227,209)")) { fails++; console.error("FAIL curtain box_color paints the gypsum"); }
+  const c2 = document.createElement("roost-curtain"); c2.setConfig({ entity: "cover.curtain", box: "gypsum", box_color: "red;}<b>" }); document.body.appendChild(c2); c2.hass = hass(true);
+  if (/<b>|red;\}/.test(c2.shadowRoot.innerHTML)) { fails++; console.error("FAIL curtain box_color lets a strange value through"); }
+  c1.remove(); c2.remove();
+}
+// Numbers in Arabic: a card's own choice wins, otherwise the screen's choice
+{
+  const L = window.RoostLang; globalThis.localStorage ??= window.localStorage;
+  window.localStorage.setItem("roost-numerals", "eastern");
+  if (!L.eastern({ numerals: "auto" }) || L.eastern({ numerals: "western" })) { fails++; console.error("FAIL numerals follow the screen unless the card picks"); }
+  window.localStorage.setItem("roost-numerals", "western");
+  if (L.eastern({}) || !L.eastern({ numerals: "eastern" })) { fails++; console.error("FAIL numerals western screen / eastern card"); }
+  window.localStorage.removeItem("roost-numerals");
+}
 // Errors for missing settings
 for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }], ["roost-rooms", { rooms: [] }]]) {
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 45} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 49} checks passed`);
 process.exit(fails ? 1 : 0);

@@ -995,7 +995,9 @@ class RoostEditor extends HTMLElement {
     const noBroken = noSurface || ["roost-nav", "roost-page", "roost-panel", "roost-rooms"].includes(cls.tag);
     const WHO = { name: "show_to", label: "Only these people see this card (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } };
     const LANG = { name: "language", label: "Language of this card", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Like Home Assistant (or this screen's choice)" }, { value: "en", label: "English" }, { value: "ar", label: "العربية · Arabic, right to left" }] } } };
-    const schema = [...(noSurface ? form.schema : [...form.schema, ...(noBroken ? [] : [BROKEN_FIELDS]), SURFACE_FIELDS(cls.tag === "roost-nav")]), WHO, LANG];
+    const NUMS = { name: "numerals", label: "Numbers in Arabic", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Like this screen's choice" }, { value: "western", label: "Arabic numerals · 1 2 3" }, { value: "eastern", label: "Indian numerals · ١ ٢ ٣" }] } } };
+    const ownNums = ["roost-clock", "roost-prayer"].includes(cls.tag);
+    const schema = [...(noSurface ? form.schema : [...form.schema, ...(noBroken ? [] : [BROKEN_FIELDS]), SURFACE_FIELDS(cls.tag === "roost-nav")]), WHO, LANG, ...(ownNums ? [] : [NUMS])];
     this._data = { ...cls.defaults, ...this._config };
     if (!this._form) {
       this._form = document.createElement("ha-form");
@@ -1282,7 +1284,7 @@ class RoostTile extends RoostBase {
 class RoostChips extends RoostBase {
   static get defaults() { return { entities: [], theme: "auto", style: "classic", align: "stretch", size: "medium", chip_shape: "pill", background: "solid" }; }
 
-  validate(c) { if ((!Array.isArray(c.entities) || !c.entities.length) && !c.show_fullscreen && !c.show_theme && !c.show_language) throw new Error("Choose at least one device"); }
+  validate(c) { if ((!Array.isArray(c.entities) || !c.entities.length) && !c.show_fullscreen && !c.show_theme && !c.show_language && !c.show_numerals) throw new Error("Choose at least one device"); }
 
   extraSignature() { return `${RoostFull.isOn() ? 1 : 0}|${this._hass?.themes?.darkMode ? 1 : 0}`; }
 
@@ -1299,6 +1301,7 @@ class RoostChips extends RoostBase {
         { name: "fullscreen_users", label: "Full screen chip only for (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
         { name: "theme_users", label: "Light and dark chip only for (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } },
         { name: "show_language", label: "An Arabic / English chip", selector: { boolean: {} } },
+        { name: "show_numerals", label: "A numbers chip: Arabic 123 or Indian ١٢٣ (in Arabic)", selector: { boolean: {} } },
         { type: "grid", name: "", schema: [
           { name: "size", selector: { select: { mode: "dropdown", options: [{ value: "compact", label: "Compact (for wall panels)" }, { value: "small", label: "Small" }, { value: "medium", label: "Medium" }, { value: "large", label: "Large" }] } } },
           { name: "show_words", label: "Words next to door icons (“Closed”)", selector: { boolean: {} } },
@@ -1386,6 +1389,7 @@ class RoostChips extends RoostBase {
     if (people.length) chips.push({ key: "__people", people: true, group: "people", label: "People", say: homeN ? `${homeN} home` : "Away", frac: homeN / people.length, of: `${homeN}/${people.length}` });
     if (c.show_theme && forPeople(this._hass, c.theme_users)) chips.push({ key: "__theme", icon: RoostMode.icon(), colour: this.dark ? "#FCD34D" : "#6D4BFF", text: "", special: "theme" });
     if (c.show_language) chips.push({ key: "__lang", icon: "mdi:translate", colour: p.text, text: "", special: "language" });
+    if (c.show_numerals) chips.push({ key: "__num", icon: "mdi:numeric", colour: p.text, text: RoostLang.eastern() ? "١٢٣" : "123", special: "numerals" });
     if (c.show_fullscreen && forPeople(this._hass, c.fullscreen_users)) chips.push({ key: "__full", icon: specialIcon("fullscreen"), colour: RoostFull.isOn() ? "#8B6CFF" : p.text, text: "", special: "fullscreen" });
     const open = this._open;
     const initials = (id) => (this.sx(id)?.attributes.friendly_name || id.split(".")[1]).split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
@@ -2499,7 +2503,7 @@ class RoostNav extends RoostBase {
       ev.preventDefault();
       const mk = (c.items || []).map((x) => x.path).join("|"); ((RoostNav.memo = RoostNav.memo || {})[mk] = RoostNav.memo[mk] || {}).go = Date.now();
       this.vibrate();
-      if (it.action === "fullscreen" || it.action === "theme" || it.action === "language") { specialRun(it.action); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 120); return; }
+      if (["fullscreen", "theme", "language", "numerals"].includes(it.action)) { specialRun(it.action); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 120); return; }
       if (!it.path) return;
       if (it.path.startsWith("#")) { if (location.hash === it.path) RoostNav.jump(it.path, it.path === c.items[0]?.path); else location.hash = it.path; }
       else { history.pushState(null, "", it.path); this.fire("location-changed", { replace: false }); }
@@ -2734,7 +2738,7 @@ class RoostTopBar extends RoostBase {
       else if (b.dataset.k === "fwd") { RoostTopBar.ahead = Math.max(0, (RoostTopBar.ahead || 0) - 1); RoostTopBar.steps = (RoostTopBar.steps || 0) + 1; history.forward(); }
       else {
         const it = c.items[+b.dataset.i];
-        if (it.action === "fullscreen" || it.action === "theme" || it.action === "language") { specialRun(it.action); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 120); return; }
+        if (["fullscreen", "theme", "language", "numerals"].includes(it.action)) { specialRun(it.action); setTimeout(() => { this._sig = null; this.hass = this._hass; }, 120); return; }
         if (it.path) go(it.path);
       }
       setTimeout(() => { this._sig = null; if (this._hass) this.hass = this._hass; }, 150);
@@ -3212,6 +3216,10 @@ class RoostCurtain extends RoostBase {
             { name: "box_fabric", label: "Pelmet fabric or wood", selector: pick([["linen", "Linen"], ["cream", "Cream"], ["white", "White"], ["sand", "Sand"], ["taupe", "Taupe"], ["grey", "Stone grey"], ["sage", "Sage"], ["navy", "Navy"], ["charcoal", "Charcoal"], ["blush", "Blush"], ["oak", "Oak wood"], ["walnut", "Walnut wood"]]) },
             { name: "box_shape", label: "Pelmet edge", selector: pick([["straight", "Straight"], ["scallop", "Scalloped"]]) },
           ] },
+          { name: "box_color", label: "Gypsum colour (pick one, or type your own like #D9CFC1)", selector: { select: { mode: "dropdown", custom_value: true, options: [
+            { value: "", label: "Ceiling white (follows light and dark)" }, { value: "#FFFFFF", label: "Bright white" }, { value: "#F3EEE4", label: "Off-white" }, { value: "#EDE3D1", label: "Ivory" },
+            { value: "#DCCDB6", label: "Beige" }, { value: "#C9B79C", label: "Sand" }, { value: "#CFCBC4", label: "Light grey" }, { value: "#9C978F", label: "Grey" }, { value: "#4A4744", label: "Charcoal" },
+            { value: "#232323", label: "Black" }, { value: "#B7C4B0", label: "Sage" }, { value: "#A9BCCB", label: "Dusty blue" }] } } },
           { name: "blind_look", label: "Blind look", selector: pick([["classic", "Classic stripes (bright, simple)"], ["venetian", "Venetian slats that tilt"], ["roller", "Roller blind that rolls up"], ["roman", "Roman shade with soft folds"]]) },
           { name: "fabric", label: "Fabric or finish", selector: pick([["", "Card colour (below)"], ["linen", "Linen"], ["sand", "Sand"], ["sage", "Sage"], ["navy", "Navy"], ["charcoal", "Charcoal"], ["blush", "Blush"], ["white", "White"], ["cream", "Cream"], ["oak", "Oak wood"], ["walnut", "Walnut wood"], ["grey", "Stone grey"], ["black", "Black"]]) },
           ...colourFields("color", "Card colour"),
@@ -3297,14 +3305,17 @@ class RoostCurtain extends RoostBase {
     // what hides the top of the curtain: the rail as it is (default), or a curtain box in the ceiling or a pelmet
     const box = ["gypsum", "cornice", "light", "fabric", "wood"].includes(c.box) ? c.box : "";
     const ptone = FAB[c.box_fabric || (box === "wood" ? "oak" : "linen")] || FAB.linen, pmix = (k) => `rgb(${ptone.map((v) => Math.max(0, Math.min(255, Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k))))).join(",")})`;
-    const ceil = this.dark ? ["#E9E6E0", "#C9C4BB", "#8E897F"] : ["#FBFAF7", "#E6E2DA", "#B9B3A8"];
+    // the gypsum box takes its own colour when one is chosen (box_color), shaded the same way as the plain white one
+    const gc = /^#[0-9a-f]{6}$/i.test(c.box_color || "") ? [1, 3, 5].map((i) => parseInt(c.box_color.slice(i, i + 2), 16)) : null;
+    const shade = (k) => `rgb(${gc.map((v) => Math.max(0, Math.min(255, Math.round(k >= 0 ? v + (255 - v) * k : v * (1 + k))))).join(",")})`;
+    const ceil = gc ? [shade(0), shade(-0.1), shade(-0.28)] : this.dark ? ["#E9E6E0", "#C9C4BB", "#8E897F"] : ["#FBFAF7", "#E6E2DA", "#B9B3A8"];
     const bh = Math.round(Math.max(16, Math.min(34, (Number(c.height) || 150) * 0.14)));
     const boxCss = !box ? "" : `
       .box{position:absolute;left:0;right:0;top:0;height:${bh}px;z-index:4;pointer-events:none;box-shadow:0 7px 9px -5px rgba(0,0,0,.45)}
       .box i{position:absolute;left:0;right:0}
       .box.gypsum,.box.cornice,.box.light{background:linear-gradient(180deg,${ceil[0]},${ceil[1]})}
       .box.gypsum i,.box.light i{bottom:0;height:4px;background:linear-gradient(180deg,${ceil[2]},${ceil[1]})}
-      .box.cornice{background:linear-gradient(180deg,#FFFFFF 0 3px,${ceil[2]} 3px 4px,${ceil[0]} 4px 7px,${ceil[2]} 7px 8px,${ceil[1]} 8px 10px,${ceil[0]} 10px)}
+      .box.cornice{background:linear-gradient(180deg,${gc ? shade(0.35) : "#FFFFFF"} 0 3px,${ceil[2]} 3px 4px,${ceil[0]} 4px 7px,${ceil[2]} 7px 8px,${ceil[1]} 8px 10px,${ceil[0]} 10px)}
       .box.cornice i{bottom:0;height:3px;background:${ceil[2]}}
       .box.light i{bottom:-10px;height:14px;background:radial-gradient(ellipse at 50% 0,rgba(255,214,150,.75),rgba(255,214,150,0) 70%);box-shadow:0 -3px 0 ${ceil[2]} inset}
       .box.fabric{background:repeating-linear-gradient(0deg,rgba(0,0,0,.04) 0 2px,rgba(0,0,0,0) 2px 4px),linear-gradient(180deg,${pmix(0.1)},${pmix(-0.12)});${c.box_shape === "scallop" ? `-webkit-mask:radial-gradient(${bh * 0.6}px ${bh * 0.35}px at 50% 0,#000 98%,transparent) 0 ${bh * 0.62}px/${bh * 1.6}px 100% repeat-x,linear-gradient(#000,#000) 0 0/100% ${bh * 0.66}px no-repeat;mask:radial-gradient(${bh * 0.6}px ${bh * 0.35}px at 50% 0,#000 98%,transparent) 0 ${bh * 0.62}px/${bh * 1.6}px 100% repeat-x,linear-gradient(#000,#000) 0 0/100% ${bh * 0.66}px no-repeat` : ""}}
@@ -4037,7 +4048,7 @@ const easternDigits = (s) => String(s).replace(/\d/g, (d) => "٠١٢٣٤٥٦٧٨
 // (any common method, your own adjustments), read from your sensors, or fetched online.
 class RoostPrayer extends ticking(RoostBase, 15000) {
   static get defaults() {
-    return { source: "calculate", method: "makkah", asr: "standard", prayers: ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"], adjust: {}, names: "english", numerals: "western",
+    return { source: "calculate", method: "makkah", asr: "standard", prayers: ["fajr", "sunrise", "dhuhr", "asr", "maghrib", "isha"], adjust: {}, names: "english", numerals: "auto",
       hour24: false, layout: "list", show_header: true, show_hijri: true, show_timeline: true, hijri_offset: 0, jumuah: true, title: "", color: "active", radius: 22, frame: true, ramadan: "auto", theme: "auto" };
   }
 
@@ -4068,7 +4079,7 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
         ] },
         { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
           { name: "layout", selector: pick([["list", "List"], ["tiles", "Tiles in a row"], ["compact", "One line"]]) },
-          { type: "grid", name: "", schema: [{ name: "names", label: "Names", selector: pick([["english", "English"], ["arabic", "Arabic"], ["both", "Both"]]) }, { name: "numerals", selector: pick([["western", "1 2 3"], ["eastern", "١ ٢ ٣"]]) }] },
+          { type: "grid", name: "", schema: [{ name: "names", label: "Names", selector: pick([["english", "English"], ["arabic", "Arabic"], ["both", "Both"]]) }, { name: "numerals", label: "Numbers", selector: pick([["auto", "Like this screen"], ["western", "1 2 3"], ["eastern", "١ ٢ ٣"]]) }] },
           { type: "grid", name: "", schema: [{ name: "hour24", label: "24-hour", selector: { boolean: {} } }, { name: "show_header", label: "Next prayer at the top", selector: { boolean: {} } }] },
           { type: "grid", name: "", schema: [{ name: "show_hijri", label: "Hijri date", selector: { boolean: {} } }, { name: "hijri_offset", label: "Hijri day correction", selector: slider(-2, 2, 1, "days") }] },
           { type: "grid", name: "", schema: [{ name: "show_timeline", label: "Day line", selector: { boolean: {} } }, { name: "jumuah", label: "Call Dhuhr \"Jumu'ah\" on Fridays", selector: { boolean: {} } }] },
@@ -4159,6 +4170,8 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
   }
 
   // Arabic prayer names when chosen, or when the whole dashboard is in Arabic (unless English names were chosen)
+  // Indian numerals when chosen on the card, or (on "auto") when the screen shows Arabic with Indian numerals
+  eastNums() { const n = this._config.numerals; return n === "eastern" || ((!n || n === "auto") && RoostLang.pick(this._hass, this._config) === "ar" && RoostLang.eastern()); }
   arNames() { const n = this._given?.names; if (n) return n === "arabic"; return RoostLang.pick(this._hass, this._config) === "ar"; }
   label(k, date) {
     const c = this._config, fri = c.jumuah && k === "dhuhr" && date.getDay() === 5;
@@ -4170,13 +4183,13 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
     const c = this._config;
     let s = d.toLocaleTimeString(c.hour24 ? "en-GB" : "en-US", { hour: "numeric", minute: "2-digit", hour12: !c.hour24 });
     if (this.arNames() && !c.hour24) s = s.replace("AM", "ص").replace("PM", "م");
-    return c.numerals === "eastern" ? easternDigits(s) : s;
+    return this.eastNums() ? easternDigits(s) : s;
   }
 
   left(ms) {
     const m = Math.max(0, Math.round(ms / 60000)), h = Math.floor(m / 60), r = m % 60;
     const ar = this.arNames(), s = ar ? (h ? `${h} س ${r} د` : `${r} دقيقة`) : h ? `${h}h ${r}m` : `${r} min`;
-    return this._config.numerals === "eastern" ? easternDigits(s) : s;
+    return this.eastNums() ? easternDigits(s) : s;
   }
 
   render() {
@@ -4197,7 +4210,7 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
     }
     const span = nextAt && prevAt ? Math.max(1, nextAt - prevAt) : 1, done = nextAt ? Math.min(1, Math.max(0, (now - prevAt) / span)) : 0;
     const hj = this.hijri(now), hjNow = hj, ar = this.arNames();
-    const greg = now.toLocaleDateString(ar ? `ar-u-nu-${c.numerals === "eastern" ? "arab" : "latn"}` : "en-GB", { weekday: "long", day: "numeric", month: "long" });
+    const greg = now.toLocaleDateString(ar ? `ar-u-nu-${this.eastNums() ? "arab" : "latn"}` : "en-GB", { weekday: "long", day: "numeric", month: "long" });
     const hijriText = hj.year ? (ar ? `${easternDigits(hj.day)} ${hj.nameAr} ${easternDigits(hj.year)}` : `${hj.day} ${hj.name} ${hj.year}`) : "";
     const soon = nextAt && nextAt - now < 15 * 60000;
     const R = 34, C = 2 * Math.PI * R;
@@ -4323,7 +4336,7 @@ function clockParts(tz) {
 
 class RoostClockFace extends RoostClockClassic {
   static get defaults() {
-    return { ...super.defaults, face: "digital", hour24: false, seconds: false, date_format: "long", show_hijri: false, timezone: "", label: "", numerals: "western", ticks: "hours",
+    return { ...super.defaults, face: "digital", hour24: false, seconds: false, date_format: "long", show_hijri: false, timezone: "", label: "", numerals: "auto", ticks: "hours",
       hands: "classic", smooth: true, size: "large", align: "center", world: [], color: "active", frame: true, radius: 22, theme: "auto" };
   }
 
@@ -4335,7 +4348,7 @@ class RoostClockFace extends RoostClockClassic {
         { type: "grid", name: "", schema: [{ name: "date_format", label: "Date", selector: pick([["long", "Tuesday 17 November"], ["short", "Tue 17 Nov"], ["numeric", "17/11/2026"], ["none", "No date"]]) }, { name: "show_hijri", label: "Hijri date too", selector: { boolean: {} } }] },
         { type: "grid", name: "", schema: [{ name: "timezone", label: "Time zone (empty = here, or e.g. Asia/Riyadh)", selector: { text: {} } }, { name: "label", label: "Label (e.g. Makkah)", selector: { text: {} } }] },
         { type: "expandable", name: "", title: "Analog faces", icon: "mdi:clock-time-four-outline", schema: [
-          { type: "grid", name: "", schema: [{ name: "numerals", label: "Numbers", selector: pick([["western", "1 2 3"], ["eastern", "١ ٢ ٣"], ["roman", "I II III"], ["none", "None"]]) }, { name: "ticks", label: "Marks", selector: pick([["hours", "Hours"], ["all", "Every minute"], ["none", "None"]]) }] },
+          { type: "grid", name: "", schema: [{ name: "numerals", label: "Numbers", selector: pick([["auto", "Like this screen"], ["western", "1 2 3"], ["eastern", "١ ٢ ٣"], ["roman", "I II III"], ["none", "None"]]) }, { name: "ticks", label: "Marks", selector: pick([["hours", "Hours"], ["all", "Every minute"], ["none", "None"]]) }] },
           { type: "grid", name: "", schema: [{ name: "hands", selector: pick([["classic", "Classic"], ["slim", "Slim"], ["bold", "Bold"]]) }, { name: "smooth", label: "Sweeping seconds", selector: { boolean: {} } }] },
         ] },
         { type: "expandable", name: "", title: "Line of times (with the first face)", icon: "mdi:timeline-clock-outline", schema: [
@@ -4379,7 +4392,7 @@ class RoostClockFace extends RoostClockClassic {
     const c = this._config;
     if (c && (c.face === "times" || (((Array.isArray(c.times) && c.times.length) || c.prayer_method) && !(this._raw && "face" in this._raw)))) { super.render(); return; } // older prayer-time setups keep working
     if (!this._hass || !c) return;
-    const p = this.p, g = this.colour(), t = clockParts(c.timezone), num = (v) => (c.numerals === "eastern" ? easternDigits(v) : String(v));
+    const p = this.p, g = this.colour(), t = clockParts(c.timezone), east = c.numerals === "eastern" || (c.numerals === "auto" && RoostLang.pick(this._hass, c) === "ar" && RoostLang.eastern()), num = (v) => (east ? easternDigits(v) : String(v));
     const h12 = t.h % 12 || 12, hh = c.hour24 ? String(t.h).padStart(2, "0") : String(h12), mm = String(t.m).padStart(2, "0"), ss = String(t.s).padStart(2, "0"), ap = t.h < 12 ? "AM" : "PM";
     const S = { small: 0.6, medium: 0.8, large: 1, huge: 1.3 }[c.size] || 1;
     const dateText = c.date_format === "none" ? "" : c.date_format === "short" ? t.date.toLocaleDateString("en-GB", { timeZone: c.timezone || undefined, weekday: "short", day: "numeric", month: "short" })
@@ -10350,7 +10363,15 @@ const RoostLang = {
     if (!v || v === "auto") v = hass?.locale?.language || hass?.language || "en";
     return /^(ar|fa|ur|he)/.test(v) ? "ar" : "en";
   },
-  eastern(cfg) { if (cfg && cfg.numerals) return cfg.numerals === "eastern"; try { return localStorage.getItem("roost-numerals") === "eastern"; } catch (e) { return false; } },
+  // numbers in a right-to-left language: Arabic numerals (1 2 3) or Indian numerals (١ ٢ ٣). A card's own "numerals"
+  // wins; "auto" (or none) follows the choice made on this screen with the numbers button (Arabic numerals until then)
+  eastern(cfg) { const n = cfg && cfg.numerals; if (n && n !== "auto") return n === "eastern"; try { return localStorage.getItem("roost-numerals") === "eastern"; } catch (e) { return false; } },
+  setNumerals(v) {
+    try { localStorage.setItem("roost-numerals", v); } catch (e) { /* no storage */ }
+    for (const el of [...this.cards]) { if (!el.isConnected) { this.cards.delete(el); continue; } el._sig = null; if (el._hass) el.hass = el._hass; }
+    window.dispatchEvent(new CustomEvent("roost-language-changed"));
+  },
+  toggleNumerals() { this.setNumerals(this.eastern() ? "western" : "eastern"); },
   line(t) {
     if (!/[A-Za-z]/.test(t)) return t;
     const lead = t.match(/^\s*/)[0], tail = t.match(/\s*$/)[0], core = t.trim();
@@ -10371,7 +10392,8 @@ const RoostLang = {
     const walk = document.createTreeWalker(r, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentNode && /^(STYLE|SCRIPT)$/.test(n.parentNode.nodeName) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
     const nodes = []; while (walk.nextNode()) nodes.push(walk.currentNode);
     // a number with its unit (1240 L, 214 km, 3 h 57 min) keeps its order inside right-to-left text
-    const iso = (v) => (/^\s*[-−+]?[\d٠-٩]/.test(v) && /[A-Za-zµ]/.test(v) && !/[\u0600-\u06FF\u2066]/.test(v) ? `\u2066${v}\u2069` : v);
+    const iso = (v) => ((/^\s*[-−+]?[\d٠-٩]/.test(v) && /[A-Za-zµ]/.test(v) && !/[\u0600-\u06FF\u2066]/.test(v)) || /^\s*°[A-Za-z]?\s*$/.test(v) ? `\u2066${v}\u2069` : v);
+    // a unit on its own ("°C") keeps its order too, so it never reads "C°" next to Indian numerals
     // a word with its own Arabic for this place (data-ar) uses it: "Cool" for a light is بارد, not تبريد
     for (const n of nodes) { const own = n.parentNode?.dataset?.ar; const v = own || iso(digits(this.line(n.nodeValue))); if (v !== n.nodeValue) n.nodeValue = v; }
     r.querySelectorAll("[aria-label],[title],[placeholder]").forEach((x) => { for (const a of ["aria-label", "title", "placeholder"]) { const v = x.getAttribute(a); if (v) { const t = this.line(v); if (t !== v) x.setAttribute(a, t); } } });
@@ -11905,10 +11927,11 @@ window.addEventListener("ll-custom", (ev) => {
   if (want === "dark") RoostMode.set(true); else if (want === "light") RoostMode.set(false); else RoostMode.toggle();
 });
 // The special things a button can do instead of a page or a device.
-const SPECIAL_DOES = [{ value: "fullscreen", label: "Full screen on and off (its icon follows)" }, { value: "theme", label: "Light and dark mode (its icon follows)" }, { value: "language", label: "Arabic and English" }];
-const specialIcon = (kind) => (kind === "fullscreen" ? (RoostFull.isOn() ? "mdi:fullscreen-exit" : "mdi:fullscreen") : kind === "theme" ? RoostMode.icon() : kind === "language" ? "mdi:translate" : null);
-const specialLabel = (kind) => (kind === "fullscreen" ? (RoostFull.isOn() ? "Leave full screen" : "Full screen") : kind === "theme" ? RoostMode.label() : kind === "language" ? (window.RoostLang?.pick(document.querySelector("home-assistant")?.hass) === "ar" ? "English" : "العربية") : null);
-const specialRun = (kind) => { if (kind === "fullscreen") RoostFull.toggle({}); else if (kind === "theme") RoostMode.toggle(); else if (kind === "language") window.RoostLang?.toggle(); };
+const SPECIAL_DOES = [{ value: "fullscreen", label: "Full screen on and off (its icon follows)" }, { value: "theme", label: "Light and dark mode (its icon follows)" }, { value: "language", label: "Arabic and English" },
+  { value: "numerals", label: "In Arabic: Arabic numerals 123 or Indian numerals ١٢٣" }];
+const specialIcon = (kind) => (kind === "fullscreen" ? (RoostFull.isOn() ? "mdi:fullscreen-exit" : "mdi:fullscreen") : kind === "theme" ? RoostMode.icon() : kind === "language" ? "mdi:translate" : kind === "numerals" ? "mdi:numeric" : null);
+const specialLabel = (kind) => (kind === "fullscreen" ? (RoostFull.isOn() ? "Leave full screen" : "Full screen") : kind === "theme" ? RoostMode.label() : kind === "language" ? (window.RoostLang?.pick(document.querySelector("home-assistant")?.hass) === "ar" ? "English" : "العربية") : kind === "numerals" ? (window.RoostLang?.eastern() ? "123" : "١٢٣") : null);
+const specialRun = (kind) => { if (kind === "fullscreen") RoostFull.toggle({}); else if (kind === "theme") RoostMode.toggle(); else if (kind === "language") window.RoostLang?.toggle(); else if (kind === "numerals") window.RoostLang?.toggleNumerals(); };
 
 class RoostFullscreen extends RoostBase {
   static get defaults() {

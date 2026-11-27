@@ -36,7 +36,8 @@ Every Roost card follows the person's Home Assistant language. In Arabic the car
 
 - On one screen only: the Arabic / English chip (`show_language: true` on Roost Chips), or a bar or Roost Buttons button with **Or does: Arabic and English**.
 - One card only: `language: ar` (or `en`).
-- Arabic numbers (٢١): `numerals: eastern`.
+- **Numbers in Arabic: Arabic numerals (123) or Indian numerals (١٢٣).** On one screen: the numbers chip (`show_numerals: true` on Roost Chips), or a bar or Roost Buttons button with **Or does: In Arabic: Arabic numerals 123 or Indian numerals ١٢٣**. The screen remembers the choice.
+- One card only: **Numbers in Arabic** in its editor (`numerals: auto`, `western` or `eastern`). `auto` follows the screen's choice. The clock and prayer cards have the same choice under **Numbers**.
 
 ## Who sees what
 
@@ -345,6 +346,8 @@ follow_pause: 2            # minutes to wait after you pick a room yourself
 Looks: `look: banded` gives ripple folds with a band along the hem (`band: silver`, `band_height: 22`). For your own fabric, put a picture of it in Home Assistant's `www` folder and use `fabric_image: /local/roost/fabric.jpg`: the card adds the folds (`photo_folds: false` if the picture already shows folds) and, with `photo_band: true`, the bottom band. One curtain that opens from right to left: `style: left`.
 
 **Curtain box:** `box: gypsum` (a plain gypsum box), `cornice` (with a cornice), `light` (with a hidden light strip), `fabric` (a fabric pelmet, `box_fabric: linen` and `box_shape: scallop` for a scalloped edge) or `wood`.
+
+**Gypsum colour:** `box_color` paints the gypsum, cornice and light-strip boxes to match your ceiling: ceiling white (default), a ready colour from the list (warm white, ivory, beige, sand, light grey, grey, charcoal, black, sage, sky) or your own, like `box_color: "#EDE3D1"`.
 
 Drag sideways on the window to slide the curtains open or closed (up and down for a blind). With `reverse: true` every control is turned around for you: buttons, slide bar, tapping the window and the details sheet.
 

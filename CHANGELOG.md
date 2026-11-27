@@ -4,6 +4,8 @@ Every version of Roost Cards, newest first.
 
 ## 1.29.3
 
+- **Arabic numerals or Indian numerals.** In Arabic, choose 123 or ١٢٣ for the whole screen with a new numbers chip or bar button, or for one card with **Numbers in Arabic** in its editor. The clock and prayer cards follow the screen's choice unless you pick one. Units such as °C keep the right order next to Indian numerals.
+- **Gypsum colour for curtain boxes.** The gypsum, cornice and light-strip boxes above a curtain can now match your ceiling: pick a colour from the list or type your own (`box_color`).
 - **The bar looks the same on every page by itself.** The bottom bar and the top bar on every page now follow the look of the bar on the dashboard's first page (glass, blur, colours, size, shape), while each page keeps its own buttons. Change the first page's bar and every page changes with it. A bar that should look different can turn on **Its own look**. While editing, each bar shows its own settings.
 
 - **Arabic and other right-to-left languages, checked card by card.** The big room icon of the halo room card sits bottom right; every bar fills from the right and its slider follows the finger the right way; prayer and day timelines and good-range bars start on the right; graphs and small trend lines run from the right; the lock slides to the left; swiping between rooms goes the other way. A TV remote's direction pad and the thermostat and fan dials stay as they are, like real ones. Many more words are in Arabic: dates, sunset, "See all", "in 4 h 35 min", room summaries, graphs, the lock, the light's Warm / Neutral / Cool, and more. These rules now run with every test.
