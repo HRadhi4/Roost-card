@@ -82,7 +82,7 @@ out_of_order: The curtain remote's battery is dead
 ```
 
 ### Roost Tile
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile.gif" width="320" alt="Roost tile card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile.gif" width="320" alt="Roost tile card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/tile.gif" width="320" alt="Roost tile card in action, dark">
 
 ```yaml
 type: custom:roost-tile
@@ -115,7 +115,7 @@ hold_action: { action: more-info }
 ```
 
 ### Roost Chips
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/chips.gif" width="320" alt="Roost chips card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/chips.gif" width="320" alt="Roost chips card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/chips.gif" width="320" alt="Roost chips card in action, dark">
 
 ```yaml
 type: custom:roost-chips
@@ -136,7 +136,7 @@ show_fullscreen: true   # a full screen chip
 ```
 
 ### Roost Thermostat
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/thermostat.gif" width="320" alt="Roost thermostat card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/thermostat.gif" width="320" alt="Roost thermostat card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/thermostat.gif" width="320" alt="Roost thermostat card in action, dark">
 
 ```yaml
 type: custom:roost-thermostat
@@ -159,7 +159,7 @@ relock: 10               # seconds before it locks itself again
 Drag the knob or tap anywhere on the ring. The number follows your finger, and the temperature is sent when you let go.
 
 ### Roost Scene
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/scene.gif" width="320" alt="Roost scene card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/scene.gif" width="320" alt="Roost scene card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/scene.gif" width="320" alt="Roost scene card in action, dark">
 
 ```yaml
 type: custom:roost-scene
@@ -174,7 +174,7 @@ show_name: true
 ```
 
 ### Roost Scenes
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/scenes.gif" width="320" alt="Roost Scenes card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/scenes.gif" width="320" alt="Roost Scenes card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/scenes.gif" width="320" alt="Roost Scenes card in action, dark">
 
 All your scenes as round buttons in one card. **Spread** keeps them evenly spaced and centred, however many there are, and long names wrap under their own button. **Stacked** overlaps them like a dock: the button under your finger lifts and shows its name, and letting go runs it.
 
@@ -192,7 +192,7 @@ items:
 ```
 
 ### Roost Top Bar
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/top-bar.gif" width="320" alt="Roost Top Bar in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/top-bar.gif" width="320" alt="Roost Top Bar in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/top-bar.gif" width="320" alt="Roost Top Bar in action, dark">
 
 A bar at the top of the screen in the same frosted glass as the bottom bar: back and forward buttons, the page's name (or your own title), the time, and your own buttons on the right (a page, full screen, light and dark, or Arabic and English).
 
@@ -211,7 +211,7 @@ items:
 Like the bottom bar, the top bar on every page looks like the one on your dashboard's first page. Turn on **Its own look** to style one bar separately.
 
 ### Roost Hero
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/hero.gif" width="320" alt="Roost hero card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/hero.gif" width="320" alt="Roost hero card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/hero.gif" width="320" alt="Roost hero card in action, dark">
 
 ```yaml
 type: custom:roost-hero
@@ -244,7 +244,7 @@ tap_action: { action: none }
 ```
 
 ### Roost Row
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/row.gif" width="320" alt="Roost row card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/row.gif" width="320" alt="Roost row card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/row.gif" width="320" alt="Roost row card in action, dark">
 
 ```yaml
 type: custom:roost-row
@@ -259,7 +259,7 @@ ring_width: 6
 ```
 
 ### Roost Nav
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/nav.gif" width="320" alt="Roost nav card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/nav.gif" width="320" alt="Roost nav card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/nav.gif" width="320" alt="Roost nav card in action, dark">
 
 A button can open another page (`/dashboard-home/rooms`) or jump down the same page (`#rooms`). A `#rooms` button scrolls to the Roost Title called "Rooms" (or the one whose **Jump name** is `rooms`); if there is none, it goes back to the top.
 
@@ -283,7 +283,7 @@ own_look: false       # the bar on every page looks like the one on the dashboar
 ```
 
 ### Roost Rooms Selector
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="320" alt="Roost rooms card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/rooms.gif" width="320" alt="Roost rooms card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/rooms.gif" width="320" alt="Roost rooms card in action, dark">
 
 **No code needed:** in the card's editor, under **Cards in each room**, tap a room, then use **+** to add any card (Roost or Home Assistant's own), the arrows to move it, and the bin to remove it. The number on each room button says how many cards it has.
 
@@ -341,7 +341,7 @@ follow_pause: 2            # minutes to wait after you pick a room yourself
 ```
 
 ### Roost Curtain
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/curtain.gif" width="320" alt="Roost curtain card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/curtain.gif" width="320" alt="Roost curtain card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/curtain.gif" width="320" alt="Roost curtain card in action, dark">
 
 Looks: `look: banded` gives ripple folds with a band along the hem (`band: silver`, `band_height: 22`). For your own fabric, put a picture of it in Home Assistant's `www` folder and use `fabric_image: /local/roost/fabric.jpg`: the card adds the folds (`photo_folds: false` if the picture already shows folds) and, with `photo_band: true`, the bottom band. One curtain that opens from right to left: `style: left`.
 
@@ -402,7 +402,7 @@ schedule: automation.curtains_with_the_sun   # the card shows the times and turn
 ```
 
 ### Roost Gauge
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/gauge.gif" width="320" alt="Roost gauge card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/gauge.gif" width="320" alt="Roost gauge card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/gauge.gif" width="320" alt="Roost gauge card in action, dark">
 
 ```yaml
 type: custom:roost-gauge
@@ -416,7 +416,7 @@ second_name: Humidity
 ```
 
 ### Roost Graph
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/graph.gif" width="320" alt="Roost graph card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/graph.gif" width="320" alt="Roost graph card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/graph.gif" width="320" alt="Roost graph card in action, dark">
 
 ```yaml
 type: custom:roost-graph
@@ -427,7 +427,7 @@ height: 90
 ```
 
 ### Roost Room
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/room.gif" width="320" alt="Roost room card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/room.gif" width="320" alt="Roost room card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/room.gif" width="320" alt="Roost room card in action, dark">
 
 ```yaml
 type: custom:roost-room
@@ -499,7 +499,7 @@ Each quick button can also have its own actions: `buttons: [{ entity: light.livi
 The slim row can show small device icons instead of the temperature bar: `bar: devices` (or `bar: none`).
 
 ### Roost Light
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/light.gif" width="320" alt="Roost light card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/light.gif" width="320" alt="Roost light card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/light.gif" width="320" alt="Roost light card in action, dark">
 
 ```yaml
 type: custom:roost-light
@@ -509,7 +509,7 @@ show_colors: true
 ```
 
 ### Roost Media
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/media.gif" width="320" alt="Roost media card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/media.gif" width="320" alt="Roost media card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/media.gif" width="320" alt="Roost media card in action, dark">
 
 ```yaml
 type: custom:roost-media
@@ -520,7 +520,7 @@ max_sources: 6
 ```
 
 ### Roost Alarm
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alarm.gif" width="320" alt="Roost alarm card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alarm.gif" width="320" alt="Roost alarm card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/alarm.gif" width="320" alt="Roost alarm card in action, dark">
 
 ```yaml
 type: custom:roost-alarm
@@ -533,7 +533,7 @@ show_doors: false       # list the doors under the switch
 ```
 
 ### Roost People
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/people.gif" width="320" alt="Roost people card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/people.gif" width="320" alt="Roost people card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/people.gif" width="320" alt="Roost people card in action, dark">
 
 ```yaml
 type: custom:roost-people
@@ -542,7 +542,7 @@ layout: row              # row or list
 ```
 
 ### Roost Automations
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/automations.gif" width="320" alt="Roost automations card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/automations.gif" width="320" alt="Roost automations card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/automations.gif" width="320" alt="Roost automations card in action, dark">
 
 ```yaml
 type: custom:roost-automations
@@ -553,7 +553,7 @@ show_run: true
 ```
 
 ### Roost Clock
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/clock.gif" width="320" alt="Roost clock card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/clock.gif" width="320" alt="Roost clock card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/clock.gif" width="320" alt="Roost clock card in action, dark">
 
 A clock and nothing else, with eight faces: **digital, analog, minimal, flip, ring, words, neon and LCD**.
 
@@ -578,7 +578,7 @@ line: sky                 # the line of times: sky (colours of the day) or plain
 ```
 
 ### Roost Prayer Times
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/prayer.gif" width="320" alt="Roost prayer times card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/prayer.gif" width="320" alt="Roost prayer times card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/prayer.gif" width="320" alt="Roost prayer times card in action, dark">
 
 Today's prayer times, the next one with a countdown ring, a line of the day and the Hijri date.
 The times can be **calculated on the spot** (no internet needed), fetched **online** (aladhan.com), or read from **your own sensors**.
@@ -629,7 +629,7 @@ actions:
 Your home's location is used unless you set `latitude` and `longitude`.
 
 ### Roost Alerts
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alerts.gif" width="320" alt="Roost alerts card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/alerts.gif" width="320" alt="Roost alerts card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/alerts.gif" width="320" alt="Roost alerts card in action, dark">
 
 ```yaml
 type: custom:roost-alerts
@@ -643,7 +643,7 @@ rules:
 ```
 
 ### Roost Title and Roost Light/Dark
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/title.gif" width="240" alt="Roost title card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/theme.gif" width="240" alt="Roost theme card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/title.gif" width="240" alt="Roost title card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/title.gif" width="240" alt="Roost title card in action, dark"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/theme.gif" width="240" alt="Roost theme card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/theme.gif" width="240" alt="Roost theme card in action, dark">
 
 ```yaml
 type: custom:roost-title
@@ -1143,7 +1143,7 @@ range: 6                        # metres
 ```
 
 ### Roost Weather, Energy and Timer
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/weather.gif" width="240" alt="Roost weather card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/energy.gif" width="240" alt="Roost energy card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/timer.gif" width="240" alt="Roost timer card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/weather.gif" width="240" alt="Roost weather card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/weather.gif" width="240" alt="Roost weather card in action, dark"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/energy.gif" width="240" alt="Roost energy card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/energy.gif" width="240" alt="Roost energy card in action, dark"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/timer.gif" width="240" alt="Roost timer card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/timer.gif" width="240" alt="Roost timer card in action, dark">
 
 ```yaml
 type: custom:roost-weather
@@ -1162,7 +1162,7 @@ presets: [5, 10]    # optional quick-time buttons as well
 ```
 
 ### Roost Fan, Lock, Agenda and To-do
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fan.gif" width="240" alt="Roost fan card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/lock.gif" width="240" alt="Roost lock card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/agenda.gif" width="240" alt="Roost agenda card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/todo.gif" width="240" alt="Roost todo card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fan.gif" width="240" alt="Roost fan card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/fan.gif" width="240" alt="Roost fan card in action, dark"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/lock.gif" width="240" alt="Roost lock card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/lock.gif" width="240" alt="Roost lock card in action, dark"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/agenda.gif" width="240" alt="Roost agenda card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/agenda.gif" width="240" alt="Roost agenda card in action, dark"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/todo.gif" width="240" alt="Roost todo card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/todo.gif" width="240" alt="Roost todo card in action, dark">
 
 ```yaml
 type: custom:roost-fan
@@ -1185,7 +1185,7 @@ entity: todo.shopping_list
 ```
 
 ### Roost Camera, Sensors and Buttons
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/camera.gif" width="240" alt="Roost camera card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/sensors.gif" width="240" alt="Roost sensors card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/buttons.gif" width="240" alt="Roost buttons card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/camera.gif" width="240" alt="Roost camera card in action"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/sensors.gif" width="240" alt="Roost sensors card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/sensors.gif" width="240" alt="Roost sensors card in action, dark"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/buttons.gif" width="240" alt="Roost buttons card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/buttons.gif" width="240" alt="Roost buttons card in action, dark">
 
 ```yaml
 type: custom:roost-camera
@@ -1230,7 +1230,7 @@ background: glass     # glass, solid or none
 
 
 ### Roost Full Screen
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fullscreen.gif" width="320" alt="Roost fullscreen card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/fullscreen.gif" width="320" alt="Roost fullscreen card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/fullscreen.gif" width="320" alt="Roost fullscreen card in action, dark">
 
 ```yaml
 type: custom:roost-fullscreen
