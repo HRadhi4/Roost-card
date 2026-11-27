@@ -6,6 +6,8 @@ Every version of Roost Cards, newest first.
 
 - **The bar looks the same on every page by itself.** The bottom bar and the top bar on every page now follow the look of the bar on the dashboard's first page (glass, blur, colours, size, shape), while each page keeps its own buttons. Change the first page's bar and every page changes with it. A bar that should look different can turn on **Its own look**. While editing, each bar shows its own settings.
 
+- **Arabic and other right-to-left languages, checked card by card.** The big room icon of the halo room card sits bottom right; every bar fills from the right and its slider follows the finger the right way; prayer and day timelines and good-range bars start on the right; graphs and small trend lines run from the right; the lock slides to the left; swiping between rooms goes the other way. A TV remote's direction pad and the thermostat and fan dials stay as they are, like real ones. Many more words are in Arabic: dates, sunset, "See all", "in 4 h 35 min", room summaries, graphs, the lock, the light's Warm / Neutral / Cool, and more. These rules now run with every test.
+
 ## 1.29.2
 
 - **Safer with unusual names and values.** Everything the cards show that comes from Home Assistant (names, states, attributes such as temperatures, units, modes, colours, battery levels and positions) and every card setting is now checked before it is drawn: text is escaped, numbers must be real numbers, colours must be real colours, and pictures and fonts can only hold what an address or a font name needs. A name or value with odd characters now just shows as text.

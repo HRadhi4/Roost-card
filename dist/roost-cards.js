@@ -3146,7 +3146,8 @@ class RoostRooms extends RoostBase {
           if (x0 == null) return;
           const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
           x0 = null;
-          if (Math.abs(dx) > 60 && Math.abs(dy) < 40) this.go(this._active + (dx < 0 ? 1 : -1));
+          // in Arabic the next room is to the left, so swiping right brings it in
+          if (Math.abs(dx) > 60 && Math.abs(dy) < 40) this.go(this._active + ((rtlX(box, 0) === 1 ? dx > 0 : dx < 0) ? 1 : -1));
         }, { passive: true });
       }
     });
@@ -3418,7 +3419,7 @@ class RoostCurtain extends RoostBase {
     const trk = this.shadowRoot.querySelector(".trk");
     if (trk) {
       // drag along the bar to choose how far open; a tap while it moves stops it
-      const at = (e) => { const r = trk.getBoundingClientRect(); return Math.round(Math.max(0, Math.min(100, ((e.clientX - r.left) / (r.width || 1)) * 100)) / 5) * 5; };
+      const at = (e) => { const r = trk.getBoundingClientRect(); return Math.round(Math.max(0, Math.min(100, rtlX(trk, (e.clientX - r.left) / (r.width || 1)) * 100)) / 5) * 5; };
       let drag = null;
       trk.addEventListener("pointerdown", (e) => {
         const v = this.view(this.st());
@@ -4151,22 +4152,24 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
     } catch (e) { return { day: 0, month: 0, year: 0, name: "", nameAr: "" }; }
   }
 
+  // Arabic prayer names when chosen, or when the whole dashboard is in Arabic (unless English names were chosen)
+  arNames() { const n = this._config.names; return n === "arabic" || (n !== "english" && n !== "both" && RoostLang.pick(this._hass, this._config) === "ar"); }
   label(k, date) {
     const c = this._config, fri = c.jumuah && k === "dhuhr" && date.getDay() === 5;
     const en = fri ? "Jumu'ah" : PRAYER_NAMES[k][0], ar = fri ? "الجمعة" : PRAYER_NAMES[k][1];
-    return c.names === "arabic" ? ar : c.names === "both" ? `${en} · ${ar}` : en;
+    return this.arNames() ? ar : c.names === "both" ? `${en} · ${ar}` : en;
   }
 
   clock(d) {
     const c = this._config;
     let s = d.toLocaleTimeString(c.hour24 ? "en-GB" : "en-US", { hour: "numeric", minute: "2-digit", hour12: !c.hour24 });
-    if (c.names === "arabic" && !c.hour24) s = s.replace("AM", "ص").replace("PM", "م");
+    if (this.arNames() && !c.hour24) s = s.replace("AM", "ص").replace("PM", "م");
     return c.numerals === "eastern" ? easternDigits(s) : s;
   }
 
   left(ms) {
     const m = Math.max(0, Math.round(ms / 60000)), h = Math.floor(m / 60), r = m % 60;
-    const ar = this._config.names === "arabic", s = ar ? (h ? `${h} س ${r} د` : `${r} دقيقة`) : h ? `${h}h ${r}m` : `${r} min`;
+    const ar = this.arNames(), s = ar ? (h ? `${h} س ${r} د` : `${r} دقيقة`) : h ? `${h}h ${r}m` : `${r} min`;
     return this._config.numerals === "eastern" ? easternDigits(s) : s;
   }
 
@@ -4187,7 +4190,7 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
       prevAt = ri > 0 ? today[real[ri - 1]] : nextAt.toDateString() === now.toDateString() ? new Date(last.getTime() - 86400e3) : last;
     }
     const span = nextAt && prevAt ? Math.max(1, nextAt - prevAt) : 1, done = nextAt ? Math.min(1, Math.max(0, (now - prevAt) / span)) : 0;
-    const hj = this.hijri(now), hjNow = hj, ar = c.names === "arabic";
+    const hj = this.hijri(now), hjNow = hj, ar = this.arNames();
     const greg = now.toLocaleDateString(ar ? `ar-u-nu-${c.numerals === "eastern" ? "arab" : "latn"}` : "en-GB", { weekday: "long", day: "numeric", month: "long" });
     const hijriText = hj.year ? (ar ? `${easternDigits(hj.day)} ${hj.nameAr} ${easternDigits(hj.year)}` : `${hj.day} ${hj.name} ${hj.year}`) : "";
     const soon = nextAt && nextAt - now < 15 * 60000;
@@ -4780,7 +4783,7 @@ class RoostMedia extends RoostBase {
     const bar = root.querySelector(".vol");
     if (bar) {
       const set = (ev, done) => {
-        const r = bar.getBoundingClientRect(), f = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+        const r = bar.getBoundingClientRect(), f = Math.max(0, Math.min(1, rtlX(bar, (ev.clientX - r.left) / r.width)));
         bar.querySelector(".f").style.width = `${(f * 100).toFixed(0)}%`;
         bar.querySelector(".v").textContent = `${Math.round(f * 100)}%`;
         if (done) this.call("media_player", "volume_set", { entity_id: vid, volume_level: Math.round(f * 100) / 100 });
@@ -5039,7 +5042,7 @@ class RoostRoom extends RoostBase {
       .l{font-size:12px;line-height:1.35;opacity:.75;margin-top:4px}
       .halo{position:absolute;left:-${Math.round(hsz * 0.16)}px;bottom:-${Math.round(hsz * 0.16)}px;width:${hsz}px;height:${hsz}px;border-radius:50%;display:flex;align-items:center;justify-content:center;
         background:${light ? "rgba(255,255,255,.18)" : `color-mix(in srgb, ${g[0]} 22%, transparent)`};color:${light || this.dark ? "#FFFFFF" : g[0]};box-shadow:0 0 0 ${Math.round(hsz * 0.12)}px ${light ? "rgba(255,255,255,.07)" : `color-mix(in srgb, ${g[0]} 9%, transparent)`}}
-      .halo ha-icon{--mdc-icon-size:${Math.round(hsz * 0.42)}px;transform:translate(${Math.round(hsz * 0.05)}px,-${Math.round(hsz * 0.05)}px)}
+      .halo ha-icon{--mdc-icon-size:${Math.round(hsz * 0.42)}px;position:relative;left:${Math.round(hsz * 0.05)}px;top:-${Math.round(hsz * 0.05)}px}
       .halo .ad{position:absolute;top:${Math.round(hsz * 0.14)}px;right:${Math.round(hsz * 0.14)}px;width:12px;height:12px;border-radius:50%;background:#10B981;border:2px solid ${light ? "rgba(255,255,255,.9)" : p.panel}}
       .halo .bd{position:absolute;top:${Math.round(hsz * 0.1)}px;right:${Math.round(hsz * 0.1)}px;min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#FFFFFF;color:${g[0]};font-style:normal;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.25)}
       .qs{display:flex;flex-direction:column;gap:8px;position:relative;z-index:1}
@@ -5476,7 +5479,7 @@ class RoostLight extends RoostBase {
         ${dims ? `<span class="pc num" data-tw="pc">${pct}%</span>` : ""}<span class="sw ${on ? "on" : ""}" role="switch" aria-checked="${on}"></span></div>
       ${dims ? `<div class="bar" role="slider" aria-valuenow="${fin(pct)}"><span class="f" data-bar="br" style="width:${fin(pct)}%"></span><ha-icon icon="mdi:brightness-6"></ha-icon></div>` : ""}
       ${(temps && c.show_presets) || (colours && c.show_colors) ? `<div class="chips">
-        ${temps && c.show_presets ? [["Warm", 2700, "#FFB45A"], ["Neutral", 4000, "#FFE7C2"], ["Cool", 6000, "#CFE6FF"]].map(([w, k, col]) => `<button data-k="${k}"><i style="background:${col}"></i>${w}</button>`).join("") : ""}
+        ${temps && c.show_presets ? [["Warm", 2700, "#FFB45A"], ["Neutral", 4000, "#FFE7C2"], ["Cool", 6000, "#CFE6FF"]].map(([w, k, col]) => `<button data-k="${k}"><i style="background:${col}"></i><span data-ar="${{ Warm: "دافئ", Neutral: "محايد", Cool: "بارد" }[w]}">${w}</span></button>`).join("") : ""}
         ${colours && c.show_colors ? ["#FF5A5F", "#FFB020", "#3DD68C", "#38BDF8", "#8B6CFF", "#F472B6"].map((col) => `<button class="dotc" data-rgb="${col}" aria-label="Colour"><i style="background:${col}"></i></button>`).join("") : ""}</div>` : ""}
     </div>`;
     const root = this.shadowRoot;
@@ -5491,7 +5494,7 @@ class RoostLight extends RoostBase {
     const bar = root.querySelector(".bar");
     if (bar) {
       const set = (ev, done) => {
-        const r = bar.getBoundingClientRect(), f = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+        const r = bar.getBoundingClientRect(), f = Math.max(0, Math.min(1, rtlX(bar, (ev.clientX - r.left) / r.width)));
         bar.querySelector(".f").style.width = `${Math.round(f * 100)}%`;
         const pc = root.querySelector(".pc"); if (pc) pc.textContent = `${Math.round(f * 100)}%`;
         if (done) this.call("light", f < 0.01 ? "turn_off" : "turn_on", f < 0.01 ? { entity_id: c.entity } : { entity_id: c.entity, brightness_pct: Math.max(1, Math.round(f * 100)) });
@@ -5709,7 +5712,7 @@ class RoostGraph extends RoostBase {
       .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
       .n{font-size:15px;font-weight:600}
       .v{font-size:24px;font-weight:700}
-      svg{display:block;width:100%;height:${H}px}
+      svg{display:block;width:100%;height:${H}px;/*mirror*/}
       .gw{position:relative}
       .nd{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:${g[1]};box-shadow:0 0 0 3px ${p.panel.startsWith("rgba") ? (this.dark ? "#141831" : "#fff") : p.panel}}
       .nd i{position:absolute;inset:0;border-radius:50%;background:${g[1]};animation:roost-ping 2s ease-out infinite}
@@ -6025,10 +6028,10 @@ class RoostRemote extends RoostBase {
       .k.no{opacity:.28;cursor:default}
       .k.pw{width:48px;height:48px;flex:none;background:linear-gradient(135deg,#F43F6B,#FF8F6B);color:#fff;border-color:transparent;box-shadow:0 10px 22px -10px rgba(244,63,107,.7)}
       .pad{position:relative;width:min(190px,62cqw);aspect-ratio:1;border-radius:50%;background:${p.inset};border:1px solid ${p.border}}
-      .pad .k{position:absolute;background:transparent;border:0;transform:translate(-50%,-50%)}
-      .pad .k:active{transform:translate(-50%,-50%) scale(.88)}
-      .pad .up{left:50%;top:17%}.pad .down{left:50%;top:83%}.pad .left{left:17%;top:50%}.pad .right{left:83%;top:50%}
-      .pad .ok{left:50%;top:50%;width:38%;height:38%;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 12px 26px -10px ${g[2]}}
+      .pad .k{/*ltr*/position:absolute;background:transparent;border:0;transform:translate(-50%,-50%)}
+      .pad .k:active{/*ltr*/transform:translate(-50%,-50%) scale(.88)}
+      .pad .up{/*ltr*/left:50%;top:17%}.pad .down{/*ltr*/left:50%;top:83%}.pad .left{/*ltr*/left:17%;top:50%}.pad .right{/*ltr*/left:83%;top:50%}
+      .pad .ok{/*ltr*/left:50%;top:50%;width:38%;height:38%;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};box-shadow:0 12px 26px -10px ${g[2]}}
       .row{display:flex;gap:min(14px,3cqw);justify-content:center;width:100%;flex-wrap:wrap}
       .rock{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;border-radius:999px;background:${p.inset};border:1px solid ${p.border}}
       .rock .k{background:transparent;border:0;width:min(48px,13cqw);height:min(48px,13cqw)}
@@ -9962,13 +9965,14 @@ class RoostLock extends RoostBase {
       .n{font-size:15px;font-weight:600}
       .w{font-size:20px;font-weight:700}
       .d{font-size:13px;color:${p.muted}}
-      .track{/*ltr*/direction:ltr;position:relative;height:58px;border-radius:999px;background:${p.inset};border:1px solid ${p.border};overflow:hidden;touch-action:none;user-select:none}
+      .track{position:relative;height:58px;border-radius:999px;background:${p.inset};border:1px solid ${p.border};overflow:hidden;touch-action:none;user-select:none}
       .hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:${p.muted};animation:roost-breathe 2.2s ease-in-out infinite}
-      .hint{/*ltr*/padding-left:50px}
+      .hint{padding-left:50px}
       .short{display:none}
       @container (max-width: 250px){:host .long{display:none}:host .short{display:inline}}
-      .knob{/*ltr*/position:absolute;left:5px;top:5px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};display:flex;align-items:center;justify-content:center;cursor:grab;box-shadow:0 6px 16px -6px ${g[2]}}
+      .knob{position:absolute;left:5px;top:5px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};display:flex;align-items:center;justify-content:center;cursor:grab;box-shadow:0 6px 16px -6px ${g[2]}}
       .knob ha-icon{--mdc-icon-size:24px}
+      :host([dir=rtl]) .knob ha-icon{transform:scaleX(-1)}
       .wait{position:relative;height:58px;border-radius:999px;background:${p.inset};border:1px solid ${p.border};overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:${p.muted}}
       .wait::before{content:"";position:absolute;top:0;bottom:0;width:40%;background:linear-gradient(90deg,transparent,${ACTIVE[2]},transparent);opacity:.5;animation:roost-sweep 1.2s linear infinite}
       @keyframes roost-sweep{from{left:-40%}to{left:100%}}
@@ -9984,12 +9988,13 @@ class RoostLock extends RoostBase {
     r.querySelector(".lockb")?.addEventListener("click", () => { this.vibrate(); this.call(cover ? "cover" : "lock", cover ? "close_cover" : "lock", { entity_id: c.entity }); });
     const track = r.querySelector(".track"), knob = r.querySelector(".knob");
     if (track && knob) {
-      let x0 = null, max = 0;
-      knob.addEventListener("pointerdown", (e) => { knob.setPointerCapture(e.pointerId); x0 = e.clientX; max = track.clientWidth - knob.clientWidth - 10; });
-      knob.addEventListener("pointermove", (e) => { if (x0 == null) return; knob.style.transform = `translateX(${Math.max(0, Math.min(max, e.clientX - x0))}px)`; });
+      // in Arabic the knob starts on the right and slides to the left
+      let x0 = null, max = 0, dir = 1;
+      knob.addEventListener("pointerdown", (e) => { knob.setPointerCapture(e.pointerId); x0 = e.clientX; max = track.clientWidth - knob.clientWidth - 10; dir = rtlX(track, 0) === 1 ? -1 : 1; });
+      knob.addEventListener("pointermove", (e) => { if (x0 == null) return; knob.style.transform = `translateX(${dir * Math.max(0, Math.min(max, dir * (e.clientX - x0)))}px)`; });
       knob.addEventListener("pointerup", (e) => {
         if (x0 == null) return;
-        const d = e.clientX - x0; x0 = null;
+        const d = dir * (e.clientX - x0); x0 = null;
         if (d >= max * 0.85) { this.vibrate(30); this.call(cover ? "cover" : "lock", cover ? "open_cover" : "unlock", { entity_id: c.entity }); }
         else { try { knob.animate([{ transform: knob.style.transform }, { transform: "translateX(0)" }], { duration: 250, easing: "ease-out" }); } catch (err) { /* jumps back */ } }
         knob.style.transform = "translateX(0)";
@@ -10291,9 +10296,20 @@ const AR_WORDS = {
   "Feed now": "أطعمه الآن", "Back to dock": "العودة للقاعدة", "Find it": "ابحث عنه", "Start cleaning": "ابدأ التنظيف", "Docked": "في القاعدة", "Cleaning": "ينظّف", "Returning": "يعود",
   "No reading": "لا توجد قراءة", "Not working right now": "لا يعمل حالياً", "Loading": "جارٍ التحميل", "Nothing planned": "لا شيء مخطط", "The shopping list is empty": "قائمة التسوق فارغة",
   "Volume": "الصوت", "Source": "المصدر", "Speed": "السرعة", "Swing": "تأرجح", "Mute": "كتم", "Previous": "السابق", "Next": "التالي",
+  "Too high": "مرتفع جداً", "Too low": "منخفض جداً", "same time": "التوقيت نفسه", "AM": "ص", "PM": "م", "SET TO": "مضبوط على", "Set to ": "مضبوط على", "Playing": "يعمل الآن", "Paused": "متوقف مؤقتاً",
+  "yesterday": "أمس", "Add an item": "أضف عنصراً", "All day": "طوال اليوم", "Fresh": "منعش", "Stale": "خانق", "Breeze": "نسيم", "Doors and alarm": "الأبواب والإنذار", "LAST 24 HOURS": "آخر 24 ساعة",
+  "Shopping list": "قائمة التسوق", "No tasks": "لا مهام", "No chores": "لا أعمال منزلية", "Slide to": "اسحب لـ", "Wind": "الرياح",
+  "See all": "عرض الكل", "No history yet": "لا يوجد سجل بعد", "Power consumption": "استهلاك الطاقة", "Energy": "الطاقة", "humidity": "الرطوبة", "Sunset": "الغروب", "Room on": "الغرفة تعمل",
+  "Slide to unlock ›››": "اسحب لفتح القفل ›››", "Slide to open ›››": "اسحب للفتح ›››", "Lowest": "الأدنى", "Highest": "الأعلى", "Next prayer": "الصلاة القادمة",
+  "Warm": "دافئ", "Neutral": "محايد", "Cool white": "بارد", "Comfortable": "مريح", "Comfy": "مريح", "Cold": "بارد", "Hot": "حار", "Humid": "رطب",
   "Language": "اللغة", "English": "English", "Arabic": "العربية", "Ready": "جاهز", "Done": "تم", "Upload": "رفع", "Download": "تنزيل", "Live": "مباشر", "Camera offline": "الكاميرا غير متصلة",
 };
+const AR_DAYS = "Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday", AR_MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December";
 const AR_PATTERNS = [
+  [new RegExp(`^(${AR_DAYS}) (\\d{1,2}) (${AR_MONTHS})$`), (m, d, n, mo) => `${AR_WORDS[d]} ${n} ${AR_WORDS[mo]}`], [new RegExp(`^(\\d{1,2}) (${AR_MONTHS})$`), (m, n, mo) => `${n} ${AR_WORDS[mo]}`],
+  [/^(Sunset|Sunrise) at (.+)$/, (m, a, t) => `${a === "Sunset" ? "الغروب" : "الشروق"} الساعة ${arWord(t) || t}`], [/^in (\d+)h (\d+)m$/, "بعد $1 س $2 د"], [/^room (.+)$/i, "الغرفة $1"], [/^at (\d.+)$/, (m, t) => `الساعة ${arWord(t) || t}`], [/^(\d+) devices?$/, "$1 أجهزة"], [/^([+−-]\d+)h$/, "$1 س"], [/^(\d+) people here$/, "$1 أشخاص هنا"], [/^1 person here$/, "شخص واحد هنا"],
+  [/^(\d+) to do$/, "$1 للإنجاز"], [/^Clear (\d+) ticked$/, "امسح $1 منجزة"], [/^Wind (.+)$/, "الرياح $1"], [/^Humidity (\d+)%$/, "الرطوبة $1٪"], [/^vs this time (.+)$/, "مقارنة بهذا الوقت $1"], [/^(\d+) open: (.+)$/, "$1 مفتوح: $2"], [/^(\d+) min$/, "$1 د"], [/^(\d+)h (\d+)m$/, "$1 س $2 د"], [/^Last (\d+) h$/, "آخر $1 س"], [/^in (\d+)h$/, "بعد $1 س"], [/^in (\d+)m$/, "بعد $1 د"],
+  [/^(\d+(?:\.\d+)?)% humidity$/, "الرطوبة $1٪"],
   [/^for (\d+) min$/, "منذ $1 د"], [/^for (\d+)h(?: (\d+)m)?$/, (m, h, mi) => `منذ ${h} س${mi ? ` ${mi} د` : ""}`], [/^for (\d+) days?$/, "منذ $1 يوم"],
   [/^(\d+) min ago$/, "قبل $1 د"], [/^(\d+) h ago$/, "قبل $1 س"], [/^(\d+) days? ago$/, "قبل $1 يوم"], [/^Since (.+) ago$/, (m, x) => `منذ ${arWord(x)}`], [/^Since (.+)$/, (m, x) => `منذ ${arWord(x)}`],
   [/^(\d+) lights? on$/, "$1 أضواء تعمل"], [/^(\d+) lights? are on$/, "$1 أضواء تعمل"], [/^(\d+) on$/, "$1 يعمل"], [/^(\d+) open$/, "$1 مفتوح"], [/^(\d+) home$/, "$1 في المنزل"], [/^(.+) is unlocked$/, "$1 غير مقفل"], [/^(\d+) more$/, "$1 أخرى"], [/^(\d+) of (\d+) on$/, "$1 من $2 يعمل"],
@@ -10305,6 +10321,7 @@ const AR_PATTERNS = [
   [/^(.+) is open$/, "$1 مفتوح"], [/^(.+) is on$/, "$1 يعمل"], [/^(\d+) doors or windows are open$/, "$1 أبواب أو نوافذ مفتوحة"], [/^(\d+) batteries are low$/, "$1 بطاريات منخفضة"], [/^(.+): battery low$/, "$1: البطارية منخفضة"],
   [/^Last ran (.+)$/, (m, x) => `آخر تشغيل ${arWord(x)}`], [/^(\d+(?:\.\d+)?)° outside$/, "$1° في الخارج"], [/^And it is (.+) outside$/, "والحرارة $1 في الخارج"], [/^At night$/, "في الليل"],
   [/(\d+(?:[.,]\d+)?) ?(AM|PM)$/, (m, t, ap) => `${t} ${ap === "AM" ? "ص" : "م"}`],
+  [/^([A-Z][A-Za-z ]+) (on|off|open|closed)$/, (m, x, st) => `${arWord(x) || x} ${AR_WORDS[st.charAt(0).toUpperCase() + st.slice(1)]}`],
 ];
 function arWord(x) {
   const s = String(x).trim(); if (!s) return x;
@@ -10314,6 +10331,8 @@ function arWord(x) {
   for (const [re, to] of AR_PATTERNS) if (re.test(s)) return s.replace(re, to);
   return null;
 }
+// a slider read in right-to-left: the start is on the right, so the finger's place is counted from the right
+const rtlX = (el, x) => { try { return getComputedStyle(el).direction === "rtl" ? 1 - x : x; } catch (e) { return x; } };
 const RoostLang = {
   pick(hass, cfg) {
     let v = cfg && cfg.language && cfg.language !== "auto" ? cfg.language : null;
@@ -10325,8 +10344,9 @@ const RoostLang = {
   line(t) {
     if (!/[A-Za-z]/.test(t)) return t;
     const lead = t.match(/^\s*/)[0], tail = t.match(/\s*$/)[0], core = t.trim();
-    const whole = arWord(core); if (whole) return lead + whole + tail;
+    // a line of parts (Monday 16 November · 3:20 PM) is translated part by part
     if (core.includes(" · ")) { const parts = core.split(" · ").map((x) => arWord(x) || x); return lead + parts.join(" · ") + tail; }
+    const whole = arWord(core); if (whole) return lead + whole + tail;
     return t;
   },
   apply(el, root, cfg) {
@@ -10336,12 +10356,14 @@ const RoostLang = {
     el.style.direction = "rtl"; el.setAttribute("dir", "rtl"); el.setAttribute("lang", "ar");
     if (!r) return;
     this.mirror(r, true);
+    this.flipMarks(r);
     const east = this.eastern(cfg || el._config), digits = (s) => (east ? s.replace(/[0-9]/g, (d) => "٠١٢٣٤٥٦٧٨٩"[d]).replace(/%/g, "٪") : s);
     const walk = document.createTreeWalker(r, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentNode && /^(STYLE|SCRIPT)$/.test(n.parentNode.nodeName) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
     const nodes = []; while (walk.nextNode()) nodes.push(walk.currentNode);
     // a number with its unit (1240 L, 214 km, 3 h 57 min) keeps its order inside right-to-left text
     const iso = (v) => (/^\s*[-−+]?[\d٠-٩]/.test(v) && /[A-Za-zµ]/.test(v) && !/[\u0600-\u06FF\u2066]/.test(v) ? `\u2066${v}\u2069` : v);
-    for (const n of nodes) { const v = iso(digits(this.line(n.nodeValue))); if (v !== n.nodeValue) n.nodeValue = v; }
+    // a word with its own Arabic for this place (data-ar) uses it: "Cool" for a light is بارد, not تبريد
+    for (const n of nodes) { const own = n.parentNode?.dataset?.ar; const v = own || iso(digits(this.line(n.nodeValue))); if (v !== n.nodeValue) n.nodeValue = v; }
     r.querySelectorAll("[aria-label],[title],[placeholder]").forEach((x) => { for (const a of ["aria-label", "title", "placeholder"]) { const v = x.getAttribute(a); if (v) { const t = this.line(v); if (t !== v) x.setAttribute(a, t); } } });
   },
   // right to left: everything placed by a side (a corner button, a badge, a bar) moves to the other side, so the
@@ -10353,21 +10375,24 @@ const RoostLang = {
     return css.replace(/([^{}]*)\{([^{}]*)\}/g, (m, sel, body) => {
       // marked to stay as drawn (a slide-to-unlock track, things placed by the card's own sums)
       if (/\/\*ltr\*\//.test(sel + body)) return m;
+      // a drawing that runs along time (a graph's curve) is drawn mirrored, so it starts on the right
+      if (/\/\*mirror\*\//.test(body)) return `${sel}{${body.replace("/*mirror*/", "transform:scaleX(-1);")}}`;
       const sides = [...body.matchAll(/(?:^|[;\s])(left|right)\s*:\s*([^;]+)/g)];
       // something centred stays centred
       if (sides.some((x) => /^50%/.test(x[2].trim()))) return m;
       // placed by the card's own sums (no side here): leave it
       if (!sides.length && /position\s*:\s*(absolute|fixed)/.test(body)) return m;
       let b = body;
-      // one side only, at 0: a fill growing from that edge (bars and sliders follow the finger): it stays
-      if (!(sides.length === 1 && /^0(px)?\s*(!important)?$/.test(sides[0][2].trim())) && sides.length) {
+      // everything placed from a side moves to the other side, fills included: in Arabic a bar fills from the right
+      // and its slider is read from the right too (see rtlX)
+      if (sides.length) {
         b = b.replace(/(^|[;\s])(left|right)(\s*:)/g, (q, a, side, c) => a + swap(side) + c)
           // a knob that slides along from its side slides the other way
           .replace(/translateX\((-?)(\d+(?:\.\d+)?px)\)/g, (q, neg, v) => `translateX(${neg ? "" : "-"}${v})`);
       }
       // a switch that is on: its knob slides the other way
       if (!sides.length && /\.on\b/.test(sel) && /transform\s*:\s*translateX\(\d+(?:\.\d+)?px\)\s*(;|$)/.test(b.trim() + ";")) b = b.replace(/translateX\((\d+(?:\.\d+)?px)\)/g, "translateX(-$1)");
-      b = b.replace(/(margin|padding|border)-(left|right)/g, (q, a, side) => `${a}-${swap(side)}`)
+      b = b.replace(/linear-gradient\(90deg/g, "linear-gradient(270deg").replace(/(margin|padding|border)-(left|right)/g, (q, a, side) => `${a}-${swap(side)}`)
         .replace(/border-(top|bottom)-(left|right)-radius/g, (q, v, side) => `border-${v}-${swap(side)}-radius`)
         .replace(/(text-align|float)\s*:\s*(left|right)/g, (q, a, side) => `${a}:${swap(side)}`)
         .replace(/(^|[;\s])(margin|padding)\s*:\s*([^;!]+?)(\s*!important)?(?=;|$)/g, (q, a, k, v, imp) => four(v, (x) => `${a}${k}:${x[0]} ${x[3]} ${x[2]} ${x[1]}${imp || ""}`) || q)
@@ -10382,6 +10407,21 @@ const RoostLang = {
       if (st.__roostLtr !== undefined && now !== st.__roostRtl) st.__roostLtr = undefined; // the card wrote new styles
       if (on) { if (st.__roostLtr === undefined) { st.__roostLtr = now; st.__roostRtl = this.flipCss(now); } if (st.textContent !== st.__roostRtl) st.textContent = st.__roostRtl; }
       else if (st.__roostLtr !== undefined) { if (st.textContent !== st.__roostLtr) st.textContent = st.__roostLtr; st.__roostLtr = undefined; }
+    });
+  },
+  // Marks placed along a scale from its start (a prayer or day timeline, a good-range bar) carry their place in their
+  // own style as left: N%. In Arabic the scale starts on the right, so each mark moves to right: N%; a mark centred on
+  // its place (translateX(-50%)) is centred from the other side.
+  flipMarks(r) {
+    r.querySelectorAll('[style*="left:"]').forEach((n) => {
+      const v = n.style.left;
+      if (!/%$/.test(v) || n.style.right) return;
+      const cs = getComputedStyle(n), ml = cs.marginLeft, mr = cs.marginRight;
+      n.style.left = ""; n.style.right = v;
+      if (ml !== mr) { n.style.marginLeft = mr; n.style.marginRight = ml; } // a mark centred with a margin stays centred
+      const t = getComputedStyle(n).transform;
+      const m = t && t !== "none" ? t.match(/matrix\(([^)]+)\)/) : null;
+      if (m) { const tx = Number(m[1].split(",")[4]); if (tx < 0 && Math.abs(Math.abs(tx) - n.offsetWidth / 2) < 2) n.style.transform = "translateX(50%)"; }
     });
   },
   cards: new Set(),
@@ -10755,7 +10795,7 @@ const RoostSheet = {
       .seg{display:grid;gap:4px;padding:4px;border-radius:16px;background:${p.inset}}
       .seg button{height:44px;border-radius:12px;border:0;background:transparent;color:${p.muted};font-size:14px;font-weight:600}
       .seg button.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:#FFFFFF}
-      .sens{display:flex;align-items:flex-end;gap:16px}.sens svg{flex:1;height:60px;min-width:0}
+      .sens{display:flex;align-items:flex-end;gap:16px}.sens svg{flex:1;height:60px;min-width:0;/*mirror*/}
       .note{font-size:14px;color:${p.muted}}
       .mt{font-size:15px;font-weight:600;text-align:center}.mt span{color:${p.muted};font-weight:500}
       .more{border:0;background:none;color:${p.muted};font-size:12px;padding:0;align-self:center}
@@ -10767,7 +10807,7 @@ const RoostSheet = {
       .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.tiles button{min-height:72px;border-radius:18px;border:0;padding:12px;background:${p.inset};color:${p.text};display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:6px;text-align:left;--mdc-icon-size:20px}
       .tiles button span{font-size:14px;font-weight:600}.tiles button small{font-size:12px;opacity:.8}.tiles button.on{color:#FFFFFF}
       .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.stats div{border-radius:16px;background:${p.inset};padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0}.stats span{font-size:12px;color:${p.muted}}.stats b{font-size:15px;font-weight:600;overflow-wrap:anywhere}
-      .chart{border-radius:18px;background:${p.inset};padding:10px 10px 6px}.chart svg{width:100%;height:120px;display:block}
+      .chart{border-radius:18px;background:${p.inset};padding:10px 10px 6px}.chart svg{width:100%;height:120px;display:block;/*mirror*/}
       .ax{display:flex;justify-content:space-between;font-size:11px;color:${p.muted};padding:4px 2px 0}
       .strip{position:relative;height:28px;border-radius:10px;background:${p.inset};overflow:hidden}.strip i{position:absolute;top:0;bottom:0}
       .tl small{color:${p.muted};font-size:12px}
@@ -10867,7 +10907,7 @@ const RoostSheet = {
     // drag the bars: the value follows the finger and is sent when it lets go
     root.querySelectorAll("[data-bar]").forEach((bar) => {
       const fill = bar.querySelector("i"), label = bar.querySelector("b");
-      const at = (e) => Math.max(0, Math.min(100, Math.round(((e.clientX - bar.getBoundingClientRect().left) / bar.clientWidth) * 100)));
+      const at = (e) => Math.max(0, Math.min(100, Math.round(rtlX(bar, (e.clientX - bar.getBoundingClientRect().left) / bar.clientWidth) * 100)));
       let v = null;
       const word = (x) => (bar.dataset.bar === "num" ? `${fmt(Number(a.min ?? 0) + (Number(a.max ?? 100) - Number(a.min ?? 0)) * x / 100, 0)}${unitGap(a.unit_of_measurement || "")}` : `${x}%`);
       bar.addEventListener("pointerdown", (e) => { el.busy = true; bar.setPointerCapture(e.pointerId); v = at(e); fill.style.width = `${v}%`; label.textContent = word(v); });
@@ -11534,7 +11574,7 @@ class RoostSensors extends RoostBase {
       .v{font-weight:700;line-height:1;letter-spacing:-.5px;font-size:15px}
       .v small{font-size:13px;font-weight:600;color:${p.muted};margin-left:1px;letter-spacing:0}
       .tr{font-size:11px;font-weight:600;color:${p.muted};white-space:nowrap}
-      .sp{display:block;width:100%;height:34px}
+      .sp{display:block;width:100%;height:34px;/*mirror*/}
       .rg{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;font-size:11px;color:${p.muted}}
       .rb{position:relative;height:4px;border-radius:999px;background:${p.track}}
       .rb i,.scb i{position:absolute;top:50%;border-radius:50%;background:${this.dark ? "#EEF0FF" : "#FFFFFF"}}
@@ -13114,7 +13154,7 @@ class RoostTour extends RoostBase {
     }));
     ctl.querySelectorAll("[data-bar]").forEach((bar) => {
       const fill = bar.querySelector("i"), label = bar.querySelector("b"), a = st.attributes; let v = null;
-      const pos = (e) => { const r = bar.getBoundingClientRect(), x = (e.clientX - r.left) / bar.clientWidth; return Math.max(0, Math.min(100, Math.round((getComputedStyle(bar).direction === "rtl" ? 1 - x : x) * 100))); };
+      const pos = (e) => { const r = bar.getBoundingClientRect(), x = (e.clientX - r.left) / bar.clientWidth; return Math.max(0, Math.min(100, Math.round(rtlX(bar, x) * 100))); };
       const word = (x) => (bar.dataset.bar === "num" ? `${fmt(Number(a.min ?? 0) + (Number(a.max ?? 100) - Number(a.min ?? 0)) * x / 100, 0)}${unitGap(a.unit_of_measurement || "")}` : `${x}%`);
       const show = () => { fill.style.width = `${v}%`; label.textContent = word(v); if (this.pan && bar.dataset.bar === "light") this.pan.root.querySelector(".sc").style.setProperty("--on", v ? (0.25 + 0.75 * v / 100).toFixed(2) : "0"); if (this.pan && bar.dataset.bar === "cover") this.pan.want.open = v / 100; };
       bar.addEventListener("pointerdown", (e) => { e.stopPropagation(); if (this.pan) this.pan.busy = true; try { bar.setPointerCapture(e.pointerId); } catch (x) { /* a pointer that already ended */ } v = pos(e); show(); });
