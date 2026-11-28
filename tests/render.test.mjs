@@ -574,12 +574,12 @@ if (!calls.some((x) => x[1] === "toggle")) { fails++; console.error("FAIL confir
     "climate.t_car": { entity_id: "climate.t_car", state: "off", attributes: {} }, "button.t_flash": { entity_id: "button.t_flash", state: "unknown", attributes: {} },
     "binary_sensor.t_door": { entity_id: "binary_sensor.t_door", state: "on", attributes: {} }, "sensor.t_bat": { entity_id: "sensor.t_bat", state: "58", attributes: { unit_of_measurement: "%" } },
   });
-  const cr = mk("roost-ev", { type: "custom:roost-ev", kind: "fuel", fuel: "sensor.t_fuel", lock: "lock.t_car", climate: "climate.t_car", find: "button.t_flash", doors: "binary_sensor.t_door", look: "suv", paint: "red",
+  const cr = mk("roost-ev", { type: "custom:roost-ev", kind: "fuel", fuel: "sensor.t_fuel", lock: "lock.t_car", climate: "climate.t_car", find: "button.t_flash", doors: "binary_sensor.t_door", look: "suv",
     cars: [{ name: "Layla's car", car: "electric", battery: "sensor.t_bat", look: "photo" }] });
   const ch = () => cr.shadowRoot.innerHTML;
   if (!cr.shadowRoot.querySelector(".pack") || !/Fuel low/.test(ch())) bad("car shows low fuel");
   if (!cr.shadowRoot.querySelector("[data-lk]")) bad("car has its lock button");
-  if (!/#B21E26/.test(ch()) || !cr.shadowRoot.querySelector("svg.drawn")) bad("car drawn in its own colour");
+  if (!cr.shadowRoot.querySelector("svg.drawn") || /paint/.test(JSON.stringify(customElements.get("roost-ev").getConfigForm()))) bad("car drawn, with no colour choice");
   if (!/A door is open/.test(ch()) || !cr.shadowRoot.querySelector(".open")) bad("car says a door is open");
   calls.length = 0; click(cr, '[data-cb="ac"]'); if (!calls.some((x) => x[0] === "climate" && x[1] === "turn_on")) bad("car starts the AC", calls);
   calls.length = 0; click(cr, '[data-cb="find"]'); if (!calls.some((x) => x[0] === "button" && x[1] === "press") || !cr.shadowRoot.querySelector(".flash")) bad("car flashes its lights", calls);

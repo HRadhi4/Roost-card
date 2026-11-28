@@ -1,3 +1,4 @@
 node_modules/
 .audit/
 DESIGN_RULES.md
+*.tmp.mjs

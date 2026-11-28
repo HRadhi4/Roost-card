@@ -739,7 +739,9 @@ class RoostBase extends HTMLElement {
     const run = (el, frames, opts) => { if (still) return; try { el.animate(frames, opts); } catch (e) { /* old browser: no movement */ } };
     const raf = window.requestAnimationFrame ? (f) => window.requestAnimationFrame(f) : (f) => setTimeout(() => f(performance.now()), 16);
     root.querySelectorAll("[data-tw]").forEach((el) => {
-      const txt = el.textContent, m = txt.match(/-?\d+(?:\.\d+)?/);
+      // count in the text that holds the number only, so a smaller unit beside it (<small>%</small>) stays as it is
+      let node = el; if (el.children.length) { const w = document.createTreeWalker(el, 4); for (let n = w.nextNode(); n; n = w.nextNode()) if (/\d/.test(n.nodeValue)) { node = n; break; } }
+      const txt = node === el ? el.textContent : node.nodeValue, m = txt.match(/-?\d+(?:\.\d+)?/);
       if (!m) return;
       const key = `n${el.dataset.tw}`, to = parseFloat(m[0]), dec = (m[0].split(".")[1] || "").length, from = mem[key];
       mem[key] = to;
@@ -747,7 +749,7 @@ class RoostBase extends HTMLElement {
       const pre = txt.slice(0, m.index), post = txt.slice(m.index + m[0].length), t0 = performance.now(), D = 650;
       const step = (t) => {
         const k = Math.min(1, (t - t0) / D), e = 1 - (1 - k) ** 3;
-        el.textContent = pre + (from + (to - from) * e).toFixed(dec) + post;
+        const v = pre + (from + (to - from) * e).toFixed(dec) + post; if (node === el) el.textContent = v; else node.nodeValue = v;
         if (k < 1 && el.isConnected) raf(step);
       };
       raf(step);
@@ -1050,7 +1052,7 @@ const LOOK_NEST = /look|colour|sky|shape|tiles|room buttons|analog|big tile/i;
 const SHOW_TITLE = /^(what it shows|what the remote shows|buttons|numbers)$/i;
 const TAP_TITLE = /^(tap and hold|tap|safety)$/i;
 // the visual pickers above the sections take these over
-const PICKED = new Set(["color", "theme", "paint"]);
+const PICKED = new Set(["color", "theme"]);
 const kindOf = (f) => {
   if (!f.name) return "device";
   if (TAP_RE.test(f.name)) return "tap";
@@ -1183,7 +1185,7 @@ class RoostEditor extends HTMLElement {
     // the card's main look choice, drawn as small live pictures (not for bars that stick to the screen edge)
     const styleKey = ["roost-nav", "roost-top-bar", "roost-page", "roost-panel", "roost-fullscreen", "roost-popup"].includes(cls.tag) ? null
       : STYLE_KEYS.find((k) => { const f = findField(form.schema, k); const o = f?.selector?.select?.options; return o && o.length >= 2 && o.length <= 8; }) || null;
-    this._look = { styleKey, style: styleKey ? findField(form.schema, styleKey) : null, color: findField(form.schema, "color"), theme: findField(form.schema, "theme"), paint: findField(form.schema, "paint") };
+    this._look = { styleKey, style: styleKey ? findField(form.schema, styleKey) : null, color: findField(form.schema, "color"), theme: findField(form.schema, "theme") };
     if (this._look.color && !this._look.color.selector?.select) this._look.color = null;
     const sections = arrangeSchema(form.schema, more, styleKey);
     const top = sections.filter((x) => x.title === "Device"), rest = sections.filter((x) => x.title !== "Device");
@@ -1266,11 +1268,11 @@ class RoostEditor extends HTMLElement {
 
   // Look, picked by sight: live small pictures of each style, colour dots, Auto / Light / Dark
   drawLook() {
-    const { styleKey, style, color, theme, paint } = this._look, box = this._lookBox, d = this._data, cls = this.cardClass;
-    const key = JSON.stringify([styleKey, d[styleKey], d.color, d.theme, d.paint, !!style, !!color, !!theme, !!paint]);
+    const { styleKey, style, color, theme } = this._look, box = this._lookBox, d = this._data, cls = this.cardClass;
+    const key = JSON.stringify([styleKey, d[styleKey], d.color, d.theme, !!style, !!color, !!theme]);
     if (box._key !== key) {
       box._key = key; box.innerHTML = ""; this._pics = [];
-      if (!style && !color && !theme && !paint) return;
+      if (!style && !color && !theme) return;
       const h = document.createElement("div"); h.className = "roost-h"; h.textContent = "Look"; box.appendChild(h);
       if (style) {
         const lab = document.createElement("div"); lab.className = "roost-sub"; lab.style.marginTop = "0"; lab.textContent = computeLabel(style) === "Look" ? "Style" : computeLabel(style);
@@ -1289,18 +1291,6 @@ class RoostEditor extends HTMLElement {
           grid.appendChild(b);
         }
         box.append(lab, grid);
-      }
-      if (paint) { // the car's own colour, as dots of that paint
-        const lab = document.createElement("div"); lab.className = "roost-sub"; lab.style.marginTop = "0"; lab.textContent = computeLabel(paint);
-        const row = document.createElement("div"); row.className = "roost-row"; row.setAttribute("role", "group"); row.setAttribute("aria-label", computeLabel(paint));
-        for (const o of paint.selector.select.options) {
-          const pc = CAR_PAINTS[o.value];
-          const b = document.createElement("button"); b.type = "button"; b.className = "roost-dot"; b.title = o.label; b.setAttribute("aria-label", o.label); b.setAttribute("aria-pressed", String((d.paint || "auto") === o.value));
-          const img = document.createElement("img"); img.src = pc ? dotImg(pc[0], pc[1]) : RAINBOW; img.alt = ""; b.appendChild(img);
-          b.addEventListener("click", () => this.setKeys({ paint: o.value }));
-          row.appendChild(b);
-        }
-        box.append(lab, row);
       }
       if (color) {
         const lab = document.createElement("div"); lab.className = "roost-sub"; lab.style.marginTop = "0"; lab.textContent = computeLabel(color);
@@ -8160,9 +8150,8 @@ const CAR_STRIP = "M504 146 C536 149 596 155 640 163 L790 161";
 const CAR_GRILLE = { x: 637, y: 178, w: 164, h: 47 };
 const CAR_DOOR = "M205 112 L330 104 L345 268 L210 262 Z", CAR_BOOT = "M20 80 L66 52 L70 190 L18 178 Z";
 const CAR_AIR = "M150 70 q14 8 28 0 t28 0 t28 0 M250 64 q14 8 28 0 t28 0 t28 0 t28 0 M380 72 q14 8 28 0 t28 0 t28 0";
-// the car's own colour: [paint, edge, name]
-const CAR_PAINTS = { white: ["#F1F2F4", "#B9BDC6", "White"], silver: ["#BEC4CD", "#8D93A0", "Silver"], grey: ["#606672", "#3E4450", "Grey"], black: ["#282B32", "#05060A", "Black"],
-  red: ["#B21E26", "#7A161C", "Red"], blue: ["#284E96", "#1C3360", "Blue"], sand: ["#C9B28C", "#9A8462", "Sand"] };
+// the drawn cars: one plain white body with a soft grey edge
+const CAR_FILL = ["#F1F2F4", "#B9BDC6"];
 // simple drawn cars seen from the side (420 × 170), front to the left
 const CAR_DRAWN = {
   suv: { body: "M28 128 V100 Q30 86 48 82 L118 74 L156 40 Q164 33 178 33 L318 33 Q332 33 340 44 L366 76 L386 82 Q398 86 398 102 V128 Z", glass: "M162 72 L188 42 L254 42 L254 72 Z M262 42 L318 42 Q326 42 332 50 L350 72 L262 72 Z", seams: "M156 72 L156 126 M258 42 L258 126 M352 72 L352 120", handles: "M226 84 h16 M318 84 h16", lights: "M30 92 h26 v10 h-26 Z", tail: "M386 86 h10 v16 h-10 Z", air: "M176 52 q10 6 20 0 t20 0 t20 0 M272 52 q10 6 20 0 t20 0 t20 0", boot: "M352 72 L366 76 L386 82 Q398 86 398 102 V124", door: "M156 72 L188 42 L254 42 L258 42 L258 126 L156 126 Z", w: [104, 322], l: [22, 96], t: [398, 94] },
@@ -8170,53 +8159,12 @@ const CAR_DRAWN = {
   hatch: { body: "M48 128 V102 Q50 90 66 86 L124 78 L160 44 Q168 38 180 38 L304 38 Q318 38 324 50 L352 98 V128 Z", glass: "M166 76 L190 46 L246 46 L246 76 Z M254 46 L302 46 Q312 46 316 54 L334 76 L254 76 Z", seams: "M160 76 L160 126 M250 46 L250 126 M336 70 L346 104", handles: "M218 88 h16 M300 88 h16", lights: "M50 94 h24 v10 h-24 Z", tail: "M342 84 h9 v18 h-9 Z", air: "M180 58 q10 6 20 0 t20 0 M266 58 q10 6 20 0 t20 0", boot: "M324 50 L352 98 V124", door: "M160 76 L190 46 L246 46 L250 46 L250 126 L160 126 Z", w: [114, 300], l: [42, 98], t: [352, 92] },
   pickup: { body: "M20 128 V98 Q22 86 40 82 L110 74 L144 40 Q150 34 162 34 L230 34 Q238 34 240 42 L242 78 L400 78 V128 Z", glass: "M152 72 L174 44 L232 44 L232 72 Z", seams: "M144 72 L144 126 M242 78 L242 126 M400 78 L400 126", handles: "M206 86 h16", lights: "M22 92 h26 v10 h-26 Z", tail: "M390 84 h10 v16 h-10 Z", air: "M168 56 q10 6 20 0 t20 0", boot: "M246 78 H400", door: "M144 72 L174 44 L232 44 L242 44 L242 126 L144 126 Z", w: [96, 334], l: [14, 96], t: [400, 92] },
 };
-// The realistic pictures in another colour, made once on the screen itself and kept: the body takes the new paint, the
-// glass, tyres and lights keep theirs. A petrol car in a new colour is the electric body (its paint is the cleanest to
-// colour) with the petrol car's grille set in. Until it is ready (or where a screen cannot), the picture shows as it is.
-const CAR_PAINTED = new Map();
-const loadImg = (src) => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
-function paintedCar(kind, paint, done) {
-  if (!CAR_PAINTS[paint] || paint === (kind === "electric" ? "white" : "grey")) return CAR_PICS[kind];
-  const key = `${kind}|${paint}`, have = CAR_PAINTED.get(key);
-  if (typeof have === "string") return have;
-  if (have) { have.push(done); return CAR_PICS[kind]; }
-  CAR_PAINTED.set(key, [done]);
-  const fail = () => CAR_PAINTED.set(key, CAR_PICS[kind]); // keep it as it is
-  Promise.all([loadImg(CAR_PICS.electric), kind === "petrol" ? loadImg(CAR_PICS.petrol) : null]).then(([body, front]) => {
-    const W = body.naturalWidth, H = body.naturalHeight, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
-    const x = cv.getContext("2d"); x.drawImage(body, 0, 0);
-    const d = x.getImageData(0, 0, W, H), px = d.data;
-    let fp = null;
-    if (front) { const c2 = document.createElement("canvas"); c2.width = W; c2.height = H; const x2 = c2.getContext("2d"); x2.drawImage(front, 0, 0); fp = x2.getImageData(0, 0, W, H).data; }
-    const g = CAR_GRILLE, gx0 = g.x - 9, gx1 = g.x + g.w + 7, gy0 = g.y - 6, gy1 = g.y + g.h + 9, F = 4;
-    const grille = (X, Y) => { const dx = Math.min(X - gx0, gx1 - X), dy = Math.min(Y - gy0, gy1 - Y); return Math.max(0, Math.min(1, Math.min(dx, dy) / F)); };
-    const col = CAR_PAINTS[paint][0], cr = parseInt(col.slice(1, 3), 16), cg = parseInt(col.slice(3, 5), 16), cb = parseInt(col.slice(5, 7), 16);
-    const recolour = paint !== "white";
-    for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) {
-      const i = (Y * W + X) * 4, gm = fp ? grille(X, Y) : 0;
-      const r = px[i], gg = px[i + 1], b = px[i + 2];
-      let nr = r, ng = gg, nb = b;
-      if (recolour) {
-        const l = (r + gg + b) / 3, sat = Math.max(r, gg, b) - Math.min(r, gg, b);
-        const m = Math.min(1, Math.max(0, (l - 150) / 25)) * Math.min(1, Math.max(0, 1 - (sat - 30) / 30));
-        if (m) { const sh = Math.pow(l / 225, 1.1), lift = Math.max(0, l / 225 - 1) * 90; nr = r * (1 - m) + Math.min(255, cr * sh + lift) * m; ng = gg * (1 - m) + Math.min(255, cg * sh + lift) * m; nb = b * (1 - m) + Math.min(255, cb * sh + lift) * m; }
-      }
-      if (gm) { nr = nr * (1 - gm) + fp[i] * gm; ng = ng * (1 - gm) + fp[i + 1] * gm; nb = nb * (1 - gm) + fp[i + 2] * gm; px[i + 3] = px[i + 3] * (1 - gm) + fp[i + 3] * gm; }
-      px[i] = nr; px[i + 1] = ng; px[i + 2] = nb;
-    }
-    x.putImageData(d, 0, 0);
-    let url = cv.toDataURL("image/webp", 0.86); if (!/^data:image\/webp/.test(url)) url = cv.toDataURL("image/png");
-    const waiting = CAR_PAINTED.get(key); CAR_PAINTED.set(key, url);
-    (Array.isArray(waiting) ? waiting : []).forEach((f) => { try { f(); } catch (e) { /* card gone */ } });
-  }).catch(fail);
-  return CAR_PICS[kind];
-}
 // what every car in the card shares with the first one
 const CAR_SHARED = ["theme", "color", "color_start", "color_end", "animate", "language", "numerals"];
 const CAR_ENTITIES = ["battery", "fuel", "range", "power", "charging", "plugged", "limit", "lock", "engine", "odometer", "climate", "tracker", "find", "doors", "boot"];
 const carType = (c) => (c.car === "petrol" || c.kind === "fuel" ? "petrol" : c.car === "electric" ? "electric" : c.fuel && !c.battery ? "petrol" : "electric");
 class RoostEV extends ticking(RoostBase, 60000) {
-  static get defaults() { return { capacity: 60, color: "green", theme: "auto", car: "auto", look: "drawing", paint: "auto", view: "side", animate: true }; }
+  static get defaults() { return { capacity: 60, color: "green", theme: "auto", car: "auto", look: "drawing", view: "side", animate: true }; }
 
   kind(c = this.current()) { return carType(c); }
 
@@ -8231,7 +8179,7 @@ class RoostEV extends ticking(RoostBase, 60000) {
     const c = this._config || {}, { cars, ...first } = c;
     const more = Array.isArray(cars) ? cars.filter((x) => x && typeof x === "object") : [];
     const shared = Object.fromEntries(CAR_SHARED.filter((k) => k in c).map((k) => [k, c[k]]));
-    return [first, ...more.map((x) => ({ capacity: 60, car: "auto", look: c.look, paint: "auto", view: c.view, ...x, ...shared }))];
+    return [first, ...more.map((x) => ({ capacity: 60, car: "auto", look: c.look, view: c.view, ...x, ...shared }))];
   }
 
   current() { const all = this.cars(); this._i = Math.max(0, Math.min(all.length - 1, this._i || 0)); return all[this._i]; }
@@ -8243,7 +8191,6 @@ class RoostEV extends ticking(RoostBase, 60000) {
     const ent = (domain) => ({ entity: { domain } });
     const TYPES = pick([["auto", "Find out from the devices"], ["electric", "Electric"], ["petrol", "Petrol or hybrid"]]);
     const PICS = [["photo", "Realistic"], ["suv", "Drawn SUV"], ["sedan", "Drawn sedan"], ["hatch", "Drawn hatchback"], ["pickup", "Drawn pickup"], ["drawing", "Charging drawing"]];
-    const PAINT = pick([["auto", "The picture's own"], ...Object.entries(CAR_PAINTS).map(([k, v]) => [k, v[2]])]);
     return { schema: [
       { name: "sample", label: "Show sample data", selector: { boolean: {} } },
       { type: "grid", name: "", schema: [{ name: "car", label: "Car type", selector: TYPES }, { name: "name", selector: { text: {} } }] },
@@ -8261,7 +8208,6 @@ class RoostEV extends ticking(RoostBase, 60000) {
       ] },
       { type: "expandable", name: "", title: "Look", icon: "mdi:palette", schema: [
         { name: "look", label: "Picture", selector: pick(PICS) },
-        { name: "paint", label: "The car's colour", selector: PAINT },
         { type: "grid", name: "", schema: [{ name: "view", label: "Seen from", selector: pick([["side", "The side or front corner"], ["top", "Above (shows which door is open)"]]) }, { name: "animate", label: "Moving picture", selector: { boolean: {} } }] },
         { name: "image", label: "Your own car picture instead (optional, for example /local/my-car.png; a see-through PNG looks best)", selector: { text: {} } },
         ...colourFields("color"), THEME_FIELD,
@@ -8275,15 +8221,15 @@ class RoostEV extends ticking(RoostBase, 60000) {
           engine: { label: "Engine running", selector: ent(["binary_sensor", "switch", "sensor"]) }, charging: { label: "Charging on/off", selector: ent(["switch", "binary_sensor", "sensor"]) },
           climate: { label: "Start the AC", selector: ent(["climate", "button", "script", "switch"]) }, find: { label: "Flash the lights", selector: ent(["button", "script", "switch"]) },
           tracker: { label: "Where it is", selector: ent(["device_tracker", "sensor"]) }, doors: { label: "A door open", selector: ent("binary_sensor") }, boot: { label: "Boot open", selector: ent("binary_sensor") },
-          look: { label: "Picture", selector: pick(PICS) }, paint: { label: "The car's colour", selector: PAINT }, image: { label: "Your own car picture (optional)", selector: { text: {} } },
+          look: { label: "Picture", selector: pick(PICS) }, image: { label: "Your own car picture (optional)", selector: { text: {} } },
         } } } },
       ] },
     ], computeLabel };
   }
 
   static getStubConfig() {
-    return { sample: true, car: "petrol", name: "Family car", look: "photo", paint: "white",
-      cars: [{ name: "Layla's car", car: "electric", battery: "sensor.sample_ev_battery", range: "sensor.sample_ev_range", power: "sensor.sample_ev_power", charging: "switch.sample_ev_charging", lock: "lock.sample_ev", look: "photo", paint: "red" }] };
+    return { sample: true, car: "petrol", name: "Family car", look: "photo",
+      cars: [{ name: "Layla's car", car: "electric", battery: "sensor.sample_ev_battery", range: "sensor.sample_ev_range", power: "sensor.sample_ev_power", charging: "switch.sample_ev_charging", lock: "lock.sample_ev", look: "photo" }] };
   }
 
   getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
@@ -8311,9 +8257,9 @@ class RoostEV extends ticking(RoostBase, 60000) {
     </svg>`;
   }
 
-  // a simple drawn car from the side in its own colour, with the same air, flash and open-door glow
-  drawnCar(type, paint, st) {
-    const d = CAR_DRAWN[type] || CAR_DRAWN.suv, [fill, edge] = CAR_PAINTS[paint] || CAR_PAINTS[type === "pickup" ? "grey" : "white"];
+  // a simple drawn car from the side, with the same air, flash and open-door glow
+  drawnCar(type, st) {
+    const d = CAR_DRAWN[type] || CAR_DRAWN.suv, [fill, edge] = CAR_FILL;
     const wheel = (x) => `<circle cx="${x}" cy="128" r="27" fill="#0B0D14"/><circle cx="${x}" cy="128" r="15" fill="#8A93A6"/><circle cx="${x}" cy="128" r="5" fill="#2A3040"/>`;
     return `<svg class="drawn" viewBox="0 0 420 170" aria-hidden="true">
       <defs><linearGradient id="dshine" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset=".45" stop-color="#fff" stop-opacity=".06"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient>
@@ -8333,8 +8279,8 @@ class RoostEV extends ticking(RoostBase, 60000) {
   }
 
   // the car from above: which door or the boot is open
-  topCar(paint, st) {
-    const [fill, edge] = CAR_PAINTS[paint] || CAR_PAINTS.white;
+  topCar(st) {
+    const [fill, edge] = CAR_FILL;
     return `<svg class="drawn" viewBox="0 0 420 190" aria-hidden="true">
       <rect x="92" y="24" width="40" height="12" rx="4" fill="#0B0D14"/><rect x="290" y="24" width="40" height="12" rx="4" fill="#0B0D14"/>
       <rect x="92" y="154" width="40" height="12" rx="4" fill="#0B0D14"/><rect x="290" y="154" width="40" height="12" rx="4" fill="#0B0D14"/>
@@ -8387,8 +8333,6 @@ class RoostEV extends ticking(RoostBase, 60000) {
     const look = c.look || "drawing", top = c.view === "top" && !c.image;
     const photo = !c.image && !top && (look === "photo" || (!ev && look === "drawing"));
     const drawn = !c.image && !top && CAR_DRAWN[look];
-    const paint = c.paint && c.paint !== "auto" ? c.paint : null;
-    const pic = photo ? paintedCar(kind, paint || "auto", () => { this._sig = null; this.render(); }) : "";
     const pack = `<div class="pack">${Array.from({ length: cells }, (_, k) => `<i class="cell ${charging && k === full && k < limCell ? "next" : ""}" style="background:${k < full ? `linear-gradient(90deg,${g[0]},${col})` : k < limCell ? p.track : "transparent"};${k < limCell ? "" : `border:1px dashed ${p.track}`}"></i>`).join("")}
           ${charging ? '<ha-icon icon="mdi:lightning-bolt" class="pb"></ha-icon>' : !ev ? `<ha-icon icon="mdi:gas-station" class="pb fuel" style="color:${col}"></ha-icon>` : ""}</div>`;
     const aria = `${ev ? "Battery" : "Fuel"} ${lvl == null ? "unknown" : `${Math.round(lvl)}%`}${charging ? ", charging" : ""}${engine ? ", engine running" : ""}${lockWord ? `, ${lockWord.toLowerCase()}` : ""}${door ? ", a door is open" : ""}${boot ? ", the boot is open" : ""}`;
@@ -8408,8 +8352,8 @@ class RoostEV extends ticking(RoostBase, 60000) {
         ${this.val(c.range) ? `<div class="rg"><b class="num">${esc(this.val(c.range))}</b><span>range</span></div>` : ""}</div>
       <div class="car photo pic" data-car="1" role="img" aria-label="${esc(aria)}">
         ${c.image ? `<img class="own" src="${esc(c.image)}" alt="${esc(c.name || "Car")}" draggable="false">`
-          : photo ? `<div class="stage"><img src="${pic}" alt="" draggable="false">${this.carFx(kind, st)}</div>`
-          : `<div class="stage drawn-stage ${top ? "top" : ""}">${top ? this.topCar(paint || "white", st) : this.drawnCar(look, paint, st)}</div>`}${badge}
+          : photo ? `<div class="stage"><img src="${CAR_PICS[kind]}" alt="" draggable="false">${this.carFx(kind, st)}</div>`
+          : `<div class="stage drawn-stage ${top ? "top" : ""}">${top ? this.topCar(st) : this.drawnCar(look, st)}</div>`}${badge}
         ${pack}
       </div>
       ${dots}

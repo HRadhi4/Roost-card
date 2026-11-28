@@ -21,7 +21,7 @@ Every version of Roost Cards, newest first.
 - **Roost Car, rebuilt.**
   - **Petrol or electric**, chosen in the settings or found from your devices. A petrol car shows its fuel, range, engine and distance driven; an electric one its charging.
   - **A realistic car whose lights mean something**: a soft glow while unlocked, a blue pulse while charging, a shine over the grille while the engine runs, and a greeting when you unlock.
-  - **In your car's colour**: white, silver, grey, black, red, blue or sand, picked as dots. Or a drawn SUV, sedan, hatchback or pickup, seen from the side or from above.
+  - **Or a drawn car**: an SUV, sedan, hatchback or pickup, seen from the side or from above.
   - **Cool it, find it**: start the AC (cold air moves over the windows), flash the lights to find it, hold the picture to see where it is, and an open door or boot glows.
   - **More than one car on one card**: swipe the picture or tap the dots.
   - **A lock button on the car** opens the lock's sheet, where you slide to unlock, so a stray tap never opens your car.

@@ -792,14 +792,13 @@ zones:
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car.gif" width="320" alt="Roost car card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/car.gif" width="320" alt="Roost car card in action, dark">
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car-looks.gif" width="320" alt="Roost car card, picture choices, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/car-looks.gif" width="320" alt="Roost car card, picture choices, dark">
 
-Your car, petrol or electric. The realistic picture comes in seven colours (or keep its own), and its lights tell you what it is doing: a soft glow while unlocked, a blue pulse while it charges, a shine over the grille while the engine runs, cold air while the AC runs, and a flash when you tap **Find**. An open door or boot glows. Prefer a drawing? Pick a drawn SUV, sedan, hatchback or pickup, seen from the side or from above. More than one car? Add them under **More cars** and swipe the picture (or tap the dots) to see the next one.
+Your car, petrol or electric. The realistic picture matches your car type, and its lights tell you what it is doing: a soft glow while unlocked, a blue pulse while it charges, a shine over the grille while the engine runs, cold air while the AC runs, and a flash when you tap **Find**. An open door or boot glows. Prefer a drawing? Pick a drawn SUV, sedan, hatchback or pickup, seen from the side or from above. More than one car? Add them under **More cars** and swipe the picture (or tap the dots) to see the next one.
 
 ```yaml
 type: custom:roost-ev
 name: Family car
 car: petrol                      # petrol, electric, or auto (finds out from the devices)
 look: photo                      # photo = realistic; suv, sedan, hatch or pickup = drawn
-paint: white                     # auto (the picture's own), white, silver, grey, black, red, blue or sand
 view: side                       # side, or top (from above: shows which door is open)
 animate: true                    # the moving picture: glows, air and flashing lights
 fuel: sensor.car_fuel_level
@@ -818,7 +817,6 @@ cars:                            # more cars on the same card
     range: sensor.layla_car_range
     charging: switch.layla_car_charging
     lock: lock.layla_car
-    paint: red
 ```
 
 An electric car also takes `power`, `plugged`, `limit` and `capacity` (battery size in kWh, for “full in”). `image: /local/my-car.png` shows your own photo instead; it stays on your Home Assistant.

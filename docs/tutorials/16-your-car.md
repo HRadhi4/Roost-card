@@ -1,6 +1,6 @@
-# 16 · Your car: realistic, in its own colour, and more than one
+# 16 · Your car: realistic, and more than one
 
-One **Roost Car** card for any car, petrol or electric. It can show a realistic car in your car's colour, and more than one car: swipe between them.
+One **Roost Car** card for any car, petrol or electric. It can show a realistic car, and more than one car: swipe between them.
 
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car.gif" width="300" alt="Roost car card"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/car.gif" width="300" alt="Roost car card, dark">
 
@@ -26,14 +26,13 @@ One **Roost Car** card for any car, petrol or electric. It can show a realistic 
 Under **Look**:
 
 - **Picture**: *Realistic* (it matches the car type: a petrol car has a grille, an electric one a light bar), or a drawn *SUV*, *sedan*, *hatchback* or *pickup*.
-- **The car's colour**: tap a dot. White, silver, grey, black, red, blue or sand.
 - **Seen from**: the side (or the front corner for the realistic car), or from above, which shows exactly which door is open.
 - **Moving picture**: turn it off for a still picture.
 - **Your own car picture**: a see-through PNG in your `www` folder, written as `/local/my-car.png`. It stays on your Home Assistant.
 
 ## More than one car
 
-Open **More cars** and add each car with its own name, type, devices, picture and colour. On the dashboard, swipe the picture left or right, or tap the dots under it. Light or dark and the card's colour are shared by all the cars.
+Open **More cars** and add each car with its own name, type, devices and picture. On the dashboard, swipe the picture left or right, or tap the dots under it. Light or dark and the card's colour are shared by all the cars.
 
 ## What the lights mean
 
