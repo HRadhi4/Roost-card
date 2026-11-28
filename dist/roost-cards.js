@@ -350,6 +350,40 @@ const Sample = {
           "binary_sensor.sample_grocy_missing": st("binary_sensor.sample_grocy_missing", "on", { friendly_name: "Grocy missing products", missing_products: [{ id: 30, name: "Olive oil", amount_missing: 1 }, { id: 31, name: "Salt", amount_missing: 1 }], count: 2 }),
         };
       })(),
+      "switch.sample_guest_wifi": st("switch.sample_guest_wifi", "on", { friendly_name: "Guest Wi-Fi" }),
+      "sensor.sample_guest_clients": st("sensor.sample_guest_clients", "3", { friendly_name: "Guests connected" }),
+      "tts.sample_voice": st("tts.sample_voice", "unknown", { friendly_name: "Voice" }),
+      "media_player.sample_living_speaker": st("media_player.sample_living_speaker", "idle", { friendly_name: "Living room" }),
+      "media_player.sample_kitchen_speaker": st("media_player.sample_kitchen_speaker", "idle", { friendly_name: "Kitchen" }),
+      "media_player.sample_majlis_speaker": st("media_player.sample_majlis_speaker", "idle", { friendly_name: "Majlis" }),
+      "media_player.sample_bedroom_speaker": st("media_player.sample_bedroom_speaker", "idle", { friendly_name: "Bedrooms" }),
+      "sensor.sample_oven": st("sensor.sample_oven", "baking", { friendly_name: "Oven" }),
+      "sensor.sample_oven_left": st("sensor.sample_oven_left", "12", { friendly_name: "Oven time left", unit_of_measurement: "min" }),
+      "sensor.sample_oven_progress": st("sensor.sample_oven_progress", "70", { friendly_name: "Oven progress", unit_of_measurement: "%" }),
+      "sensor.sample_oven_temp": st("sensor.sample_oven_temp", "180", { friendly_name: "Oven temperature", unit_of_measurement: "°C" }),
+      "sensor.sample_air_fryer": st("sensor.sample_air_fryer", "done", { friendly_name: "Air fryer" }),
+      "sensor.sample_dishwasher": st("sensor.sample_dishwasher", "rinsing", { friendly_name: "Dishwasher" }),
+      "sensor.sample_dishwasher_left": st("sensor.sample_dishwasher_left", "45", { friendly_name: "Dishwasher time left", unit_of_measurement: "min" }),
+      "sensor.sample_dishwasher_progress": st("sensor.sample_dishwasher_progress", "38", { friendly_name: "Dishwasher progress", unit_of_measurement: "%" }),
+      "switch.sample_coffee": st("switch.sample_coffee", "off", { friendly_name: "Coffee machine" }),
+      "switch.sample_kid_tablet": st("switch.sample_kid_tablet", "on", { friendly_name: "Saeed's tablet" }),
+      "sensor.sample_kid_usage": st("sensor.sample_kid_usage", "1 h 20 min", { friendly_name: "Time online today" }),
+      "switch.sample_kid_phone": st("switch.sample_kid_phone", "off", { friendly_name: "Layla's phone" }),
+      "sensor.sample_kid_until": st("sensor.sample_kid_until", (() => { const d = new Date(); d.setHours(20, 0, 0, 0); return d.toISOString(); })(), { friendly_name: "Paused until", device_class: "timestamp" }),
+      "input_boolean.sample_bedtime": st("input_boolean.sample_bedtime", "on", { friendly_name: "Bedtime" }),
+      "sensor.sample_parcels": st("sensor.sample_parcels", "3", { friendly_name: "Parcels", packages: [
+        { friendly_name: "Running shoes", status: "Out for delivery", info_text: "Driver 4 stops away" },
+        { friendly_name: "Phone case", status: "In transit", expected: new Date(Date.now() + 2 * 864e5).toISOString() },
+        { friendly_name: "Groceries", status: "Delivered" }] }),
+      "sensor.sample_ups_battery": st("sensor.sample_ups_battery", "86", { friendly_name: "UPS battery", unit_of_measurement: "%", device_class: "battery" }),
+      "sensor.sample_ups_runtime": st("sensor.sample_ups_runtime", "7800", { friendly_name: "UPS runtime", unit_of_measurement: "s", device_class: "duration" }),
+      "sensor.sample_ups_status": st("sensor.sample_ups_status", "OL", { friendly_name: "UPS status" }),
+      "sensor.sample_ups_power": st("sensor.sample_ups_power", "180", { friendly_name: "UPS power", unit_of_measurement: "W", device_class: "power" }),
+      "sensor.sample_car_fuel": st("sensor.sample_car_fuel", "62", { friendly_name: "Fuel", unit_of_measurement: "%" }),
+      "sensor.sample_car_range": st("sensor.sample_car_range", "410", { friendly_name: "Range", unit_of_measurement: "km" }),
+      "lock.sample_car": st("lock.sample_car", "locked", { friendly_name: "Car doors" }),
+      "climate.sample_car": st("climate.sample_car", "off", { friendly_name: "Car AC", hvac_modes: ["off", "cool"] }),
+      "device_tracker.sample_car": st("device_tracker.sample_car", "home", { friendly_name: "Car" }),
       "button.sample_robot_empty": st("button.sample_robot_empty", "unknown", { friendly_name: "Robot vacuum Empty dustbin", icon: "mdi:delete-empty-outline" }),
       "button.sample_robot_wash": st("button.sample_robot_wash", "unknown", { friendly_name: "Robot vacuum Wash the mop", icon: "mdi:water-sync" }),
     };
@@ -427,6 +461,7 @@ const Sample = {
       else if (service === "set_fan_speed") this.set(id, null, { fan_speed: data.fan_speed });
       return undefined;
     }
+    if (domain === "climate") return this.set(id, service === "turn_off" || data.hvac_mode === "off" ? "off" : service === "turn_on" ? (s.attributes.hvac_modes || []).find((m) => m !== "off") || "cool" : s.state === "off" ? "cool" : "off");
     if (domain === "select") return this.set(id, data.option);
     if (domain === "input_select") return this.set(id, data.option);
     if (domain === "input_number" || domain === "input_text" || domain === "number" || domain === "text") return this.set(id, String(data.value));
@@ -503,7 +538,7 @@ class RoostBase extends HTMLElement {
         "roost-garage": { entity: "cover.sample_garage" },
         "roost-flow": { solar: "sensor.sample_solar", battery: "sensor.sample_battery_power", battery_level: "sensor.sample_battery_level", grid: "sensor.sample_grid", home: "sensor.sample_house" },
         "roost-irrigation": { zones: [{ entity: "switch.sample_zone_1", icon: "mdi:grass" }, { entity: "switch.sample_zone_2", icon: "mdi:grass" }, { entity: "switch.sample_zone_3", icon: "mdi:flower-tulip" }, { entity: "switch.sample_zone_4", icon: "mdi:pine-tree" }], rain: "sensor.sample_rain" },
-        "roost-ev": { battery: "sensor.sample_ev_battery", range: "sensor.sample_ev_range", power: "sensor.sample_ev_power", charging: "switch.sample_ev_charging", plugged: "binary_sensor.sample_ev_plugged", limit: "number.sample_ev_limit", capacity: 64 },
+        "roost-ev": config.kind === "fuel" ? { fuel: "sensor.sample_car_fuel", range: "sensor.sample_car_range", lock: "lock.sample_car", climate: "climate.sample_car", tracker: "device_tracker.sample_car", name: "Family car" } : { battery: "sensor.sample_ev_battery", range: "sensor.sample_ev_range", power: "sensor.sample_ev_power", charging: "switch.sample_ev_charging", plugged: "binary_sensor.sample_ev_plugged", limit: "number.sample_ev_limit", capacity: 64 },
         "roost-plant": { name: "Monstera", moisture: "sensor.sample_plant_moisture", light: "sensor.sample_plant_light", temperature: "sensor.sample_plant_temp" },
         "roost-printer": config.kind === "3d" ? { entity: "sensor.sample_3d_state", progress: "sensor.sample_3d_progress", remaining: "sensor.sample_3d_left", nozzle: "sensor.sample_3d_nozzle", bed: "sensor.sample_3d_bed" }
           : { entity: "sensor.sample_printer", inks: [{ entity: "sensor.sample_ink_black", color: "#1F2333" }, { entity: "sensor.sample_ink_cyan", color: "#22D3EE" }, { entity: "sensor.sample_ink_magenta", color: "#EC4899" }, { entity: "sensor.sample_ink_yellow", color: "#FACC15" }] },
@@ -520,6 +555,12 @@ class RoostBase extends HTMLElement {
           consumables: ["sensor.sample_robot_filter", "sensor.sample_robot_main_brush", "sensor.sample_robot_side_brush", "sensor.sample_robot_mop_pad"],
           selects: ["select.sample_robot_water", "select.sample_robot_mode"], buttons: ["button.sample_robot_empty", "button.sample_robot_wash"],
           rooms: [{ name: "Living room", icon: "mdi:sofa" }, { name: "Kitchen", icon: "mdi:stove" }, { name: "Bedroom", icon: "mdi:bed-king" }, { name: "Hallway", icon: "mdi:door" }] }, "roost-remote": { athom_remote: "Sample TV" },
+        "roost-wifi": { ssid: "Nest-Guest", password: "sample-guest-2026", switch: "switch.sample_guest_wifi", clients: "sensor.sample_guest_clients" },
+        "roost-announce": { speakers: ["media_player.sample_living_speaker", "media_player.sample_kitchen_speaker", "media_player.sample_majlis_speaker", "media_player.sample_bedroom_speaker"], tts: "tts.sample_voice", quick: "Dinner is ready\nTime to leave for school\nThe majlis is open" },
+        "roost-kitchen": { appliances: [{ entity: "sensor.sample_oven", name: "Oven", icon: "mdi:stove", remaining: "sensor.sample_oven_left", progress: "sensor.sample_oven_progress", temperature: "sensor.sample_oven_temp" }, { entity: "sensor.sample_air_fryer", name: "Air fryer", icon: "mdi:pot-steam-outline" }, { entity: "sensor.sample_dishwasher", name: "Dishwasher", icon: "mdi:dishwasher", remaining: "sensor.sample_dishwasher_left", progress: "sensor.sample_dishwasher_progress" }, { entity: "switch.sample_coffee", name: "Coffee machine", icon: "mdi:coffee-maker-outline", start: "switch.sample_coffee" }] },
+        "roost-kids": { devices: [{ entity: "switch.sample_kid_tablet", name: "Saeed's tablet", usage: "sensor.sample_kid_usage" }, { entity: "switch.sample_kid_phone", name: "Layla's phone", until: "sensor.sample_kid_until" }], bedtime: "input_boolean.sample_bedtime", bedtime_text: "9:30 pm to 6:00 am, school nights" },
+        "roost-deliveries": { entities: ["sensor.sample_parcels"] },
+        "roost-backup": { battery: "sensor.sample_ups_battery", runtime: "sensor.sample_ups_runtime", status: "sensor.sample_ups_status", power: "sensor.sample_ups_power", covered: "Router\nHome Assistant\nCameras" },
         "roost-values": { entities: [{ entity: "input_number.sample_ac_night" }, { entity: "input_select.sample_guest" }, { entity: "input_boolean.sample_guests" }, { entity: "input_text.sample_note" }] } }[this.localName] || {};
       config = { ...fill, ...config };
       if (this.localName === "roost-remote" && config.entity && !config.athom_remote) config = { ...config, entity: undefined, athom_remote: "Sample TV" };
@@ -8083,19 +8124,29 @@ class RoostIrrigation extends ticking(RoostBase, 20000) {
 // ------------------------------------------------------------------ Roost EV
 // An electric car from the side with its battery filling, power flowing in while it charges, range, the limit and when it will be full.
 class RoostEV extends ticking(RoostBase, 60000) {
-  static get defaults() { return { capacity: 60, color: "green", theme: "auto" }; }
+  static get defaults() { return { kind: "electric", capacity: 60, color: "green", theme: "auto" }; }
 
-  validate(c) { if (!c.battery) throw new Error("Choose the car's battery level"); }
+  validate(c) {
+    if (c.kind === "fuel") { if (!c.fuel && !c.lock) throw new Error("Choose the car's fuel level or its lock"); }
+    else if (!c.battery) throw new Error("Choose the car's battery level");
+  }
 
-  watched() { const c = this._config; return [c.battery, c.range, c.power, c.charging, c.plugged, c.limit].filter(Boolean); }
+  watched() { const c = this._config; return [c.battery, c.range, c.power, c.charging, c.plugged, c.limit, c.fuel, c.lock, c.climate, c.tracker].filter(Boolean); }
 
   static getConfigForm() {
     return { schema: [
       { name: "sample", label: "Show sample data", selector: { boolean: {} } },
-      { type: "grid", name: "", schema: [{ name: "battery", label: "Battery level (%)", required: true, selector: { entity: { domain: "sensor" } } }, { name: "range", label: "Range", selector: { entity: { domain: "sensor" } } }] },
-      { type: "grid", name: "", schema: [{ name: "power", label: "Charging power", selector: { entity: { domain: "sensor" } } }, { name: "charging", label: "Charging on/off", selector: { entity: { domain: ["switch", "binary_sensor", "sensor"] } } }] },
-      { type: "grid", name: "", schema: [{ name: "plugged", label: "Plugged in", selector: { entity: { domain: "binary_sensor" } } }, { name: "limit", label: "Charge limit", selector: { entity: { domain: ["number", "sensor"] } } }] },
-      { type: "grid", name: "", schema: [{ name: "capacity", label: "Battery size (kWh, for the time to full)", selector: { number: { mode: "box" } } }, { name: "name", selector: { text: {} } }] },
+      { type: "grid", name: "", schema: [{ name: "kind", label: "It is", selector: pick([["electric", "Electric"], ["fuel", "Petrol or hybrid"]]) }, { name: "name", selector: { text: {} } }] },
+      { name: "range", label: "Range", selector: { entity: { domain: "sensor" } } },
+      { type: "expandable", name: "", title: "Electric car", icon: "mdi:car-electric", schema: [
+        { type: "grid", name: "", schema: [{ name: "battery", label: "Battery level (%)", selector: { entity: { domain: "sensor" } } }, { name: "power", label: "Charging power", selector: { entity: { domain: "sensor" } } }] },
+        { type: "grid", name: "", schema: [{ name: "charging", label: "Charging on/off", selector: { entity: { domain: ["switch", "binary_sensor", "sensor"] } } }, { name: "plugged", label: "Plugged in", selector: { entity: { domain: "binary_sensor" } } }] },
+        { type: "grid", name: "", schema: [{ name: "limit", label: "Charge limit", selector: { entity: { domain: ["number", "sensor"] } } }, { name: "capacity", label: "Battery size (kWh, for the time to full)", selector: { number: { mode: "box" } } }] },
+      ] },
+      { type: "expandable", name: "", title: "Petrol or hybrid car", icon: "mdi:car", schema: [
+        { type: "grid", name: "", schema: [{ name: "fuel", label: "Fuel level (%)", selector: { entity: { domain: "sensor" } } }, { name: "lock", label: "Doors lock", selector: { entity: { domain: "lock" } } }] },
+        { type: "grid", name: "", schema: [{ name: "climate", label: "Start the AC (climate, button or script)", selector: { entity: { domain: ["climate", "button", "script", "switch"] } } }, { name: "tracker", label: "Where it is (tracker)", selector: { entity: { domain: ["device_tracker", "person", "sensor"] } } }] },
+      ] },
       { name: "image", label: "Picture of your car from the side (optional, for example /local/my-car.png; a see-through PNG looks best)", selector: { text: {} } },
       ...colourFields("color"), THEME_FIELD,
     ], computeLabel };
@@ -8105,8 +8156,52 @@ class RoostEV extends ticking(RoostBase, 60000) {
 
   getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
 
+  // a petrol or hybrid car: fuel and range, locked or not, cool it before you get in, and where it is
+  renderFuel() {
+    const c = this._config, p = this.p, g = this.colour();
+    const fuel = this.n(c.fuel), lk = this.sx(c.lock), locked = lk?.state === "locked", acS = this.sx(c.climate);
+    const acOn = acS ? (c.climate.startsWith("climate.") ? !["off", ...UNAVAILABLE].includes(acS.state) : this.on(c.climate)) : false;
+    const tr = this.sx(c.tracker);
+    const where = tr ? (tr.state === "home" ? "Parked at home" : tr.state === "not_home" ? "Away" : UNAVAILABLE.includes(tr.state) ? "" : `At ${tr.state}`) : "";
+    const since = tr?.last_changed ? Math.round((Date.now() - new Date(tr.last_changed)) / 60000) : null;
+    const line = [where, where && since != null ? (since < 60 ? `${since} min` : since < 1440 ? `${Math.round(since / 60)} h` : `${Math.round(since / 1440)} d`) : ""].filter(Boolean).join(" · ") || (locked ? "Locked" : lk ? "Unlocked" : "");
+    const col = fuel != null && fuel <= 15 ? "#F43F6B" : fuel != null && fuel <= 25 ? "#F5A623" : g[1];
+    const btn = (k, icon, label, on) => `<button class="cb ${on ? "on" : ""}" data-cb="${k}"><ha-icon icon="${esc(icon)}"></ha-icon><span class="t">${label}</span></button>`;
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, acOn)}
+      .lk{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:${locked ? "#34D399" : "#F5A623"};--mdc-icon-size:16px;flex:none}
+      .car{border-radius:18px;background:radial-gradient(120% 90% at 60% 110%,${g[0]}33,transparent 60%),${p.inset};padding:10px 12px}
+      .car svg{display:block;width:100%;height:auto}
+      .car img{display:block;width:100%;max-height:150px;object-fit:contain;filter:drop-shadow(0 12px 14px rgba(0,0,0,${this.dark ? 0.55 : 0.2}))}
+      .fl{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+      .fl span{font-size:13px;color:${p.muted}}
+      .fl b{font-size:24px;font-family:${FONT_NUM}}
+      .bar{height:10px;border-radius:999px;background:${p.track};overflow:hidden}
+      .bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,${g[0]},${col})}
+      .btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px}
+      .cb{min-height:56px;border-radius:16px;border:0;background:${p.inset};color:${p.text};font:inherit;font-size:13px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;--mdc-icon-size:20px}
+      .cb.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]}}
+      ${acOn ? ".cb.on ha-icon{animation:roost-spin 3s linear infinite}" : ""}
+    </style>
+    <div class="card">
+      ${head("mdi:car", c.name || "Car", line, lk ? `<span class="lk"><ha-icon icon="${locked ? "mdi:lock" : "mdi:lock-open-variant"}"></ha-icon><span class="t">${locked ? "Locked" : "Unlocked"}</span></span>` : "")}
+      <div class="car" role="img" aria-label="${esc(c.name || "Car")}">${c.image ? `<img src="${esc(c.image)}" alt="">` : `<svg viewBox="0 0 260 96" aria-hidden="true"><path d="M18 66c0-10 6-16 18-18l30-4 26-20c6-4 12-6 20-6h46c10 0 18 3 26 9l22 17 24 4c10 2 14 8 14 18v6H18z" fill="${g[0]}" opacity=".9"/><path d="M96 44l20-15c4-3 8-4 13-4h22v19zM157 25h18c7 0 12 2 18 7l14 12h-50z" fill="${this.dark ? "#0E1530" : "#DDE6FF"}"/><circle cx="70" cy="74" r="15" fill="#0B0D17"/><circle cx="70" cy="74" r="7" fill="#DDE1F0"/><circle cx="196" cy="74" r="15" fill="#0B0D17"/><circle cx="196" cy="74" r="7" fill="#DDE1F0"/></svg>`}</div>
+      ${fuel != null ? `<div class="fl"><span class="t">Fuel</span><span><b class="num">${Math.round(fuel)}%</b>${this.val(c.range) ? `<span> · <bdi>${esc(this.val(c.range))}</bdi></span>` : ""}</span></div>
+      <div class="bar" role="img" aria-label="Fuel ${Math.round(fuel)}%"><i style="width:${Math.max(0, Math.min(100, Math.round(fuel)))}%"></i></div>` : ""}
+      ${lk || c.climate || c.tracker ? `<div class="btns">${lk ? btn("lock", locked ? "mdi:lock-open-variant-outline" : "mdi:lock-outline", locked ? "Unlock" : "Lock", false) : ""}${c.climate ? btn("ac", "mdi:fan", acOn ? "Cooling" : "Cool it", acOn) : ""}${c.tracker ? btn("find", "mdi:map-marker-outline", "Find", false) : ""}</div>` : ""}
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.fuel || c.lock));
+    r.querySelectorAll("[data-cb]").forEach((b) => b.addEventListener("click", () => {
+      const k = b.dataset.cb;
+      if (k === "lock") { if (locked && !this._sure) { this._sure = true; b.querySelector(".t").textContent = "Tap again"; setTimeout(() => { this._sure = false; this._sig = null; this.render(); }, 3000); return; } this._sure = false; this.call("lock", locked ? "unlock" : "lock", { entity_id: c.lock }); }
+      else if (k === "ac") { const d = c.climate.split(".")[0]; this.call(d, d === "button" ? "press" : d === "climate" ? (acOn ? "turn_off" : "turn_on") : acOn && d !== "script" ? "turn_off" : "turn_on", { entity_id: c.climate }); }
+      else this.moreInfo(c.tracker);
+    }));
+  }
+
   render() {
     if (!this._hass || !this._config) return;
+    if (this._config.kind === "fuel") { this.renderFuel(); return; }
     const c = this._config, p = this.p, g = this.colour();
     const lvl = this.n(c.battery), lim = this.n(c.limit) ?? 100;
     const pw = (() => { const v = this.n(c.power); if (v == null) return null; const u = this.sx(c.power).attributes.unit_of_measurement; return u === "W" ? v / 1000 : v; })();
@@ -10566,9 +10661,14 @@ const AR_WORDS = {
   "Slide to unlock ›››": "اسحب لفتح القفل ›››", "Slide to open ›››": "اسحب للفتح ›››", "Lowest": "الأدنى", "Highest": "الأعلى", "Next prayer": "الصلاة القادمة",
   "Warm": "دافئ", "Neutral": "محايد", "Cool white": "بارد", "Comfortable": "مريح", "Comfy": "مريح", "Cold": "بارد", "Hot": "حار", "Humid": "رطب",
   "Language": "اللغة", "English": "English", "Arabic": "العربية", "Ready": "جاهز", "Done": "تم", "Upload": "رفع", "Download": "تنزيل", "Live": "مباشر", "Camera offline": "الكاميرا غير متصلة",
+  "Guest Wi-Fi": "واي فاي الضيوف", "Point the phone camera here to join": "وجّه كاميرا الهاتف هنا للاتصال", "Show password": "إظهار كلمة المرور", "Hide password": "إخفاء كلمة المرور", "Share": "مشاركة", "Copied": "تم النسخ", "Turn on guest Wi-Fi": "تشغيل واي فاي الضيوف", "Announce": "إعلان", "Speak through the speakers": "تحدّث عبر السماعات", "Announced": "تم الإعلان", "Message": "الرسالة", "Sending": "جارٍ الإرسال", "Speak the message": "قل الرسالة بصوتك", "Speakers": "السماعات", "Ready to serve": "جاهز للتقديم", "now": "الآن", "All off": "الكل مطفأ", "Kids' internet": "إنترنت الأطفال", "All online": "الكل متصل", "Online": "متصل", "Resume": "استئناف", "Tap again": "اضغط مرة أخرى", "Bedtime": "وقت النوم", "Family notes": "ملاحظات العائلة", "No notes": "لا توجد ملاحظات", "Add a note": "إضافة ملاحظة", "Write a note": "اكتب ملاحظة", "Add": "إضافة", "Tap + to write a note": "اضغط + لكتابة ملاحظة", "Tap again to remove": "اضغط مرة أخرى للحذف", "Deliveries": "الطلبات", "All delivered": "وصلت جميعها", "No parcels": "لا توجد طرود", "Delivered": "تم التوصيل", "Problem with this parcel": "مشكلة في هذا الطرد", "Out for delivery": "خرج للتوصيل", "On its way": "في الطريق", "Ordered": "تم الطلب", "Nothing on the way": "لا شيء في الطريق", "Power backup": "الطاقة الاحتياطية", "Power cut: running on battery": "انقطاع الكهرباء: يعمل على البطارية", "On mains power · full": "على كهرباء المنزل · ممتلئة", "On mains power": "على كهرباء المنزل", "battery": "البطارية", "Runs for": "يعمل لمدة", "If the power goes out": "إذا انقطعت الكهرباء", "Car": "السيارة", "Fuel": "الوقود", "Cool it": "برّدها", "Find": "أين هي", "Parked at home": "متوقفة في المنزل", "Dinner is ready": "العشاء جاهز",
+  "Family car": "سيارة العائلة", "Oven": "الفرن", "Air fryer": "القلاية الهوائية", "Dishwasher": "غسالة الصحون", "Coffee machine": "آلة القهوة", "Baking": "يخبز", "Rinsing": "يشطف", "Living room": "غرفة الجلوس", "Majlis": "المجلس", "Bedrooms": "غرف النوم", "The majlis is open": "المجلس مفتوح", "Time to leave for school": "حان وقت المدرسة", "Router": "الراوتر", "Cameras": "الكاميرات", "Running shoes": "حذاء رياضي", "Phone case": "غطاء الهاتف", "Groceries": "البقالة"
 };
 const AR_DAYS = "Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday", AR_MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December";
 const AR_PATTERNS = [
+  [/^(.+) · (\d+) guests? on$/, (m, n, k) => `${n} · ${k} ضيوف متصلون`], [/^Last: “(.+)”$/, "آخر إعلان: “$1”"], [/^(\d+) running$/, "$1 يعمل"], [/^(\d+) ready$/, "$1 جاهز"], [/^(\d+) paused$/, "$1 متوقف"],
+  [/^bedtime (.+)$/, "وقت النوم $1"], [/^Online · (.+) today$/, "متصل · $1 اليوم"], [/^(\u2068.+\u2069) today$/, "$1 اليوم"], [/^Paused until (.+)$/, "متوقف حتى $1"], [/^(\d+) notes?$/, "$1 ملاحظات"], [/^(\d+) arriving today$/, "$1 يصل اليوم"],
+  [/^(\d+) on the way$/, "$1 في الطريق"], [/^Using (.+) W now$/, "يستهلك $1 واط الآن"], [/^Load (.+)%$/, "الحمل $1٪"], [/^At (.+)$/, "في $1"], [/^(\d+) (min|h|d)$/, (m, n, u) => `${n} ${u === "min" ? "د" : u === "h" ? "س" : "يوم"}`],
   [new RegExp(`^(${AR_DAYS}) (\\d{1,2}) (${AR_MONTHS})$`), (m, d, n, mo) => `${AR_WORDS[d]} ${n} ${AR_WORDS[mo]}`], [new RegExp(`^(\\d{1,2}) (${AR_MONTHS})$`), (m, n, mo) => `${n} ${AR_WORDS[mo]}`],
   [/^(Sunset|Sunrise) at (.+)$/, (m, a, t) => `${a === "Sunset" ? "الغروب" : "الشروق"} الساعة ${arWord(t) || t}`], [/^in (\d+)h (\d+)m$/, "بعد $1 س $2 د"], [/^room (.+)$/i, "الغرفة $1"], [/^at (\d.+)$/, (m, t) => `الساعة ${arWord(t) || t}`], [/^(\d+) devices?$/, "$1 أجهزة"], [/^([+−-]\d+)h$/, "$1 س"], [/^(\d+) people here$/, "$1 أشخاص هنا"], [/^1 person here$/, "شخص واحد هنا"],
   [/^(\d+) to do$/, "$1 للإنجاز"], [/^Clear (\d+) ticked$/, "امسح $1 منجزة"], [/^Wind (.+)$/, "الرياح $1"], [/^Humidity (\d+)%$/, "الرطوبة $1٪"], [/^vs this time (.+)$/, "مقارنة بهذا الوقت $1"], [/^(\d+) open: (.+)$/, "$1 مفتوح: $2"], [/^(\d+) min$/, "$1 د"], [/^(\d+)h (\d+)m$/, "$1 س $2 د"], [/^Last (\d+) h$/, "آخر $1 س"], [/^in (\d+)h$/, "بعد $1 س"], [/^in (\d+)m$/, "بعد $1 د"],
@@ -13438,6 +13538,641 @@ class RoostTour extends RoostBase {
   }
 }
 
+// ------------------------------------------------------------------ Roost Guest Wi-Fi
+// A QR code guests point their phone camera at to join the Wi-Fi, without saying the password out loud.
+// the code is drawn by Roost's QR maker (see QR above), with the full quiet border QR readers like
+const wifiQr = (text, label) => {
+  const g = QR(text); if (!g) return "";
+  const n = g.length + 8; let d = "";
+  g.forEach((row, r) => row.forEach((x, c) => { if (x) d += `M${c + 4} ${r + 4}h1v1h-1z`; }));
+  return `<svg viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges" role="img" aria-label="${esc(label)}"><rect width="${n}" height="${n}" fill="#fff"/><path d="${d}" fill="#111"/></svg>`;
+};
+// the text a phone camera understands as "join this Wi-Fi"; \ ; , : " are escaped as the format asks
+const wifiCode = (ssid, password, security, hidden) => {
+  const e = wifiEsc;
+  const t = security === "nopass" ? "nopass" : security === "WEP" ? "WEP" : "WPA";
+  return `WIFI:T:${t};S:${e(ssid)};${t === "nopass" ? "" : `P:${e(password)};`}${hidden ? "H:true;" : ""};`;
+};
+
+class RoostWifi extends RoostBase {
+  static get defaults() { return { security: "WPA", color: "blue", theme: "auto" }; }
+
+  static code(...a) { return wifiCode(...a); }
+
+  validate(c) { if (!c.ssid) throw new Error("Type the Wi-Fi name"); }
+
+  watched() { const c = this._config; return [c.switch, c.clients].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { type: "grid", name: "", schema: [{ name: "ssid", label: "Wi-Fi name", required: true, selector: { text: {} } }, { name: "password", label: "Password", selector: { text: { type: "password" } } }] },
+      { type: "grid", name: "", schema: [{ name: "security", label: "Security", selector: pick([["WPA", "WPA or WPA2 (most Wi-Fi)"], ["WEP", "WEP (old)"], ["nopass", "Open, no password"]]) }, { name: "hidden", label: "Hidden network", selector: { boolean: {} } }] },
+      { type: "grid", name: "", schema: [{ name: "switch", label: "Guest Wi-Fi on/off (optional)", selector: { entity: { domain: ["switch", "input_boolean"] } } }, { name: "clients", label: "Guests connected (optional)", selector: { entity: { domain: "sensor" } } }] },
+      { name: "name", selector: { text: {} } },
+      { name: "show_password", label: "Show password button", selector: { boolean: {} } },
+      { name: "show_share", label: "Share button", selector: { boolean: {} } },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { sample: true, show_password: true, show_share: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  signature() { return `${super.signature()}|${this._show ? 1 : 0}|${this._copied ? 1 : 0}`; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    const on = c.switch ? this.on(c.switch) : true, guests = this.n(c.clients);
+    const line = !on ? "Off" : guests != null ? `${c.ssid} · ${Math.round(guests)} ${guests === 1 ? "guest" : "guests"} on` : c.ssid;
+    const pw = c.security === "nopass" ? "" : String(c.password || "");
+    const code = on ? wifiQr(wifiCode(c.ssid, pw, c.security, c.hidden), "QR code to join the Wi-Fi") : "";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, on)}
+      .qr{align-self:center;width:min(180px,70%);aspect-ratio:1;padding:10px;box-sizing:border-box;border-radius:18px;background:#fff;box-shadow:0 14px 30px -18px ${g[2]}}
+      .qr svg{display:block;width:100%;height:100%}
+      .hint{text-align:center;font-size:13px;color:${p.muted}}
+      .pw{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 14px;border-radius:14px;background:${p.inset};font-family:${FONT_NUM};font-size:16px;font-weight:600;letter-spacing:.02em;overflow-wrap:anywhere;text-align:center;direction:ltr;unicode-bidi:isolate}
+      .row{display:flex;gap:8px}
+      .row .big{flex:1;min-width:0}
+    </style>
+    <div class="card">
+      ${head(on ? "mdi:wifi" : "mdi:wifi-off", c.name || "Guest Wi-Fi", line)}
+      ${on ? `<div class="qr">${code}</div><div class="hint t">Point the phone camera here to join</div>
+        ${this._show && pw ? `<div class="pw">${esc(pw)}</div>` : ""}
+        ${(c.show_password && pw) || c.show_share ? `<div class="row">
+          ${c.show_password && pw ? `<button class="big off" data-pw="1"><ha-icon icon="${this._show ? "mdi:eye-off-outline" : "mdi:eye-outline"}"></ha-icon><span class="t">${this._show ? "Hide password" : "Show password"}</span></button>` : ""}
+          ${c.show_share ? `<button class="big" data-sh="1"><ha-icon icon="${this._copied ? "mdi:check" : "mdi:share-variant-outline"}"></ha-icon><span class="t">${this._copied ? "Copied" : "Share"}</span></button>` : ""}
+        </div>` : ""}`
+        : `<button class="big" data-on="1"><ha-icon icon="mdi:wifi"></ha-icon><span class="t">Turn on guest Wi-Fi</span></button>`}
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelector("[data-ic]").addEventListener("click", () => (c.switch ? this.moreInfo(c.switch) : null));
+    r.querySelector("[data-on]")?.addEventListener("click", () => this.call(c.switch.split(".")[0], "turn_on", { entity_id: c.switch }));
+    r.querySelector("[data-pw]")?.addEventListener("click", () => { this._show = !this._show; this._sig = null; this.render(); });
+    r.querySelector("[data-sh]")?.addEventListener("click", async () => {
+      const text = pw ? `Wi-Fi: ${c.ssid}\nPassword: ${pw}` : `Wi-Fi: ${c.ssid}`;
+      try { if (navigator.share) { await navigator.share({ title: c.name || "Guest Wi-Fi", text }); return; } } catch (e) { if (e?.name === "AbortError") return; }
+      try { await navigator.clipboard.writeText(text); this._copied = true; this._sig = null; this.render(); setTimeout(() => { this._copied = false; this._sig = null; this.render(); }, 2000); } catch (e) { /* no clipboard here */ }
+    });
+  }
+}
+
+// ------------------------------------------------------------------ Roost Announce
+// Type or say a message and it plays on the speakers you pick, like an intercom ("Dinner is ready").
+class RoostAnnounce extends RoostBase {
+  static get defaults() { return { color: "coral", theme: "auto" }; }
+
+  validate(c) { if (!c.speakers?.length) throw new Error("Choose the speakers"); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "speakers", label: "Speakers (smart speakers or Home Assistant voice devices)", required: true, selector: { entity: { multiple: true, domain: ["media_player", "assist_satellite"] } } },
+      { name: "tts", label: "Voice", selector: { entity: { domain: "tts" } } },
+      { name: "quick", label: "Ready messages, one per line", selector: { text: { multiline: true } } },
+      { name: "name", selector: { text: {} } },
+      { name: "show_mic", label: "Speak instead of typing (where the screen allows)", selector: { boolean: {} } },
+      { name: "show_last", label: "The last announcement", selector: { boolean: {} } },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { sample: true, show_mic: true, show_last: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  // what is typed is never redrawn away: the card only redraws for its own changes
+  signature() { return `${this.dark}|${JSON.stringify(this._config)}|${[...(this._pick || [])].join(",")}|${this._busy || ""}|${this._listening ? 1 : 0}|${this.lastSaid()?.at || ""}`; }
+
+  lastSaid() { try { return JSON.parse(localStorage.getItem(`roost-announce-${this._config.speakers.join(",")}`) || "null"); } catch (e) { return null; } }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    if (!this._pick) this._pick = new Set(c.speakers);
+    const last = c.show_last ? this.lastSaid() : null;
+    const ago = last ? Math.round((Date.now() - last.at) / 60000) : 0;
+    const line = this._busy === "sent" ? "Announced" : last ? `Last: “${last.text}”` : "Speak through the speakers";
+    const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const quick = String(c.quick || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 6);
+    const nameOf = (id) => this.sx(id)?.attributes?.friendly_name || id.split(".")[1].replace(/_/g, " ");
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, !!this._busy)}
+      label.msg{display:flex;flex-direction:column;gap:6px;font-size:12px;color:${p.muted}}
+      label.msg input{height:46px;box-sizing:border-box;border-radius:14px;border:1px solid ${p.border};background:${p.inset};color:${p.text};padding:0 14px;font:500 15px ${FONT_TEXT};outline:none;min-width:0}
+      label.msg input:focus{border-color:${g[1]}}
+      .pills{display:flex;flex-wrap:wrap;gap:8px}
+      .pill{min-height:40px;padding:4px 14px;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+      .pill.on{background:linear-gradient(135deg,${ACTIVE[0]},${ACTIVE[1]});color:#fff;border-color:transparent}
+      .pill.q{border-style:dashed}
+      .go{display:flex;gap:10px;align-items:center}
+      .mic{width:56px;height:56px;border-radius:50%;border:0;flex:none;background:${this._listening ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${this._listening ? "#fff" : p.text};display:grid;place-items:center;cursor:pointer;--mdc-icon-size:24px}
+      ${this._listening ? ".mic{animation:roost-breathe 1s ease-in-out infinite}" : ""}
+      .go .big{flex:1;height:56px}
+      .ago{font-size:12px;color:${p.muted}}
+    </style>
+    <div class="card">
+      ${head("mdi:bullhorn-outline", c.name || "Announce", line)}
+      <label class="msg"><span class="t">Message</span><input type="text" maxlength="200" placeholder="Dinner is ready" value="${esc(this._draft || "")}" aria-label="Message"></label>
+      ${quick.length ? `<div class="pills">${quick.map((q, i) => `<button class="pill q" data-q="${i}">${esc(q)}</button>`).join("")}</div>` : ""}
+      ${c.speakers.length > 1 ? `<div class="pills" role="group" aria-label="Speakers">${c.speakers.map((id, i) => `<button class="pill ${this._pick.has(id) ? "on" : ""}" data-sp="${i}" aria-pressed="${this._pick.has(id)}">${esc(nameOf(id))}</button>`).join("")}</div>` : ""}
+      <div class="go">
+        ${c.show_mic && Rec ? `<button class="mic" data-mic="1" aria-label="Speak the message"><ha-icon icon="mdi:microphone"></ha-icon></button>` : ""}
+        <button class="big" data-go="1"${this._pick.size ? "" : " disabled"}><ha-icon icon="mdi:bullhorn"></ha-icon><span class="t">${this._busy === "sending" ? "Sending" : "Announce"}</span></button>
+      </div>
+      ${last && c.show_last ? `<div class="ago t">${ago < 1 ? "just now" : ago < 60 ? `${ago} min ago` : `${Math.floor(ago / 60)} h ago`}</div>` : ""}
+    </div>`;
+    const r = this.shadowRoot, input = r.querySelector("input");
+    input.addEventListener("input", () => { this._draft = input.value; });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") r.querySelector("[data-go]").click(); });
+    r.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.speakers[0]));
+    r.querySelectorAll("[data-q]").forEach((b) => b.addEventListener("click", () => { this._draft = quick[Number(b.dataset.q)]; input.value = this._draft; input.focus(); }));
+    r.querySelectorAll("[data-sp]").forEach((b) => b.addEventListener("click", () => {
+      const id = c.speakers[Number(b.dataset.sp)];
+      if (this._pick.has(id)) this._pick.delete(id); else this._pick.add(id);
+      this._sig = null; this.render();
+    }));
+    r.querySelector("[data-mic]")?.addEventListener("click", () => {
+      if (this._rec) { this._rec.stop(); return; }
+      try {
+        const rec = new Rec(); this._rec = rec;
+        rec.lang = RoostLang.pick(this._hass, c) === "ar" ? "ar-BH" : (this._hass?.locale?.language || "en-US");
+        rec.interimResults = false;
+        rec.addEventListener("result", (e) => { this._draft = [...e.results].map((x) => x[0].transcript).join(" ").slice(0, 200); });
+        rec.addEventListener("end", () => { this._rec = null; this._listening = false; this._sig = null; this.render(); });
+        this._listening = true; this._sig = null; this.render(); rec.start();
+      } catch (e) { this._rec = null; this._listening = false; }
+    });
+    r.querySelector("[data-go]").addEventListener("click", () => {
+      const text = String(this._draft || input.value || "").trim().slice(0, 200);
+      if (!text) { input.focus(); return; }
+      const picked = c.speakers.filter((id) => this._pick.has(id));
+      const sats = picked.filter((id) => id.startsWith("assist_satellite.")), players = picked.filter((id) => id.startsWith("media_player."));
+      const voice = c.tts || Object.keys(this._hass.states).find((id) => id.startsWith("tts."));
+      sats.forEach((id) => this.call("assist_satellite", "announce", { entity_id: id, message: text }));
+      if (players.length && voice) this.call("tts", "speak", { entity_id: voice, media_player_entity_id: players, message: text });
+      try { localStorage.setItem(`roost-announce-${c.speakers.join(",")}`, JSON.stringify({ text, at: Date.now() })); } catch (e) { /* no storage */ }
+      this._draft = ""; this._busy = "sent"; this._sig = null; this.render(); this.vibrate();
+      clearTimeout(this._busyT); this._busyT = setTimeout(() => { this._busy = ""; this._sig = null; this.render(); }, 2500);
+    });
+  }
+}
+
+// ------------------------------------------------------------------ Roost Kitchen
+// The oven, air fryer, dishwasher and coffee machine in one place: what each is doing, time left, and "ready".
+const READY_WORDS = /^(done|ready|finished|finish|complete|completed|end|ended|cooked)$/i;
+class RoostKitchen extends ticking(RoostBase, 60000) {
+  static get defaults() { return { color: "amber", theme: "auto" }; }
+
+  validate(c) { if (!c.appliances?.length) throw new Error("Add the kitchen appliances"); }
+
+  watched() { return (this._config.appliances || []).flatMap((a) => [a.entity, a.remaining, a.progress, a.temperature, a.power]).filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "appliances", label: "Appliances", required: true, selector: { object: { multiple: true, label_field: "name", fields: {
+        entity: { label: "The appliance (its state, or its switch)", required: true, selector: { entity: {} } },
+        name: { label: "Name", selector: { text: {} } },
+        icon: { label: "Icon", selector: { icon: {} } },
+        remaining: { label: "Time left (optional)", selector: { entity: { domain: ["sensor", "timer"] } } },
+        progress: { label: "Progress % (optional)", selector: { entity: { domain: "sensor" } } },
+        temperature: { label: "Temperature (optional)", selector: { entity: { domain: "sensor" } } },
+        start: { label: "Start button (optional)", selector: { entity: { domain: ["button", "switch", "script", "input_boolean"] } } },
+      } } } },
+      { name: "name", selector: { text: {} } },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { sample: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  // minutes left, from a "minutes" sensor, a finish time, or a running timer
+  minsLeft(id) {
+    const s = this.sx(id); if (!s || UNAVAILABLE.includes(s.state)) return null;
+    if (id.startsWith("timer.")) { if (s.state !== "active" || !s.attributes.finishes_at) return null; return Math.max(0, (new Date(s.attributes.finishes_at) - Date.now()) / 60000); }
+    if (s.attributes.device_class === "timestamp") { const t = new Date(s.state); return Number.isNaN(+t) ? null : Math.max(0, (t - Date.now()) / 60000); }
+    const v = num(s.state); if (v == null) return null;
+    const u = s.attributes.unit_of_measurement; return u === "s" ? v / 60 : u === "h" ? v * 60 : v;
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    const rows = c.appliances.map((a, i) => {
+      const s = this.sx(a.entity), st = s ? String(s.state) : "unavailable", dom = a.entity.split(".")[0];
+      const ready = READY_WORDS.test(st), off = UNAVAILABLE.includes(st) || OFF_STATES.includes(st) || st === "idle" || st === "standby";
+      const left = a.remaining ? this.minsLeft(a.remaining) : null, pr = a.progress ? this.n(a.progress) : null;
+      const running = !ready && !off;
+      const frac = pr != null ? pr / 100 : null;
+      const word = ready ? "Ready" : off ? "Off" : s ? RoostSheet.stateWord(s) : "Not found";
+      const temp = a.temperature ? this.val(a.temperature) : "";
+      const icon = a.icon || s?.attributes?.icon || { climate: "mdi:stove", water_heater: "mdi:kettle", switch: "mdi:coffee-maker-outline" }[dom] || "mdi:silverware-fork-knife";
+      const C = 2 * Math.PI * 16;
+      const badge = ready ? `<span class="bd ok"><ha-icon icon="mdi:check"></ha-icon></span>`
+        : running && frac != null ? `<svg class="rg" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" fill="none" stroke="${p.track}" stroke-width="4"/><circle cx="20" cy="20" r="16" fill="none" stroke="${g[1]}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(C * Math.max(0, Math.min(1, frac))).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 20 20)"/></svg><ha-icon class="ri" icon="${esc(icon)}"></ha-icon>`
+        : `<span class="bd ${running ? "run" : ""}"><ha-icon icon="${esc(icon)}"></ha-icon></span>`;
+      const start = a.start && !running && !ready ? `<button class="go" data-st="${i}"><span class="t">Start</span></button>` : "";
+      return `<div class="ap ${ready ? "ready" : ""}" data-ap="${i}" role="button" tabindex="0">
+        <div class="bx">${badge}</div>
+        <div class="tx"><b class="t">${esc(a.name || s?.attributes?.friendly_name || a.entity)}</b><span class="t ${ready ? "okt" : ""}">${esc(ready ? "Ready to serve" : [word, temp].filter(Boolean).join(" · "))}</span></div>
+        ${left != null && running ? `<span class="left num t">${esc(minsText(left))}</span>` : ready ? `<span class="left2 t">now</span>` : start}
+      </div>`;
+    });
+    const nRun = c.appliances.filter((a) => { const s = this.sx(a.entity); return s && !READY_WORDS.test(s.state) && !UNAVAILABLE.includes(s.state) && !OFF_STATES.includes(s.state) && s.state !== "idle" && s.state !== "standby"; }).length;
+    const nReady = c.appliances.filter((a) => READY_WORDS.test(this.sx(a.entity)?.state || "")).length;
+    const line = [nRun ? `${nRun} running` : "", nReady ? `${nReady} ready` : ""].filter(Boolean).join(" · ") || "All off";
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, nRun + nReady > 0)}
+      .ap{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:16px;background:${p.inset};cursor:pointer;min-height:44px}
+      .ap.ready{box-shadow:inset 0 0 0 1.5px #34D39966}
+      .bx{position:relative;width:40px;height:40px;flex:none;display:grid;place-items:center}
+      .bx .rg{position:absolute;inset:0;width:40px;height:40px}
+      .bx .ri{--mdc-icon-size:18px;color:${g[1]}}
+      .bd{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:${p.track};color:${p.muted};--mdc-icon-size:20px}
+      .bd.run{background:${g[0]}2e;color:${g[1]}}
+      .bd.ok{background:#05966933;color:#34D399}
+      .ap .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+      .ap b{font-size:14px;overflow-wrap:break-word;word-break:normal}
+      @container (max-width: 300px){:host .ap{flex-wrap:wrap}:host .ap .tx{flex-basis:calc(100% - 52px)}:host .ap .go,:host .ap .left{margin-inline-start:52px}}
+      .ap .tx span{font-size:12px;color:${p.muted}}
+      .ap .okt{color:#34D399 !important}
+      .left{font-size:15px;font-weight:600;font-family:${FONT_NUM};white-space:nowrap}
+      .left2{font-size:12px;color:${p.muted}}
+      .go{min-height:40px;padding:0 14px;border-radius:12px;border:0;background:${p.track};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+      ${nReady ? ".ap.ready .bd{animation:roost-breathe 1.4s ease-in-out infinite}" : ""}
+    </style>
+    <div class="card">
+      ${head("mdi:stove", c.name || "Kitchen", line)}
+      ${rows.join("")}
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.appliances[0].entity));
+    r.querySelectorAll("[data-ap]").forEach((el) => el.addEventListener("click", (e) => { if (e.target.closest("[data-st]")) return; this.moreInfo(c.appliances[Number(el.dataset.ap)].entity); }));
+    r.querySelectorAll("[data-st]").forEach((b) => b.addEventListener("click", () => {
+      const id = c.appliances[Number(b.dataset.st)].start, d = id.split(".")[0];
+      this.call(d, d === "button" ? "press" : "turn_on", { entity_id: id });
+    }));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Kids' internet
+// Each child's phone or tablet: online or paused, with one tap to pause or resume, and the bedtime switch.
+const KID_COLOURS = ["#2F6BFF", "#DB2777", "#0E9F8A", "#E07B00", "#6D4BFF", "#475569"];
+class RoostKids extends RoostBase {
+  static get defaults() { return { color: "teal", theme: "auto" }; }
+
+  validate(c) { if (!c.devices?.length) throw new Error("Add the children's devices"); }
+
+  watched() { const c = this._config; return [...(c.devices || []).flatMap((d) => [d.entity, d.until, d.usage]), c.bedtime].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "devices", label: "Devices (each one's internet switch from your router)", required: true, selector: { object: { multiple: true, label_field: "name", fields: {
+        entity: { label: "Internet switch (on = allowed)", required: true, selector: { entity: { domain: ["switch", "input_boolean"] } } },
+        name: { label: "Name, for example Saeed's tablet", selector: { text: {} } },
+        until: { label: "Paused until (optional)", selector: { entity: { domain: ["sensor", "input_datetime"] } } },
+        usage: { label: "Time online today (optional)", selector: { entity: { domain: "sensor" } } },
+      } } } },
+      { type: "grid", name: "", schema: [{ name: "bedtime", label: "Bedtime switch (optional)", selector: { entity: { domain: ["automation", "input_boolean", "switch", "schedule"] } } }, { name: "bedtime_text", label: "Bedtime, in words", selector: { text: {} } }] },
+      { name: "name", selector: { text: {} } },
+      { name: "confirm", label: "Ask before pausing", selector: { boolean: {} } },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { sample: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  signature() { return `${super.signature()}|${this._sure ?? ""}`; }
+
+  untilText(id) {
+    const s = this.sx(id); if (!s || UNAVAILABLE.includes(s.state)) return "";
+    const t = id.startsWith("input_datetime.") ? new Date(String(s.state).replace(" ", "T")) : new Date(s.state);
+    return Number.isNaN(+t) ? "" : t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    const paused = c.devices.filter((d) => !this.on(d.entity)).length;
+    const bedOn = c.bedtime ? this.on(c.bedtime) : false;
+    const line = [paused ? `${paused} paused` : "All online", c.bedtime && bedOn && c.bedtime_text ? `bedtime \u2068${c.bedtime_text}\u2069` : ""].filter(Boolean).join(" · ");
+    const rows = c.devices.map((d, i) => {
+      const s = this.sx(d.entity), on = this.on(d.entity), missing = !s || UNAVAILABLE.includes(s.state);
+      const nm = d.name || s?.attributes?.friendly_name || d.entity;
+      const until = !on && d.until ? this.untilText(d.until) : "";
+      const use = on && d.usage ? this.val(d.usage) : "";
+      const sub = missing ? "Not found" : on ? (use ? `Online · \u2068${use}\u2069 today` : "Online") : until ? `Paused until \u2068${until}\u2069` : "Paused";
+      const sure = this._sure === i;
+      return `<div class="kd">
+        <span class="av" style="background:${KID_COLOURS[i % KID_COLOURS.length]}">${esc((nm.trim()[0] || "?").toUpperCase())}</span>
+        <div class="tx"><b class="t">${esc(nm)}</b><span class="t ${on ? "ok" : "ps"}">${esc(sub)}</span></div>
+        ${missing ? "" : `<button class="${on ? "pz" : "rs"}" data-k="${i}">${sure ? '<span class="t">Tap again</span>' : on ? '<span class="t">Pause</span>' : '<span class="t">Resume</span>'}</button>`}
+      </div>`;
+    });
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, paused > 0 || bedOn)}${switchCss(p, g)}
+      .kd{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:16px;background:${p.inset}}
+      .av{width:40px;height:40px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px}
+      .kd .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+      .kd b{font-size:14px;overflow-wrap:break-word;word-break:normal}
+      @container (max-width: 320px){:host .kd{flex-wrap:wrap}:host .kd .tx{flex-basis:calc(100% - 52px)}:host .kd .pz,:host .kd .rs{flex:1 1 100%}}
+      .kd .tx span{font-size:12px}
+      .ok{color:#34D399}.ps{color:#F5A623}
+      .pz,.rs{min-height:40px;padding:0 14px;border-radius:12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;flex:none}
+      .pz{border:0;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]}}
+      .rs{border:1px solid ${p.border};background:${p.off};color:${p.text}}
+      .bed{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:16px;border:1px dashed ${p.border};cursor:pointer}
+      .bed ha-icon{--mdc-icon-size:22px;color:${p.muted}}
+      .bed .tx{flex:1;min-width:0;display:flex;flex-direction:column}
+      .bed b{font-size:14px}.bed span{font-size:12px;color:${p.muted}}
+    </style>
+    <div class="card">
+      ${head("mdi:web", c.name || "Kids' internet", line)}
+      ${rows.join("")}
+      ${c.bedtime ? `<div class="bed" data-bed="1" role="switch" aria-checked="${bedOn}" tabindex="0"><ha-icon icon="mdi:weather-night"></ha-icon>
+        <div class="tx"><b class="t">Bedtime</b>${c.bedtime_text ? `<span><bdi>${esc(c.bedtime_text)}</bdi></span>` : ""}</div>
+        <span class="sw ${bedOn ? "on" : ""}"></span></div>` : ""}
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.devices[0].entity));
+    r.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => {
+      const i = Number(b.dataset.k), d = c.devices[i], on = this.on(d.entity);
+      if (on && c.confirm && this._sure !== i) { this._sure = i; this._sig = null; this.render(); clearTimeout(this._sureT); this._sureT = setTimeout(() => { this._sure = null; this._sig = null; this.render(); }, 3000); return; }
+      this._sure = null;
+      this.call(d.entity.split(".")[0], on ? "turn_off" : "turn_on", { entity_id: d.entity });
+    }));
+    const bed = r.querySelector("[data-bed]");
+    if (bed) { const go = () => { const d = c.bedtime.split(".")[0]; this.call(d === "schedule" ? "homeassistant" : d, bedOn ? "turn_off" : "turn_on", { entity_id: c.bedtime }); }; bed.addEventListener("click", go); bed.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } }); }
+  }
+}
+
+// ------------------------------------------------------------------ Roost Family notes
+// Short notes everyone sees on the tablet ("Buy milk", "Back at 8"), kept in a Home Assistant to-do list.
+const NOTE_COLOURS = [["#FFE9A8", "#3A2A00"], ["#C9E8FF", "#0B2A44"], ["#FFD3E4", "#4A0D26"], ["#D4F5E2", "#0B3A24"], ["#E6DDFF", "#24104A"]];
+class RoostNotes extends RoostBase {
+  static get defaults() { return { color: "pink", theme: "auto", max: 6 }; }
+
+  validate(c) { if (!c.entity && !c.sample) throw new Error("Choose a to-do list for the notes"); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "entity", label: "To-do list that keeps the notes (a Local to-do list is fine)", selector: { entity: { domain: "todo" } } },
+      { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "max", label: "Notes shown", selector: slider(2, 12, 1) }] },
+      { name: "confirm", label: "Ask before removing a note", selector: { boolean: {} } },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig(hass) { return { entity: Object.keys(hass.states).find((id) => id.startsWith("todo.")) || "", sample: !Object.keys(hass.states).some((id) => id.startsWith("todo.")) }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  signature() { return `${this.dark}|${JSON.stringify(this._config)}|${JSON.stringify(this._items || null)}|${this._writing ? 1 : 0}|${this._sure || ""}`; }
+
+  subscribe() {
+    const c = this._config;
+    if (c.sample) {
+      if (!this._items) { const t = (h) => new Date(Date.now() - h * 3600e3).toISOString(); this._items = [{ uid: "s1", summary: "Buy milk and bread", status: "needs_action", description: `Layla|${t(3)}` }, { uid: "s2", summary: "Back at 8, start dinner", status: "needs_action", description: `Daniel|${t(1)}` }, { uid: "s3", summary: "Saeed's school trip Sunday", status: "needs_action", description: `Mum|${t(20)}` }]; }
+      return;
+    }
+    const conn = this._hass?.connection;
+    if (!conn?.subscribeMessage || this._subFor === c.entity) return;
+    this._unsub?.then?.((u) => u()).catch(() => {});
+    this._subFor = c.entity;
+    this._unsub = conn.subscribeMessage((m) => { this._items = m.items || []; this._sig = null; this.hass = this._hass; }, { type: "todo/item/subscribe", entity_id: c.entity });
+    this._unsub.catch?.(() => { this._items = []; this._sig = null; this.hass = this._hass; });
+  }
+
+  connectedCallback() { super.connectedCallback?.(); if (this._hass && this._config) this.subscribe(); }
+  disconnectedCallback() { super.disconnectedCallback?.(); this._unsub?.then?.((u) => u()).catch(() => {}); this._unsub = null; this._subFor = null; }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    this.subscribe();
+    const c = this._config, p = this.p, g = this.colour();
+    const items = (this._items || []).filter((x) => x.status !== "completed").slice(0, Number(c.max) || 6);
+    const when = (iso) => { const t = new Date(iso); if (Number.isNaN(+t)) return ""; const today = new Date().toDateString() === t.toDateString(); return today ? t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : Date.now() - t < 2 * 864e5 ? "yesterday" : t.toLocaleDateString([], { day: "numeric", month: "short" }); };
+    const line = items.length ? `${items.length} ${items.length === 1 ? "note" : "notes"}` : "No notes";
+    const notes = items.map((x, i) => {
+      const [who, at] = String(x.description || "").split("|"), [bg, fg] = NOTE_COLOURS[i % NOTE_COLOURS.length], tilt = [-1.4, 1.1, 0.7, -0.8, 1.3][i % 5];
+      const sure = this._sure === x.uid;
+      return `<button class="note" data-n="${esc(x.uid)}" style="background:${bg};color:${fg};transform:rotate(${tilt}deg)" aria-label="${esc(x.summary)}${sure ? ". Tap again to remove" : ". Tap to remove"}">
+        <span class="nt">${esc(x.summary)}</span><span class="nw">${sure ? '<span class="t">Tap again to remove</span>' : esc([who, at ? when(at) : ""].filter(Boolean).join(" · "))}</span></button>`;
+    });
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, items.length > 0)}
+      .add{width:44px;height:44px;border-radius:14px;border:0;background:${p.inset};color:${p.text};display:grid;place-items:center;cursor:pointer;flex:none;--mdc-icon-size:22px}
+      .notes{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+      .note{all:unset;box-sizing:border-box;min-height:84px;padding:12px;border-radius:16px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;cursor:pointer;box-shadow:0 10px 18px -14px rgba(0,0,0,.45)}
+      .note:focus-visible{outline:2px solid ${g[1]};outline-offset:2px}
+      .nt{font-size:15px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
+      .nw{font-size:12px;opacity:.75}
+      .empty{min-height:84px;border-radius:16px;border:1.5px dashed ${p.border};color:${p.muted};display:grid;place-items:center;text-align:center;font-size:13px;font-weight:600;padding:12px}
+      .wr{display:flex;gap:8px}
+      .wr input{flex:1;min-width:0;height:46px;box-sizing:border-box;border-radius:14px;border:1px solid ${g[1]};background:${p.inset};color:${p.text};padding:0 14px;font:500 15px ${FONT_TEXT};outline:none}
+      .wr .big{height:46px}
+    </style>
+    <div class="card">
+      ${head("mdi:message-text-outline", c.name || "Family notes", line, `<button class="add" data-add="1" aria-label="${this._writing ? "Close" : "Add a note"}"><ha-icon icon="${this._writing ? "mdi:close" : "mdi:plus"}"></ha-icon></button>`)}
+      ${this._writing ? `<div class="wr"><input type="text" maxlength="80" placeholder="Write a note" aria-label="Write a note"><button class="big" data-save="1"><span class="t">Add</span></button></div>` : ""}
+      <div class="notes">${notes.join("")}${items.length < 2 && !this._writing ? `<div class="empty t">Tap + to write a note</div>` : ""}</div>
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelector("[data-ic]").addEventListener("click", () => (c.entity ? this.moreInfo(c.entity) : null));
+    r.querySelector("[data-add]").addEventListener("click", () => { this._writing = !this._writing; this._sig = null; this.render(); r.querySelector(".wr input")?.focus(); });
+    const save = () => {
+      const v = String(r.querySelector(".wr input")?.value || "").trim().slice(0, 80); if (!v) return;
+      const who = this._hass.user?.name || "", desc = `${who}|${new Date().toISOString()}`;
+      if (c.sample) this._items = [{ uid: `s${Date.now()}`, summary: v, status: "needs_action", description: desc }, ...(this._items || [])];
+      else this.call("todo", "add_item", { entity_id: c.entity, item: v, description: desc });
+      this._writing = false; this._sig = null; this.render();
+    };
+    r.querySelector("[data-save]")?.addEventListener("click", save);
+    r.querySelector(".wr input")?.addEventListener("keydown", (e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { this._writing = false; this._sig = null; this.render(); } });
+    r.querySelectorAll("[data-n]").forEach((b) => b.addEventListener("click", () => {
+      const uid = b.dataset.n;
+      if (c.confirm !== false && this._sure !== uid) { this._sure = uid; this._sig = null; this.render(); clearTimeout(this._sureT); this._sureT = setTimeout(() => { this._sure = null; this._sig = null; this.render(); }, 3000); return; }
+      this._sure = null;
+      if (c.sample) this._items = this._items.filter((x) => x.uid !== uid);
+      else { this._items = (this._items || []).filter((x) => x.uid !== uid); this.call("todo", "remove_item", { entity_id: c.entity, item: uid }); }
+      this._sig = null; this.render();
+    }));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Deliveries
+// Parcels on their way: a step bar (ordered, shipped, out for delivery, delivered) and the day it comes.
+// Works with parcel-tracking sensors that list their parcels (for example 17TRACK) or one sensor per parcel.
+const PARCEL_STEP = (s) => {
+  const t = String(s || "").toLowerCase().replace(/[_-]/g, " ");
+  if (/deliver(ed)?$|^delivered|picked up|collected/.test(t)) return 4;
+  if (/out for delivery|with courier|on the way to you/.test(t)) return 3;
+  if (/transit|shipped|on its way|departed|arrived at|customs|in transport/.test(t)) return 2;
+  if (/ready to be picked|ready for pickup|available for pickup/.test(t)) return 3;
+  if (/exception|problem|failed|returned|undeliverable|expired/.test(t)) return -1;
+  return 1;
+};
+class RoostDeliveries extends ticking(RoostBase, 300000) {
+  static get defaults() { return { color: "purple", theme: "auto", max: 4 }; }
+
+  validate(c) { if (!c.entities?.length) throw new Error("Choose the parcel sensors"); }
+
+  watched() { return this._config.entities || []; }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { name: "entities", label: "Parcel sensors (one per parcel, or one listing all parcels)", required: true, selector: { entity: { multiple: true, domain: "sensor" } } },
+      { type: "grid", name: "", schema: [{ name: "name", selector: { text: {} } }, { name: "max", label: "Parcels shown", selector: slider(1, 10, 1) }] },
+      { name: "show_delivered", label: "Delivered parcels too", selector: { boolean: {} } },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { sample: true, show_delivered: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  parcels() {
+    const out = [];
+    for (const id of this._config.entities) {
+      const s = this.sx(id); if (!s || UNAVAILABLE.includes(s.state)) continue;
+      const list = s.attributes.packages || s.attributes.parcels || s.attributes.shipments;
+      if (Array.isArray(list)) list.forEach((x) => out.push({ name: x.friendly_name || x.name || x.title || x.tracking_number || "Parcel", status: x.status || x.info_text || "", when: x.expected || x.delivery_date || x.estimated_delivery || x.eta || "", note: x.info_text || x.location || "", id }));
+      else out.push({ name: s.attributes.friendly_name || id, status: s.state, when: s.attributes.expected || s.attributes.estimated_delivery || "", note: s.attributes.info_text || s.attributes.location || "", id });
+    }
+    return out.map((x) => ({ ...x, step: PARCEL_STEP(x.status) }));
+  }
+
+  dayText(v) {
+    if (!v) return "";
+    const t = new Date(v); if (Number.isNaN(+t)) return String(v).slice(0, 24);
+    const d0 = new Date(); d0.setHours(0, 0, 0, 0); const d = Math.round((new Date(t).setHours(0, 0, 0, 0) - d0) / 864e5);
+    return d === 0 ? "Today" : d === 1 ? "Tomorrow" : d > 1 && d < 7 ? t.toLocaleDateString("en", { weekday: "long" }) : t.toLocaleDateString([], { day: "numeric", month: "short" });
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    const all = this.parcels(), coming = all.filter((x) => x.step !== 4), done = all.filter((x) => x.step === 4);
+    const today = coming.filter((x) => x.step === 3 || this.dayText(x.when) === "Today").length;
+    const line = today ? `${today} arriving today` : coming.length ? `${coming.length} on the way` : done.length ? "All delivered" : "No parcels";
+    const shown = [...coming.sort((a, b) => b.step - a.step), ...(c.show_delivered ? done : [])].slice(0, Number(c.max) || 4);
+    const row = (x) => {
+      if (x.step === 4) return `<div class="dn" data-e="${esc(x.id)}" role="button" tabindex="0"><ha-icon icon="mdi:check"></ha-icon><b class="t">${esc(x.name)}</b><span class="t">Delivered</span></div>`;
+      const day = x.step === 3 ? "Today" : this.dayText(x.when), bad = x.step < 0;
+      const say = bad ? "Problem with this parcel" : x.step === 3 ? "Out for delivery" : x.step === 2 ? "On its way" : "Ordered";
+      return `<div class="pc" data-e="${esc(x.id)}" role="button" tabindex="0">
+        <div class="r1"><b class="t">${esc(x.name)}</b>${day ? `<span class="day t ${day === "Today" ? "hot" : ""}">${esc(day)}</span>` : ""}</div>
+        <div class="steps" aria-hidden="true">${[1, 2, 3, 4].map((k) => `<i style="background:${bad ? "#F43F6B" : k <= x.step ? g[1] : p.track}"></i>`).join("")}</div>
+        <span class="nt t">${esc(say)}</span>
+      </div>`;
+    };
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, coming.length > 0)}
+      .pc{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:16px;background:${p.inset};cursor:pointer}
+      .r1{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+      .r1 b{font-size:14px;min-width:0;overflow-wrap:anywhere}
+      .day{font-size:12px;font-weight:600;color:${p.muted};flex:none}
+      .day.hot{color:#F5A623}
+      .steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+      .steps i{display:block;height:6px;border-radius:999px}
+      .nt{font-size:12px;color:${p.muted}}
+      .dn{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border-radius:16px;border:1px solid ${p.border};cursor:pointer}
+      .dn ha-icon{--mdc-icon-size:20px;color:#34D399}
+      .dn b{flex:1;font-size:14px;min-width:0;overflow-wrap:anywhere}
+      .dn span{font-size:12px;color:${p.muted}}
+      .none{font-size:13px;color:${p.muted};text-align:center;padding:8px}
+    </style>
+    <div class="card">
+      ${head("mdi:package-variant-closed", c.name || "Deliveries", line)}
+      ${shown.length ? shown.map(row).join("") : '<div class="none t">Nothing on the way</div>'}
+    </div>`;
+    const r = this.shadowRoot;
+    r.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.entities[0]));
+    r.querySelectorAll("[data-e]").forEach((el) => el.addEventListener("click", () => this.moreInfo(el.dataset.e)));
+  }
+}
+
+// ------------------------------------------------------------------ Roost Power backup
+// The UPS: battery, how long the home keeps running if the power goes out, and what it keeps on.
+class RoostBackup extends ticking(RoostBase, 60000) {
+  static get defaults() { return { color: "green", theme: "auto" }; }
+
+  validate(c) { if (!c.battery) throw new Error("Choose the backup battery level"); }
+
+  watched() { const c = this._config; return [c.battery, c.runtime, c.load, c.power, c.status].filter(Boolean); }
+
+  static getConfigForm() {
+    return { schema: [
+      { name: "sample", label: "Show sample data", selector: { boolean: {} } },
+      { type: "grid", name: "", schema: [{ name: "battery", label: "Battery level (%)", required: true, selector: { entity: { domain: "sensor" } } }, { name: "runtime", label: "Time it can run", selector: { entity: { domain: "sensor" } } }] },
+      { type: "grid", name: "", schema: [{ name: "status", label: "On battery or on mains", selector: { entity: { domain: ["sensor", "binary_sensor"] } } }, { name: "power", label: "Power used (W)", selector: { entity: { domain: "sensor" } } }] },
+      { name: "load", label: "Load (%)", selector: { entity: { domain: "sensor" } } },
+      { name: "covered", label: "What it keeps on, one per line (for example Router)", selector: { text: { multiline: true } } },
+      { name: "name", selector: { text: {} } },
+      ...colourFields("color"), THEME_FIELD,
+    ], computeLabel };
+  }
+
+  static getStubConfig() { return { sample: true }; }
+
+  getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
+
+  // NUT and most UPS integrations: "OL" on line, "OB" on battery; a binary sensor is on while on battery
+  onBattery() {
+    const c = this._config, s = this.sx(c.status); if (!s) return false;
+    if (c.status.startsWith("binary_sensor.")) return s.attributes.device_class === "power" ? s.state === "off" : s.state === "on";
+    return /\bOB\b|on battery|battery|discharging/i.test(String(s.state)) && !/\bOL\b|online|on line/i.test(String(s.state));
+  }
+
+  render() {
+    if (!this._hass || !this._config) return;
+    const c = this._config, p = this.p, g = this.colour();
+    const lvl = this.n(c.battery), onBat = this.onBattery();
+    const rt = (() => { const s = this.sx(c.runtime), v = this.n(c.runtime); if (v == null) return null; const u = s.attributes.unit_of_measurement; return u === "s" ? v / 60 : u === "h" ? v * 60 : v; })();
+    const w = c.power ? this.n(c.power) : null, ld = c.load ? this.n(c.load) : null;
+    const col = lvl != null && lvl <= 25 ? "#F43F6B" : onBat ? "#F5A623" : "#34D399";
+    const line = lvl == null ? "No reading" : onBat ? "Power cut: running on battery" : lvl >= 99 ? "On mains power · full" : "On mains power";
+    const C = 2 * Math.PI * 50, frac = lvl == null ? 0 : Math.max(0, Math.min(1, lvl / 100));
+    const items = String(c.covered || "").split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 8);
+    this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, onBat)}
+      .main{display:flex;align-items:center;gap:16px}
+      .ring{position:relative;width:118px;height:118px;flex:none}
+      .ring svg{width:118px;height:118px}
+      .ring .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+      .ring b{font-size:32px;font-family:${FONT_NUM};line-height:1}
+      .ring span{font-size:12px;color:${p.muted}}
+      .info{display:flex;flex-direction:column;gap:6px;min-width:0}
+      .info small{font-size:13px;color:${p.muted}}
+      .info b{font-size:24px;font-family:${FONT_NUM};line-height:1.1}
+      .tags{display:flex;flex-wrap:wrap;gap:8px}
+      .tag{min-height:36px;padding:0 12px;border-radius:999px;background:${p.inset};font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+      .tag ha-icon{--mdc-icon-size:16px;color:${col}}
+      ${onBat ? ".ring .arc{animation:roost-breathe 1.4s ease-in-out infinite}" : ""}
+    </style>
+    <div class="card">
+      ${head(onBat ? "mdi:battery-alert-variant-outline" : "mdi:lightning-bolt-outline", c.name || "Power backup", line)}
+      <div class="main">
+        <div class="ring" role="img" aria-label="Battery ${lvl == null ? "unknown" : `${Math.round(lvl)}%`}">
+          <svg viewBox="0 0 118 118" aria-hidden="true"><circle cx="59" cy="59" r="50" fill="none" stroke="${p.track}" stroke-width="10"/><circle class="arc" cx="59" cy="59" r="50" fill="none" stroke="${col}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(C * frac).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 59 59)"/></svg>
+          <div class="in"><b class="num">${lvl == null ? "–" : `${Math.round(lvl)}%`}</b><span class="t">battery</span></div>
+        </div>
+        <div class="info">
+          ${rt != null ? `<small class="t">${onBat ? "Runs for" : "If the power goes out"}</small><b class="num t">${esc(minsText(rt))}</b>` : ""}
+          ${w != null ? `<small class="t">Using ${esc(fmt(w, 0))} W now</small>` : ld != null ? `<small class="t">Load ${esc(fmt(ld, 0))}%</small>` : ""}
+        </div>
+      </div>
+      ${items.length ? `<div class="tags">${items.map((x) => `<span class="tag"><ha-icon icon="mdi:power-plug-outline"></ha-icon>${esc(x)}</span>`).join("")}</div>` : ""}
+    </div>`;
+    this.shadowRoot.querySelector("[data-ic]").addEventListener("click", () => this.moreInfo(c.battery));
+  }
+}
+
 const CARDS = [
   ["roost-tile", RoostTile, "Roost Tile", "A big tile with a switch, colour, icon and how long it has been on."],
   ["roost-chips", RoostChips, "Roost Chips", "Status chips in one row: doors, alarm, lights (with count), AC and people bubbles."],
@@ -13486,6 +14221,13 @@ const CARDS = [
   ["roost-pet", RoostPet, "Roost Pet", "A pet feeder and water fountain: food and water left, when it last ate, and “feed now”."],
   ["roost-nursery", RoostNursery, "Roost Nursery", "The baby's room: camera, warmth, a banner when the baby cries, night light and lullaby."],
   ["roost-network", RoostNetwork, "Roost Network", "The internet (speed, devices online) or a server (CPU, memory, disk, heat), with a safe restart."],
+  ["roost-wifi", RoostWifi, "Roost Guest Wi-Fi", "A QR code guests point their camera at to join your Wi-Fi, with show password and share."],
+  ["roost-announce", RoostAnnounce, "Roost Announce", "Type or say a message and it plays on the speakers you pick, like an intercom."],
+  ["roost-kitchen", RoostKitchen, "Roost Kitchen", "The oven, air fryer, dishwasher and coffee machine: what each is doing, time left and ready."],
+  ["roost-kids", RoostKids, "Roost Kids' internet", "Pause or resume the internet on each child's device, and a bedtime switch."],
+  ["roost-notes", RoostNotes, "Roost Family notes", "Short sticky notes the whole family sees, kept in a to-do list."],
+  ["roost-deliveries", RoostDeliveries, "Roost Deliveries", "Parcels on their way, with a step bar and the day they arrive."],
+  ["roost-backup", RoostBackup, "Roost Power backup", "The UPS: battery, how long the home runs in a power cut, and what it keeps on."],
   ["roost-batteries", RoostBatteries, "Roost Batteries", "Every battery in the home, lowest first, with a calm “All good” when none are low."],
   ["roost-timeline", RoostTimeline, "Roost Timeline", "What happened at home, newest first: doors, locks, people coming and going, alarms and leaks."],
   ["roost-values", RoostValues, "Roost Values", "Your own settings in one card: numbers to slide, choices to tap, switches and short texts."],

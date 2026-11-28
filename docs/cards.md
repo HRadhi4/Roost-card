@@ -1016,6 +1016,122 @@ restart: button.router_restart  # tap twice to restart
 # server: cpu, memory, disk, temperature, uptime
 ```
 
+### Roost Guest Wi-Fi
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/wifi.gif" width="320" alt="Roost guest Wi-Fi card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/wifi.gif" width="320" alt="Roost guest Wi-Fi card in action, dark">
+
+A QR code guests point their phone camera at to join, so nobody has to read the password out. The code is made on the screen; nothing is sent anywhere.
+```yaml
+type: custom:roost-wifi
+ssid: Nest-Guest
+password: your-guest-password
+security: WPA                 # WPA, WEP or nopass (open)
+switch: switch.guest_wifi     # optional: turn the guest network on from the card
+clients: sensor.guest_clients # optional: guests connected
+show_password: true           # a button that shows the password
+show_share: true              # share it, or copy it on a computer
+```
+Tip: use **Only show this card to these people** (under More) if the password should only show on the family's screens.
+
+### Roost Announce
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/announce.gif" width="320" alt="Roost announce card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/announce.gif" width="320" alt="Roost announce card in action, dark">
+
+Type a message, tap a ready one, or tap the microphone and say it (where the screen allows), pick the rooms, then **Announce**.
+```yaml
+type: custom:roost-announce
+speakers: [media_player.living_room, media_player.kitchen, assist_satellite.majlis]
+tts: tts.home_assistant_cloud  # the voice (Home Assistant Voice devices need none)
+quick: |                       # ready messages, one per line
+  Dinner is ready
+  Time to leave for school
+show_mic: true
+show_last: true
+```
+
+### Roost Kitchen
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/kitchen.gif" width="320" alt="Roost kitchen card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/kitchen.gif" width="320" alt="Roost kitchen card in action, dark">
+
+```yaml
+type: custom:roost-kitchen
+appliances:
+  - entity: sensor.oven_state
+    name: Oven
+    remaining: sensor.oven_time_left   # minutes, a finish time, or a timer
+    progress: sensor.oven_progress     # optional
+    temperature: sensor.oven_temperature
+  - entity: sensor.air_fryer_state     # "done", "ready" or "finished" shows a green Ready
+    name: Air fryer
+  - entity: switch.coffee_machine
+    name: Coffee machine
+    start: switch.coffee_machine       # a Start button while it is off
+```
+
+### Roost Kids' internet
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/kids.gif" width="320" alt="Roost kids' internet card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/kids.gif" width="320" alt="Roost kids' internet card in action, dark">
+
+Each device needs an internet switch from your router's integration in Home Assistant (on = allowed). Many routers offer one per device.
+```yaml
+type: custom:roost-kids
+devices:
+  - entity: switch.saeed_tablet_internet
+    name: Saeed's tablet
+    usage: sensor.saeed_tablet_time_online   # optional
+  - entity: switch.layla_phone_internet
+    name: Layla's phone
+    until: input_datetime.layla_paused_until # optional
+bedtime: automation.kids_bedtime_internet    # optional
+bedtime_text: 9:30 pm to 6:00 am, school nights
+confirm: true                                # tap twice to pause
+```
+
+### Roost Family notes
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/notes.gif" width="320" alt="Roost family notes card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/notes.gif" width="320" alt="Roost family notes card in action, dark">
+
+Tap **+** to write a note; tap a note twice to remove it. The notes live in a to-do list (Settings → Devices & services → Add → **Local to-do** makes one), so every screen shows the same notes.
+```yaml
+type: custom:roost-notes
+entity: todo.family_notes
+max: 6
+```
+
+### Roost Deliveries
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/deliveries.gif" width="320" alt="Roost deliveries card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/deliveries.gif" width="320" alt="Roost deliveries card in action, dark">
+
+```yaml
+type: custom:roost-deliveries
+entities: [sensor.17track_packages]  # a sensor that lists its parcels, or one sensor per parcel
+max: 4
+show_delivered: true
+```
+
+### Roost Power backup
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/backup.gif" width="320" alt="Roost power backup card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/backup.gif" width="320" alt="Roost power backup card in action, dark">
+
+Works with a UPS in Home Assistant, for example through the **Network UPS Tools (NUT)** integration.
+```yaml
+type: custom:roost-backup
+battery: sensor.ups_battery_charge
+runtime: sensor.ups_battery_runtime   # seconds or minutes
+status: sensor.ups_status             # OL = on mains, OB = on battery
+power: sensor.ups_real_power
+covered: |
+  Router
+  Home Assistant
+  Cameras
+```
+
+### Roost Car, petrol or hybrid
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car-fuel.gif" width="320" alt="Roost car card, petrol, in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/car-fuel.gif" width="320" alt="Roost car card, petrol, in action, dark">
+
+```yaml
+type: custom:roost-ev
+kind: fuel                  # electric (the default) or fuel
+fuel: sensor.car_fuel_level
+range: sensor.car_range
+lock: lock.car_doors        # unlocking asks for a second tap
+climate: climate.car        # or a button or script that starts the AC
+tracker: device_tracker.car
+```
+
 ### Roost Batteries
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/batteries.gif" width="320" alt="Roost batteries card in action">
 

@@ -500,10 +500,62 @@ if (!calls.some((x) => x[1] === "toggle")) { fails++; console.error("FAIL confir
   if (L.eastern({}) || !L.eastern({ numerals: "eastern" })) { fails++; console.error("FAIL numerals western screen / eastern card"); }
   window.localStorage.removeItem("roost-numerals");
 }
+// The eight cards added in 1.30.0: each draws, does what its buttons say, and checks what it is given
+{
+  const mk = (tag, cfg) => { const el = document.createElement(tag); el.setConfig(cfg); document.body.appendChild(el); el.hass = hass(true); return el; };
+  const click = (el, sel) => el.shadowRoot.querySelector(sel)?.dispatchEvent(new window.Event("click"));
+  const bad = (msg, x) => { fails++; console.error("FAIL", msg, x === undefined ? "" : JSON.stringify(x)); };
+  Object.assign(states, {
+    "switch.t_kid": { entity_id: "switch.t_kid", state: "on", attributes: { friendly_name: "Tablet" } },
+    "sensor.t_oven": { entity_id: "sensor.t_oven", state: "done", attributes: { friendly_name: "Oven" } },
+    "sensor.t_ups": { entity_id: "sensor.t_ups", state: "40", attributes: { unit_of_measurement: "%" } },
+    "sensor.t_ups_status": { entity_id: "sensor.t_ups_status", state: "OB DISCHRG", attributes: {} },
+    "sensor.t_parcel": { entity_id: "sensor.t_parcel", state: "Out for delivery", attributes: { friendly_name: "Shoes" } },
+    "lock.t_car": { entity_id: "lock.t_car", state: "unlocked", attributes: {} },
+    "sensor.t_fuel": { entity_id: "sensor.t_fuel", state: "12", attributes: { unit_of_measurement: "%" } },
+    "media_player.t_sp": { entity_id: "media_player.t_sp", state: "idle", attributes: { friendly_name: "Kitchen" } },
+    "tts.t_voice": { entity_id: "tts.t_voice", state: "unknown", attributes: {} },
+  });
+  // Guest Wi-Fi: a code to scan, and a strange name stays text
+  const wf = mk("roost-wifi", { type: "custom:roost-wifi", ssid: 'Home";<b>', password: "pa;ss", show_password: true });
+  if (!wf.shadowRoot.querySelector(".qr svg path")) bad("wifi draws a QR code");
+  if (wf.shadowRoot.querySelector(".card b")) bad("wifi name is text, not markup");
+  click(wf, "[data-pw]"); if (!wf.shadowRoot.querySelector(".pw")?.textContent.includes("pa;ss")) bad("wifi shows the password");
+  const wifiCodeForTest = (...a) => customElements.get("roost-wifi").code(...a);
+  if (wifiCodeForTest("A;B", 'p"w', "WPA", false) !== String.raw`WIFI:T:WPA;S:A\;B;P:p\"w;;`) bad("wifi code escapes", wifiCodeForTest("A;B", 'p"w', "WPA", false));
+  // Announce: tts.speak to the media players picked
+  const an = mk("roost-announce", { type: "custom:roost-announce", speakers: ["media_player.t_sp"], tts: "tts.t_voice" });
+  calls.length = 0; an._draft = "Dinner is ready"; click(an, "[data-go]");
+  if (!calls.some((x) => x[0] === "tts" && x[1] === "speak" && x[2].message === "Dinner is ready" && x[2].media_player_entity_id[0] === "media_player.t_sp")) bad("announce speaks", calls);
+  // Kitchen: "done" shows as ready
+  const kt = mk("roost-kitchen", { type: "custom:roost-kitchen", appliances: [{ entity: "sensor.t_oven", name: "Oven" }] });
+  if (!kt.shadowRoot.querySelector(".ap.ready")) bad("kitchen shows ready");
+  // Kids: pause turns the switch off; with confirm it asks first
+  const kd = mk("roost-kids", { type: "custom:roost-kids", devices: [{ entity: "switch.t_kid" }], confirm: true });
+  calls.length = 0; click(kd, "[data-k]"); if (calls.length) bad("kids asks before pausing");
+  click(kd, "[data-k]"); if (!calls.some((x) => x[0] === "switch" && x[1] === "turn_off")) bad("kids pauses", calls);
+  // Notes: sample notes can be added and removed with a second tap
+  const nt = mk("roost-notes", { type: "custom:roost-notes", sample: true, confirm: true });
+  const n0 = nt.shadowRoot.querySelectorAll(".note").length;
+  click(nt, "[data-add]"); nt.shadowRoot.querySelector(".wr input").value = "<i>Buy milk</i>"; click(nt, "[data-save]");
+  if (nt.shadowRoot.querySelectorAll(".note").length !== n0 + 1 || nt.shadowRoot.querySelector(".note i")) bad("notes adds a note as text");
+  click(nt, ".note"); click(nt, ".note"); if (nt.shadowRoot.querySelectorAll(".note").length !== n0) bad("notes removes after a second tap");
+  // Deliveries: out for delivery means arriving today
+  const dl = mk("roost-deliveries", { type: "custom:roost-deliveries", entities: ["sensor.t_parcel"] });
+  if (!/1 arriving today/.test(dl.shadowRoot.querySelector(".l").textContent)) bad("deliveries today", dl.shadowRoot.querySelector(".l").textContent);
+  // Power backup: on battery is said plainly
+  const bk = mk("roost-backup", { type: "custom:roost-backup", battery: "sensor.t_ups", status: "sensor.t_ups_status" });
+  if (!/on battery/.test(bk.shadowRoot.querySelector(".l").textContent)) bad("backup on battery", bk.shadowRoot.querySelector(".l").textContent);
+  // Car, petrol: low fuel and lock
+  const cr = mk("roost-ev", { type: "custom:roost-ev", kind: "fuel", fuel: "sensor.t_fuel", lock: "lock.t_car" });
+  if (!cr.shadowRoot.querySelector(".bar i")) bad("car shows fuel");
+  calls.length = 0; click(cr, '[data-cb="lock"]'); if (!calls.some((x) => x[0] === "lock" && x[1] === "lock")) bad("car locks", calls);
+  for (const el of [wf, an, kt, kd, nt, dl, bk, cr]) el.remove();
+}
 // Errors for missing settings
 for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }], ["roost-rooms", { rooms: [] }]]) {
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 49} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 63} checks passed`);
 process.exit(fails ? 1 : 0);

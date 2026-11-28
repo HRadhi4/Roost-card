@@ -10,6 +10,16 @@ Every version of Roost Cards, newest first.
 - **Start from Simple or Detailed.** One tap shows only the main control or everything; change anything after.
 - **Easier on the dashboard.** The first time you tap a card that does more when held, a small note says so (in Arabic too). Buttons that were small are now at least 40 px, and switches are easier to hit.
 - **Plain words.** "Only show this card to these people" lists the people by name with a tick box; no setting says "entity" any more.
+- **Seven new cards**, each with the same settings layout:
+  - **Roost Guest Wi-Fi**: a QR code guests scan with their camera to join, plus show or share the password and turn the guest network on.
+  - **Roost Announce**: type, tap a ready message or speak, pick rooms, and it plays on those speakers.
+  - **Roost Kitchen**: oven, air fryer, dishwasher and coffee machine with time left and a green "Ready to serve".
+  - **Roost Kids' internet**: pause or resume each child's device (tap twice), and a bedtime switch.
+  - **Roost Family notes**: sticky notes for the whole family, kept in a to-do list so every screen shows the same.
+  - **Roost Deliveries**: parcels with a step bar and the day they arrive.
+  - **Roost Power backup**: UPS battery ring, how long the home keeps running in a power cut, and what it keeps on.
+- **Roost Car now does petrol and hybrid cars too** (`kind: fuel`): fuel and range, lock (unlock asks for a second tap), cool it before you go, and find it.
+- Every new card works in sample mode, in Arabic, and in light and dark.
 
 ## 1.29.3
 
