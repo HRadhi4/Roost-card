@@ -585,8 +585,13 @@ if (!calls.some((x) => x[1] === "toggle")) { fails++; console.error("FAIL confir
   calls.length = 0; click(cr, '[data-cb="find"]'); if (!calls.some((x) => x[0] === "button" && x[1] === "press") || !cr.shadowRoot.querySelector(".flash")) bad("car flashes its lights", calls);
   if (cr.shadowRoot.querySelectorAll("[data-go]").length !== 2) bad("two cars, two dots");
   click(cr, '[data-go="1"]'); if (!/Layla's car/.test(ch()) || !/Battery/.test(ch()) || !cr.shadowRoot.querySelector(".stage img")) bad("the second car shows its own battery and picture");
-  const tp = mk("roost-ev", { type: "custom:roost-ev", car: "petrol", fuel: "sensor.t_fuel", boot: "binary_sensor.t_door", view: "top" });
+  const tp = mk("roost-ev", { type: "custom:roost-ev", car: "petrol", fuel: "sensor.t_fuel", boot: "binary_sensor.t_door", look: "suv", view: "top" });
   if (!/viewBox="0 0 420 190"/.test(tp.shadowRoot.innerHTML) || !/The boot is open/.test(tp.shadowRoot.innerHTML)) bad("car from above shows the open boot");
+  // the realistic car turns to its open boot by itself, and the buttons turn it back
+  const rt = mk("roost-ev", { type: "custom:roost-ev", car: "petrol", fuel: "sensor.t_fuel", boot: "binary_sensor.t_door", look: "photo" });
+  if (!/data-part="boot"/.test(rt.shadowRoot.innerHTML) || !rt.shadowRoot.querySelector('[data-view="rear"].on')) bad("realistic car turns to the open boot");
+  click(rt, '[data-view="top"]'); if (!rt.shadowRoot.querySelector('[data-view="top"].on') || !/viewBox="0 0 820 403"/.test(rt.shadowRoot.innerHTML)) bad("view buttons turn the car");
+  rt.remove();
   const st2 = mk("roost-ev", { type: "custom:roost-ev", car: "petrol", fuel: "sensor.t_fuel", doors: "binary_sensor.t_door", look: "photo", animate: false });
   if (!/animation:none!important/.test(st2.shadowRoot.innerHTML)) bad("car picture can stand still");
   tp.remove(); st2.remove();
@@ -597,5 +602,5 @@ for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }],
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 70} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 72} checks passed`);
 process.exit(fails ? 1 : 0);
