@@ -30,6 +30,10 @@ Under **Look**:
 - **Moving picture**: turn it off for a still picture.
 - **Your own car picture**: a see-through PNG in your `www` folder, written as `/local/my-car.png`. It stays on your Home Assistant.
 
+## Door and boot outlines
+
+When a door or the boot is open, an orange outline glows on it. If it does not sit exactly on your picture, fix it under **Door and boot outlines**: pick the car type, the view (Front, Side, Back, Above) and Door or Boot, then drag the square dots onto the edges. Tap the outline to add a dot, double-tap a dot to remove it. **Back to the original outline** undoes your changes.
+
 ## More than one car
 
 Open **More cars** and add each car with its own name, type, devices and picture. On the dashboard, swipe the picture left or right, or tap the dots under it. Light or dark and the card's colour are shared by all the cars.

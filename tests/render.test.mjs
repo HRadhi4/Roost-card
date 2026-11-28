@@ -597,10 +597,20 @@ if (!calls.some((x) => x[1] === "toggle")) { fails++; console.error("FAIL confir
   tp.remove(); st2.remove();
   for (const el of [wf, an, kt, kd, nt, dl, bk, cr]) el.remove();
 }
+// Roost Car: the door and boot outlines can be moved by hand in the settings, and the card uses them
+{
+  const e = customElements.get("roost-ev").getConfigElement(); e.setConfig({ type: "custom:roost-ev", car: "petrol", fuel: "sensor.t_fuel" }); e.hass = hass(false);
+  if (e.querySelectorAll(".roost-out .dot").length < 3) { fails++; console.error("FAIL car outline dots in the settings"); }
+  const own = [[100, 100], [200, 100], [200, 200]];
+  const el = document.createElement("roost-ev"); el.setConfig({ type: "custom:roost-ev", car: "petrol", fuel: "sensor.t_fuel", doors: "binary_sensor.t_door", look: "photo", view: "side", auto_turn: false, outlines: { "petrol-side-door": own } });
+  document.body.appendChild(el); el.hass = hass(true);
+  if (!/d="M100 100 L200 100 L200 200 Z"/.test(el.shadowRoot.innerHTML)) { fails++; console.error("FAIL car uses the outline drawn by hand"); }
+  el.remove();
+}
 // Errors for missing settings
 for (const [tag, cfg] of [["roost-tile", {}], ["roost-chips", { entities: [] }], ["roost-nav", { items: [] }], ["roost-rooms", { rooms: [] }]]) {
   const el = document.createElement(tag); el.setConfig(cfg); el.hass = hass(true);
   if (!el._setup || !/finish/.test(el.shadowRoot.textContent)) { fails++; console.error(`FAIL ${tag} shows no setup note for an empty config`); }
 }
-console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 72} checks passed`);
+console.log(fails ? `${fails} failed` : `all ${cases.length * 2 + 74} checks passed`);
 process.exit(fails ? 1 : 0);
