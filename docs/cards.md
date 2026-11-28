@@ -799,7 +799,9 @@ type: custom:roost-ev
 name: Family car
 car: petrol                      # petrol, electric, or auto (finds out from the devices)
 look: photo                      # photo = realistic; suv, sedan, hatch or pickup = drawn
-view: side                       # side, or top (from above: shows which door is open)
+view: corner                     # corner, side, rear or top: how the car is first turned
+show_views: true                 # the Front / Side / Back / Above buttons
+auto_turn: true                  # turn to an open door or boot
 animate: true                    # the moving picture: glows, air and flashing lights
 fuel: sensor.car_fuel_level
 range: sensor.car_range

@@ -26,7 +26,7 @@ One **Roost Car** card for any car, petrol or electric. It can show a realistic 
 Under **Look**:
 
 - **Picture**: *Realistic* (it matches the car type: a petrol car has a grille, an electric one a light bar), or a drawn *SUV*, *sedan*, *hatchback* or *pickup*.
-- **Seen from**: the side (or the front corner for the realistic car), or from above, which shows exactly which door is open.
+- **Seen from first**: Front corner, Side, Back or Above. On the dashboard, the buttons under the car turn it, and it turns by itself to an open door or the boot (turn that off with **Turn to an open door or boot**).
 - **Moving picture**: turn it off for a still picture.
 - **Your own car picture**: a see-through PNG in your `www` folder, written as `/local/my-car.png`. It stays on your Home Assistant.
 

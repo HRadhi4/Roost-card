@@ -2,6 +2,13 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.31.0
+
+- **Roost Car from every side.** The realistic petrol and electric cars now also come seen from the side, from the back corner and from above. Buttons under the car turn it: Front, Side, Back, Above.
+- **It turns to what is open.** Open the boot and the car turns to its back; open a door and it shows the side, with that door or the boot glowing orange. When it closes, the car turns back. Tap the glowing part for its details.
+- **Lights on every side.** The front light bar glows, pulses and flashes from the front and the side; from the back, the red tail bar does.
+- **Outlines that sit on the real seams**, the window frame included, for every door and boot. If one does not fit your picture, move it yourself in the settings under **Door and boot outlines**: drag the square dots, tap the outline to add one, double-tap one to remove it.
+
 ## 1.30.0
 
 - **Every card's settings look the same.** Top to bottom: **Start from**, **Device** (open), **Look**, the card's own parts, **More look settings**, **What it shows**, **Tap and hold**, and **More** (closed). The settings people rarely touch (not working, frosted glass, who sees the card, language, numbers) now wait under More instead of filling half the screen.
