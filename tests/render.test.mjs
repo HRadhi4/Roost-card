@@ -312,11 +312,34 @@ let saved = null;
 ed.addEventListener("config-changed", (e) => { saved = e.detail.config; });
 ed.setConfig({ type: "custom:roost-tile", entity: "light.kitchen" }); ed.hass = hass(true);
 const form = ed.querySelector("ha-form");
+const allNames = () => [...ed.querySelectorAll("ha-form")].flatMap((f) => names(f.schema));
 if (form.data.radius !== 22 || form.data.size !== "large") { fails++; console.error("FAIL editor shows defaults", form.data); }
-if (names(form.schema).includes("color_start")) { fails++; console.error("FAIL editor hides own colours for a preset"); }
+if (allNames().includes("color_start")) { fails++; console.error("FAIL editor hides own colours for a preset"); }
 form.dispatchEvent(new window.CustomEvent("value-changed", { detail: { value: { ...form.data, color: "custom" } } }));
 if (!saved || saved.color !== "custom" || "radius" in saved || saved.entity !== "light.kitchen") { fails++; console.error("FAIL editor saves only the change", saved); }
-if (!names(form.schema).includes("color_start")) { fails++; console.error("FAIL editor shows own colours when chosen"); }
+if (!allNames().includes("color_start")) { fails++; console.error("FAIL editor shows own colours when chosen"); }
+// Rule: every card's settings follow one layout: Device (open) first, then the card's own sections, Look, What it shows,
+// Tap and hold, and More (closed) last; colour and light/dark are picked by sight; plain words (never "entity").
+{
+  const ORDER = ["Device", "More look settings", "What it shows", "Tap and hold", "More"];
+  for (const c of window.customCards) {
+    const cls = customElements.get(c.type); if (!cls?.getConfigElement) continue;
+    const e = cls.getConfigElement(); e.setConfig({ type: `custom:${c.type}` }); e.hass = hass(false);
+    const forms = [...e.querySelectorAll("ha-form")], top = forms[0]?.schema || [], rest = forms[1]?.schema || [];
+    const titles = [...top, ...rest].filter((x) => x.type === "expandable").map((x) => x.title);
+    const known = titles.filter((t) => ORDER.includes(t));
+    const order = known.map((t) => ORDER.indexOf(t));
+    if (top.length && top[0].title !== "Device") { fails++; console.error("FAIL settings start with Device", c.type, top[0]?.title); }
+    if (top[0]?.title === "Device" && top[0].expanded !== true) { fails++; console.error("FAIL Device starts open", c.type); }
+    if (order.some((v, i) => i && v < order[i - 1])) { fails++; console.error("FAIL settings order", c.type, titles); }
+    if (titles[titles.length - 1] !== "More") { fails++; console.error("FAIL More comes last", c.type, titles); }
+    const more = rest.find((x) => x.title === "More"); if (more?.expanded) { fails++; console.error("FAIL More starts closed", c.type); }
+    const all = forms.flatMap((f) => names(f.schema));
+    for (const k of ["color", "theme"]) if (all.includes(k)) { fails++; console.error("FAIL picked by sight, not in a list:", k, c.type); }
+    const words = JSON.stringify(forms.map((f) => f.schema));
+    if (/"(label|title)":"[^"]*\bentit/i.test(words)) { fails++; console.error("FAIL plain words (no 'entity')", c.type); }
+  }
+}
 // Grocy: food going off is listed first, a shopping item disappears when ticked, a chore needs two taps.
 const gr = document.createElement("roost-grocy"); gr.setConfig({ sample: true, tabs: ["fridge", "shopping", "chores"] }); document.body.appendChild(gr); gr.hass = hass(true);
 const grt = () => gr.shadowRoot.innerHTML.replace(/<style>[\s\S]*?<\/style>/g, "");

@@ -7,7 +7,7 @@
 3. Tap **Add card** (or the **+** in a section).
 4. Type **Roost** in the search box and choose **Roost Tile**.
 5. In **Device**, pick your light.
-6. Open **Colour and shape** and pick a colour, for example **Amber**. The preview on the right changes as you go.
+6. Under **Look**, tap a colour dot, for example the orange one (**Amber**). The preview on the right changes as you go.
 7. Tap **Save**, then **Done** at the top.
 
 ![A Roost Tile turning on and off](https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/tile.gif)
@@ -18,16 +18,21 @@ Tap the tile: the light switches. Hold it: its details open.
 
 ## Make it yours
 
-Every card has the same groups in its editor:
+Every Roost card's settings are laid out the same way, top to bottom:
 
-| Group | What you change |
+| Part | What you change |
 |---|---|
-| **Colour and shape** | Colour, how it looks when on (colour fade, one colour, glass, outline), glow, roundness, size |
-| **Icon and text** | Icon box (rounded, circle, square, none), icon size, name size, left or centred |
+| **Start from** | **Simple** shows only the main control, **Detailed** shows everything. One tap, then change anything below |
+| **Device** (open) | Which device, its name and icon |
+| **Look** | Tap a small picture of each style, a colour dot, and **Auto / Light / Dark** |
+| The card's own parts | For example *Opens with the sun* on the curtain |
+| **More look settings** | Roundness, size, glow, icon box and the rest |
 | **What it shows** | The switch, the state line, "for 5 min", the power used |
-| **Safety** | **Ask before switching** for things that affect many devices, or **lock** a tile so a tap only shows its details |
-| **Tap and hold** | What a tap and a long press do |
+| **Tap and hold** | What a tap and a long press do, **Ask before switching**, **Lock** |
+| **More** (closed) | *Not working right now*, frosted glass, **Only show this card to these people**, language and numbers |
 
-> **Tip:** cards follow your phone's light or dark mode. To keep one always dark or always light, use **Theme** in its editor.
+Settings whose name is not enough have a short explanation under them.
+
+> **Tip:** the first time you tap a card that does more when held, a small note says so. Hold a card to see its details.
 
 **Next:** [Build a phone home screen →](03-phone-home-screen.md)

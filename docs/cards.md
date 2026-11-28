@@ -61,9 +61,10 @@ Everything below can also be set in the **visual editor** (tap a card while edit
 
 Edit a dashboard, tap **Add card**, and search for **Roost**. Choose a card, then set it up in the editor.
 
-Every card has these colour and look settings:
-- **Colour**: Blue, Purple, Coral, Green, Amber, Teal, Pink, Slate, or **My own colours** (pick two colours for the gradient).
-- **Light or dark**: follow Home Assistant, always dark, or always light.
+Every card's settings follow the same layout: **Start from** (Simple or Detailed), **Device**, **Look**, the card's own parts, **More look settings**, **What it shows**, **Tap and hold**, and **More** (closed). Under **Look** you pick by sight:
+- **Style**: small live pictures of each style the card has (curtain kinds, thermostat dials, clock faces and more).
+- **Colour**: a dot for each colour (Blue, Purple, Coral, Green, Amber, Teal, Pink, Slate), the rainbow dot for **My own colours** (pick two colours for the gradient under More look settings), and the bulb dot for the light's own colour.
+- **Light or dark**: **Auto** (follow Home Assistant), **Light** or **Dark**.
 - **Size** and **corner roundness** (on tiles, scenes and the thermostat).
 - **Look when on** (tiles and scenes): colour fade, one colour, see-through glass, or a coloured outline only. **Glow**: soft, strong or none.
 - **Icon box** (tiles): rounded square, circle, square, or no box. Icon size and name size are sliders.

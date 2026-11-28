@@ -2,6 +2,15 @@
 
 Every version of Roost Cards, newest first.
 
+## 1.30.0
+
+- **Every card's settings look the same.** Top to bottom: **Start from**, **Device** (open), **Look**, the card's own parts, **More look settings**, **What it shows**, **Tap and hold**, and **More** (closed). The settings people rarely touch (not working, frosted glass, who sees the card, language, numbers) now wait under More instead of filling half the screen.
+- **Pick the look by seeing it.** Styles are small live pictures of the card itself (curtain kinds, thermostat dials, clock faces), colours are dots, and light or dark is three buttons: Auto, Light, Dark.
+- **A one-line explanation** under every setting whose name is not enough.
+- **Start from Simple or Detailed.** One tap shows only the main control or everything; change anything after.
+- **Easier on the dashboard.** The first time you tap a card that does more when held, a small note says so (in Arabic too). Buttons that were small are now at least 40 px, and switches are easier to hit.
+- **Plain words.** "Only show this card to these people" lists the people by name with a tick box; no setting says "entity" any more.
+
 ## 1.29.3
 
 - **Arabic numerals or Indian numerals.** In Arabic, choose 123 or ١٢٣ for the whole screen with a new numbers chip or bar button, or for one card with **Numbers in Arabic** in its editor. The clock and prayer cards follow the screen's choice unless you pick one. Units such as °C keep the right order next to Indian numerals.

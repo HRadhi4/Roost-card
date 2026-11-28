@@ -9,7 +9,7 @@
  * Every card has a visual editor (colours, size, icon, shape and more).
  */
 
-const ROOST_VERSION = "1.29.3";
+const ROOST_VERSION = "1.30.0";
 
 // ------------------------------------------------------------------ look
 const PALETTE = {
@@ -469,6 +469,25 @@ const Sample = {
 };
 
 // ------------------------------------------------------------------ shared base
+// The first time someone taps a card that does more when held, a small note says so (once on each screen).
+function holdHint(card) {
+  try {
+    if (localStorage.getItem("roost-hold-hint") || document.getElementById("roost-hold-hint")) return;
+    if (/[?&]edit=1/.test(location.search) || card.closest?.("hui-card-preview, hui-card-options")) return;
+    localStorage.setItem("roost-hold-hint", "1");
+    const ar = RoostLang.pick(card._hass, card._config) === "ar", dark = !!card._hass?.themes?.darkMode;
+    const tip = document.createElement("div");
+    tip.id = "roost-hold-hint"; tip.setAttribute("role", "status");
+    if (ar) { tip.dir = "rtl"; tip.lang = "ar"; }
+    tip.textContent = ar ? "نصيحة: اضغط مطوّلاً على أي بطاقة لترى المزيد" : "Tip: press and hold a card to see more";
+    tip.style.cssText = `position:fixed;inset-inline:16px;bottom:calc(24px + env(safe-area-inset-bottom,0px));margin:auto;width:fit-content;max-width:calc(100% - 32px);z-index:9999;padding:12px 18px;border-radius:16px;font:600 14px ${FONT_TEXT};line-height:1.35;text-align:center;color:${dark ? "#EEF0FF" : "#161936"};background:${dark ? "rgba(20,24,49,.96)" : "rgba(255,255,255,.97)"};border:1px solid ${dark ? "#242A4D" : "#E2E5F2"};box-shadow:0 12px 32px rgba(0,0,0,.25);cursor:pointer`;
+    const close = () => tip.remove();
+    tip.addEventListener("click", close);
+    document.body.appendChild(tip);
+    setTimeout(close, 6000);
+  } catch (e) { /* no storage: no tip */ }
+}
+
 class RoostBase extends HTMLElement {
   static get defaults() { return {}; }
 
@@ -876,12 +895,12 @@ class RoostBase extends HTMLElement {
   /** Tap and long-press on an element. */
   press(el, onTap, onHold) {
     let timer = null, held = false;
-    const start = () => { held = false; timer = setTimeout(() => { held = true; onHold?.(); }, 550); };
+    const start = () => { held = false; timer = setTimeout(() => { held = true; onHold?.(); try { localStorage.setItem("roost-hold-hint", "1"); } catch (e) { /* fine */ } }, 550); };
     const cancel = () => clearTimeout(timer);
     el.addEventListener("pointerdown", start);
     el.addEventListener("pointerleave", cancel);
     el.addEventListener("pointercancel", cancel);
-    el.addEventListener("pointerup", (ev) => { cancel(); if (!held) onTap(ev); });
+    el.addEventListener("pointerup", (ev) => { cancel(); if (!held) { onTap(ev); if (onHold) holdHint(this); } });
     el.addEventListener("contextmenu", (ev) => ev.preventDefault());
     el.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onTap(ev); } });
   }
@@ -928,7 +947,7 @@ const colourFields = (key = "color", label = "Colour") => [
 const ACTION_FIELD = (name, label) => ({ name, label, selector: { ui_action: {} } });
 
 const LABELS = {
-  entity: "Device", name: "Name (optional)", icon: "Icon (optional)", size: "Size", radius: "Corner roundness",
+  entity: "Which device", name: "Name (optional)", icon: "Icon (optional)", size: "Size", radius: "Corner roundness",
   show_switch: "Show the switch", show_since: "Show how long (“for 5 min”)", power_entity: "Power reading (optional)",
   animation: "Animation when on", tap_action: "When tapped", hold_action: "When held", theme: "Light or dark",
   sensor: "Room temperature sensor (optional)", modes: "Mode buttons", show_power: "Show the power button",
@@ -962,12 +981,116 @@ function fitSchema(schema, data) {
 
 // How see-through a card is: solid, frosted glass (blurs what is behind) or clear. Added to every card's editor.
 const BROKEN_FIELDS = { type: "expandable", name: "", title: "Not working right now", icon: "mdi:alert-circle-outline", schema: [
-  { name: "out_of_order", label: "A note over the card (for example “The curtain remote's battery is dead”); empty = working", selector: { text: {} } },
+  { name: "out_of_order", label: "Not working: a note over the card", selector: { text: {} } },
 ] };
 const SURFACE_FIELDS = (nav) => ({ type: "expandable", name: "", title: "See-through (frosted glass)", icon: "mdi:blur", schema: [
   ...(nav ? [] : [{ name: "surface", label: "Background", selector: pick([["solid", "Solid"], ["frosted", "Frosted glass"], ["clear", "Clear (no background)"]]) }]),
   { type: "grid", name: "", schema: [{ name: "opacity", label: "How solid (%)", selector: slider(0, 100, 5, "%") }, { name: "blur", label: "Blur", selector: slider(0, 40, 2) }] },
 ] });
+
+// ------------------------------------------------------------------ one layout for every card's settings
+// Every card's own settings are sorted into the same sections, always in this order: Device (open), the card's own
+// feature sections, Look, What it shows, Tap and hold, and More (closed: the settings people rarely touch).
+// Colour, light/dark and the main style are picked by sight above the sections (see RoostEditor.drawLook).
+const LOOK_RE = /^(color|color_start|color_end|radius|theme|style|look|size|fill|glow|shape|height|max_width|plain|frame|layout|align|icon_shape|icon_size|name_size|off_tint|animation|background|bar_height|chip_shape|button_size|key_size|ring_size|ring_width|pill_[a-z_]+|tile_[a-z_]+|active_style|sky|sky_start|sky_end|orb_[a-z_]+|min_height|box|box_[a-z_]+|band|band_[a-z_]+|folds|fabric|fabric_image|blind_look|photo_[a-z_]+|columns|gap|tiles|face|ticks|hands|smooth|own_look|compact|chip_shape|full_width|pad_style|light_slider|bar|temp_bar|badge|icon_position|temp_position|tile_color|auto_colors|image|image_night)$/;
+const SHOW_RE = /^(show_[a-z_]+|only_on|max_sources|forecast|count|max|seconds|stale_hours|summary|subtitle)$/;
+const TAP_RE = /^(tap_action|hold_action|double_tap_action|confirm|locked|relock|lock|power_action|problem)$/;
+const LOOK_TITLE = /^(look|colour and shape|colour and size|size and shape|icon and text|sky and shape)$/i;
+const LOOK_NEST = /look|colour|sky|shape|tiles|room buttons|analog|big tile/i;
+const SHOW_TITLE = /^(what it shows|what the remote shows|buttons|numbers)$/i;
+const TAP_TITLE = /^(tap and hold|tap|safety)$/i;
+// the visual pickers above the sections take these over
+const PICKED = new Set(["color", "theme"]);
+const kindOf = (f) => {
+  if (!f.name) return "device";
+  if (TAP_RE.test(f.name)) return "tap";
+  if (LOOK_RE.test(f.name)) return "look";
+  if (SHOW_RE.test(f.name) || (f.name.startsWith("show_") && f.selector?.boolean)) return "show";
+  return "device";
+};
+function arrangeSchema(schema, more, styleKey) {
+  const sec = { device: [], feature: [], look: [], lookNest: [], show: [], tap: [] };
+  const put = (f) => {
+    if (f.name && (PICKED.has(f.name) || f.name === styleKey)) return; // chosen by sight above
+    sec[kindOf(f)].push(f);
+  };
+  for (const f of schema) {
+    if (f.type === "grid") {
+      const kinds = new Set(f.schema.map(kindOf));
+      const keep = f.schema.filter((x) => !(x.name && (PICKED.has(x.name) || x.name === styleKey)));
+      if (!keep.length) continue;
+      if (kinds.size === 1) sec[kindOf(f.schema[0])].push({ ...f, schema: keep }); else keep.forEach(put);
+    } else if (f.type === "expandable") {
+      const t = f.title || "";
+      if (LOOK_TITLE.test(t)) arrangeSchema(f.schema, null, styleKey).forEach((x) => (x.title === "Device" || x.title === "Look" ? x.schema : [x]).forEach((y) => sec.look.push(y)));
+      else if (SHOW_TITLE.test(t)) sec.show.push(...f.schema);
+      else if (TAP_TITLE.test(t)) (/safety/i.test(t) ? sec.tap.push({ ...f, expanded: false }) : sec.tap.push(...f.schema));
+      else if (LOOK_NEST.test(t)) sec.lookNest.push({ ...f, schema: f.schema.filter((x) => !(x.name && (PICKED.has(x.name) || x.name === styleKey))) });
+      else sec.feature.push(f);
+    } else put(f);
+  }
+  // anything chosen by sight above is taken out wherever a card keeps it (inside its own sections too)
+  const strip = (list) => list.map((f) => (f.schema ? { ...f, schema: strip(f.schema) } : f)).filter((f) => !(f.name && (PICKED.has(f.name) || f.name === styleKey)) && !(f.schema && !f.schema.length));
+  for (const k of Object.keys(sec)) sec[k] = strip(sec[k]);
+  if (more === null) return [{ type: "expandable", name: "", title: "Device", schema: sec.device }, { type: "expandable", name: "", title: "Look", schema: [...sec.look, ...sec.lookNest] }];
+  const ex = (title, icon, list, expanded = false) => (list.length ? [{ type: "expandable", name: "", title, icon, expanded, schema: list }] : []);
+  return [
+    ...ex("Device", "mdi:devices", sec.device, true),
+    ...sec.feature,
+    ...ex("More look settings", "mdi:palette-outline", [...sec.look, ...sec.lookNest]),
+    ...ex("What it shows", "mdi:eye-outline", sec.show),
+    ...ex("Tap and hold", "mdi:gesture-tap-hold", sec.tap),
+    ...ex("More", "mdi:dots-horizontal-circle-outline", more || []),
+  ];
+}
+// the setting whose choices change the whole look of the card, shown as small live pictures
+const STYLE_KEYS = ["style", "look", "face", "layout"];
+const findField = (schema, name) => { for (const f of schema) { if (f.name === name) return f; if (f.schema) { const x = findField(f.schema, name); if (x) return x; } } return null; };
+// a one-line plain explanation under settings whose name alone is not enough
+const HELP = {
+  out_of_order: "For example “The remote's battery is dead”. The card greys out with your note; leave it empty when it works.",
+  surface: "Frosted glass blurs the wallpaper behind the card; clear shows no background at all.",
+  opacity: "Lower lets more of what is behind show through.",
+  show_to: "Nobody ticked means everyone sees it. While you edit the dashboard it always shows.",
+  language: "Each card can speak its own language; Arabic also turns the card right to left.",
+  numerals: "Only used when the card is in Arabic.",
+  stale_hours: "Greys the card out if the device has not reported for this many hours (0 = never).",
+  power_entity: "A plug or sensor that measures how much power it is using, shown under the name.",
+  locked: "Taps do nothing, so a child or guest cannot change it by accident.",
+  confirm: "Asks “Are you sure?” before switching.",
+  problem: "When this goes on, the card turns red to warn you.",
+  quick: "What the small button on the card does.",
+  off_tint: "Keeps a little of the card's colour when the device is off.",
+  animation: "A gentle movement while the device is on (a turning fan, a glowing lamp).",
+  fixed: "Stays on screen while the page scrolls.",
+  push_content: "Moves the page aside so the bar never covers a card.",
+  own_look: "Uses its own colours instead of following the other Roost cards.",
+  sample: "Fills the card with pretend values so you can see it before choosing your devices.",
+  reverse: "For devices that report on when they are really off.",
+  relock: "Locks the controls again after a minute.",
+  compact: "A smaller card with only the main control.",
+  plain: "No colour gradient, only a flat background.",
+  follow: "The card turns to the room you are in, using your phone's location in the home.",
+  tap_action: "What happens when the card is tapped once.",
+  hold_action: "What happens when the card is pressed and held.",
+  modes: "Which mode buttons to show (cool, heat, fan and so on).",
+  show_numerals: "A button that switches between 123 and ١٢٣ in Arabic.",
+};
+// small pictures for the choices drawn by sight
+const svgUri = (body) => `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">${body}</svg>`)}`;
+const dotImg = (a, b) => svgUri(`<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><circle cx="24" cy="24" r="20" fill="url(#g)"/>`);
+const RAINBOW = svgUri(`<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F43F6B"/><stop offset=".35" stop-color="#F5A623"/><stop offset=".65" stop-color="#34D399"/><stop offset="1" stop-color="#2F6BFF"/></linearGradient></defs><circle cx="24" cy="24" r="20" fill="url(#g)"/><circle cx="24" cy="24" r="7" fill="#fff"/>`);
+const LAMP = svgUri(`<circle cx="24" cy="24" r="20" fill="#FFE2A8"/><path d="M18 30h12M20 34h8M24 10a8 8 0 0 0-4 15v3h8v-3a8 8 0 0 0-4-15z" fill="none" stroke="#B26B00" stroke-width="2.4" stroke-linecap="round"/>`);
+const colourDots = () => [
+  { value: "active", label: "Selected purple", image: dotImg(ACTIVE[0], ACTIVE[1]) },
+  ...Object.entries(COLORS).map(([k, c]) => ({ value: k, label: k[0].toUpperCase() + k.slice(1), image: dotImg(c[0], c[1]) })),
+  { value: "custom", label: "My own colours", image: RAINBOW }, { value: "lamp", label: "The light's own colour", image: LAMP },
+];
+const THEME_PICS = [
+  { value: "auto", label: "Auto", image: svgUri(`<circle cx="24" cy="24" r="18" fill="#EEF1FA" stroke="#8B8FB0" stroke-width="2"/><path d="M24 6a18 18 0 0 1 0 36z" fill="#141831"/>`) },
+  { value: "light", label: "Light", image: svgUri(`<circle cx="24" cy="24" r="9" fill="#F5A623"/><g stroke="#F5A623" stroke-width="3" stroke-linecap="round"><path d="M24 5v5M24 38v5M5 24h5M38 24h5M10.5 10.5l3.5 3.5M34 34l3.5 3.5M10.5 37.5l3.5-3.5M34 14l3.5-3.5"/></g>`) },
+  { value: "dark", label: "Dark", image: svgUri(`<path d="M31 6a18 18 0 1 0 11 27A15 15 0 0 1 31 6z" fill="#6D4BFF"/>`) },
+];
 
 class RoostEditor extends HTMLElement {
   setConfig(config) { this._config = { ...config }; this.draw(); }
@@ -993,34 +1116,150 @@ class RoostEditor extends HTMLElement {
     const label = form.computeLabel;
     const noSurface = ["roost-page", "roost-fullscreen", "roost-title", "roost-theme"].includes(cls.tag);
     const noBroken = noSurface || ["roost-nav", "roost-page", "roost-panel", "roost-rooms"].includes(cls.tag);
-    const WHO = { name: "show_to", label: "Only these people see this card (empty = everyone)", selector: { entity: { multiple: true, domain: "person" } } };
+    const people = Object.keys(this._hass.states || {}).filter((id) => id.startsWith("person.")).sort();
+    const WHO = people.length
+      ? { name: "show_to", label: "Only show this card to these people", selector: { select: { multiple: true, mode: "list", options: people.map((id) => ({ value: id, label: this._hass.states[id].attributes?.friendly_name || id.slice(7) })) } } }
+      : { name: "show_to", label: "Only show this card to these people", selector: { entity: { multiple: true, domain: "person" } } };
     const LANG = { name: "language", label: "Language of this card", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Like Home Assistant (or this screen's choice)" }, { value: "en", label: "English" }, { value: "ar", label: "العربية · Arabic, right to left" }] } } };
     const NUMS = { name: "numerals", label: "Numbers in Arabic", selector: { select: { mode: "dropdown", options: [{ value: "auto", label: "Like this screen's choice" }, { value: "western", label: "Arabic numerals · 1 2 3" }, { value: "eastern", label: "Indian numerals · ١ ٢ ٣" }] } } };
     const ownNums = ["roost-clock", "roost-prayer"].includes(cls.tag);
-    const schema = [...(noSurface ? form.schema : [...form.schema, ...(noBroken ? [] : [BROKEN_FIELDS]), SURFACE_FIELDS(cls.tag === "roost-nav")]), WHO, LANG, ...(ownNums ? [] : [NUMS])];
+    const more = [...(noBroken ? [] : BROKEN_FIELDS.schema), ...(noSurface ? [] : SURFACE_FIELDS(cls.tag === "roost-nav").schema), WHO, LANG, ...(ownNums ? [] : [NUMS])];
+    // the card's main look choice, drawn as small live pictures (not for bars that stick to the screen edge)
+    const styleKey = ["roost-nav", "roost-top-bar", "roost-page", "roost-panel", "roost-fullscreen", "roost-popup"].includes(cls.tag) ? null
+      : STYLE_KEYS.find((k) => { const f = findField(form.schema, k); const o = f?.selector?.select?.options; return o && o.length >= 2 && o.length <= 8; }) || null;
+    this._look = { styleKey, style: styleKey ? findField(form.schema, styleKey) : null, color: findField(form.schema, "color"), theme: findField(form.schema, "theme") };
+    if (this._look.color && !this._look.color.selector?.select) this._look.color = null;
+    const sections = arrangeSchema(form.schema, more, styleKey);
+    const top = sections.filter((x) => x.title === "Device"), rest = sections.filter((x) => x.title !== "Device");
+    this._shows = (sections.find((x) => x.title === "What it shows")?.schema || []).flatMap((f) => (f.type === "grid" ? f.schema : [f])).filter((f) => f.selector?.boolean).map((f) => f.name);
     this._data = { ...cls.defaults, ...this._config };
     if (!this._form) {
-      this._form = document.createElement("ha-form");
-      this._form.addEventListener("value-changed", (ev) => {
+      const onChange = (ev) => {
         ev.stopPropagation();
         const next = ev.detail.value || {};
         const config = { ...this._config };
         for (const key of new Set([...Object.keys(next), ...Object.keys(this._data)])) {
           if (sameValue(next[key], this._data[key])) continue;
-          if (next[key] === undefined || next[key] === "" || next[key] === null) delete config[key];
+          if (next[key] === undefined || next[key] === "" || next[key] === null || (Array.isArray(next[key]) && !next[key].length && key === "show_to")) delete config[key];
           else config[key] = next[key];
         }
-        this._config = config;
-        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
-        this.draw();
-      });
-      this.appendChild(this._form);
+        this.commit(config);
+      };
+      this._presets = document.createElement("div"); this._presets.className = "roost-presets";
+      this._form = document.createElement("ha-form"); this._form.addEventListener("value-changed", onChange);
+      this._lookBox = document.createElement("div"); this._lookBox.className = "roost-look";
+      this._form2 = document.createElement("ha-form"); this._form2.addEventListener("value-changed", onChange);
+      const st = document.createElement("style");
+      st.textContent = `.roost-presets,.roost-look{display:flex;flex-direction:column;gap:10px;margin:4px 0 14px}
+        .roost-presets:empty,.roost-look:empty{display:none}
+        .roost-h{font-weight:600;font-size:14px;margin:6px 0 0}
+        .roost-sub{font-size:13px;opacity:.72;margin-top:-6px}
+        .roost-row{display:flex;flex-wrap:wrap;gap:8px}
+        .roost-seg{display:flex;flex-wrap:wrap;gap:8px}
+        .roost-seg button,.roost-pic,.roost-dot{font:inherit;cursor:pointer;color:var(--primary-text-color);background:var(--secondary-background-color,#8881);border:2px solid transparent;border-radius:14px}
+        .roost-seg button{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 14px;font-weight:600;font-size:14px}
+        .roost-seg button img{width:22px;height:22px}
+        .roost-seg button[aria-pressed=true],.roost-pic[aria-pressed=true],.roost-dot[aria-pressed=true]{border-color:var(--primary-color,#6D4BFF);background:color-mix(in srgb,var(--primary-color,#6D4BFF) 12%,transparent)}
+        .roost-dot{width:44px;height:44px;padding:4px;display:grid;place-items:center;border-radius:50%}
+        .roost-dot img{width:32px;height:32px}
+        .roost-pics{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+        .roost-pic{display:flex;flex-direction:column;gap:6px;padding:8px;text-align:center;font-size:13px;font-weight:600}
+        .roost-pic .win{position:relative;height:104px;overflow:hidden;border-radius:10px;pointer-events:none;background:var(--card-background-color,#0000)}
+        .roost-pic .win > *{position:absolute;inset-inline-start:0;top:0;width:280px;transform:scale(.42);transform-origin:top left}
+        :host([dir=rtl]) .roost-pic .win > *,[dir=rtl] .roost-pic .win > *{transform-origin:top right}`;
+      this.append(st, this._presets, this._form, this._lookBox, this._form2);
     }
-    this._form.hass = rawHass(this._hass);
-    this._form.data = this._data;
-    this._form.schema = fitSchema(schema, this._data);
-    this._form.computeLabel = label;
+    for (const f of [this._form, this._form2]) { f.hass = rawHass(this._hass); f.data = this._data; f.computeLabel = label; f.computeHelper = (sch) => HELP[sch.name]; }
+    this._form.schema = fitSchema(top, this._data);
+    this._form2.schema = fitSchema(rest, this._data);
+    this.drawPresets(); this.drawLook();
     if (cls.hasCards || cls.roomCards) this.drawCards();
+  }
+
+  commit(config) {
+    this._config = config;
+    this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
+    this.draw();
+  }
+
+  setKeys(obj) {
+    const config = { ...this._config };
+    for (const [k, v] of Object.entries(obj)) { if (sameValue(v, this.cardClass.defaults?.[k]) && !(k in this._config)) continue; config[k] = v; }
+    this.commit(config);
+  }
+
+  // Start from: Simple (only the main control) or Detailed (everything shown)
+  drawPresets() {
+    const shows = this._shows || [], box = this._presets;
+    const key = shows.join(",") + "|" + shows.map((k) => !!this._data[k]).join("");
+    if (box._key === key) return; box._key = key;
+    box.innerHTML = "";
+    if (shows.length < 2) return;
+    const on = shows.filter((k) => this._data[k]).length, now = on === 0 ? "simple" : on === shows.length ? "detailed" : "";
+    const h = document.createElement("div"); h.className = "roost-h"; h.textContent = "Start from";
+    const seg = document.createElement("div"); seg.className = "roost-seg"; seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Start from");
+    for (const [v, t, d] of [["simple", "Simple", "Only the main control"], ["detailed", "Detailed", "Everything shown"]]) {
+      const b = document.createElement("button"); b.type = "button"; b.setAttribute("aria-pressed", String(now === v)); b.title = d;
+      b.append(document.createTextNode(t));
+      b.addEventListener("click", () => this.setKeys(Object.fromEntries(shows.map((k) => [k, v === "detailed"]))));
+      seg.appendChild(b);
+    }
+    const sub = document.createElement("div"); sub.className = "roost-sub"; sub.textContent = "One tap sets what the card shows; change any of it below.";
+    box.append(h, seg, sub);
+  }
+
+  // Look, picked by sight: live small pictures of each style, colour dots, Auto / Light / Dark
+  drawLook() {
+    const { styleKey, style, color, theme } = this._look, box = this._lookBox, d = this._data, cls = this.cardClass;
+    const key = JSON.stringify([styleKey, d[styleKey], d.color, d.theme, !!style, !!color, !!theme]);
+    if (box._key !== key) {
+      box._key = key; box.innerHTML = ""; this._pics = [];
+      if (!style && !color && !theme) return;
+      const h = document.createElement("div"); h.className = "roost-h"; h.textContent = "Look"; box.appendChild(h);
+      if (style) {
+        const lab = document.createElement("div"); lab.className = "roost-sub"; lab.style.marginTop = "0"; lab.textContent = computeLabel(style) === "Look" ? "Style" : computeLabel(style);
+        const grid = document.createElement("div"); grid.className = "roost-pics"; grid.setAttribute("role", "group"); grid.setAttribute("aria-label", computeLabel(style));
+        for (const o of style.selector.select.options) {
+          const b = document.createElement("button"); b.type = "button"; b.className = "roost-pic"; b.setAttribute("aria-pressed", String(d[styleKey] === o.value));
+          const win = document.createElement("div"); win.className = "win";
+          try {
+            const card = document.createElement(cls.tag);
+            card.setConfig({ ...this._config, type: `custom:${cls.tag}`, [styleKey]: o.value, fixed: false, push_content: false, show_to: [], out_of_order: "" });
+            win.appendChild(card); this._pics.push(card);
+          } catch (e) { /* this style needs a device first */ }
+          const t = document.createElement("span"); t.textContent = o.label;
+          b.append(win, t);
+          b.addEventListener("click", () => this.setKeys({ [styleKey]: o.value }));
+          grid.appendChild(b);
+        }
+        box.append(lab, grid);
+      }
+      if (color) {
+        const lab = document.createElement("div"); lab.className = "roost-sub"; lab.style.marginTop = "0"; lab.textContent = computeLabel(color);
+        const row = document.createElement("div"); row.className = "roost-row"; row.setAttribute("role", "group"); row.setAttribute("aria-label", computeLabel(color));
+        const allowed = new Set(color.selector.select.options.map((o) => o.value));
+        for (const o of colourDots().filter((o) => allowed.has(o.value))) {
+          const b = document.createElement("button"); b.type = "button"; b.className = "roost-dot"; b.title = o.label; b.setAttribute("aria-label", o.label); b.setAttribute("aria-pressed", String((d.color || "") === o.value));
+          const img = document.createElement("img"); img.src = o.image; img.alt = ""; b.appendChild(img);
+          b.addEventListener("click", () => this.setKeys({ color: o.value }));
+          row.appendChild(b);
+        }
+        box.append(lab, row);
+        if (d.color === "custom") { const n = document.createElement("div"); n.className = "roost-sub"; n.style.marginTop = "0"; n.textContent = "Pick your two colours under More look settings below."; box.appendChild(n); }
+      }
+      if (theme) {
+        const lab = document.createElement("div"); lab.className = "roost-sub"; lab.style.marginTop = "0"; lab.textContent = "Light or dark";
+        const seg = document.createElement("div"); seg.className = "roost-seg"; seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Light or dark");
+        for (const o of THEME_PICS) {
+          const b = document.createElement("button"); b.type = "button"; b.setAttribute("aria-pressed", String((d.theme || "auto") === o.value));
+          const img = document.createElement("img"); img.src = o.image; img.alt = ""; b.append(img, document.createTextNode(o.label));
+          b.addEventListener("click", () => this.setKeys({ theme: o.value }));
+          seg.appendChild(b);
+        }
+        box.append(lab, seg);
+      }
+    }
+    for (const c of this._pics || []) { try { c.hass = this._hass; } catch (e) { /* preview only */ } }
   }
 
   // Rooms card: which room's cards are being edited.
@@ -1112,7 +1351,7 @@ class RoostTile extends RoostBase {
       show_switch: true, quick: "switch", entities: [], stale_hours: 0, show_state: true, show_since: true, animation: "auto", locked: false, confirm: false, tap_action: { action: "toggle" }, hold_action: { action: "more-info" }, theme: "auto" };
   }
 
-  validate(c) { if (!c.entity) throw new Error("Choose a device (entity)"); }
+  validate(c) { if (!c.entity) throw new Error("Choose a device"); }
 
   watched() { return [this._config.entity, this._config.power_entity, ...this.members()].filter(Boolean); }
 
@@ -1645,7 +1884,7 @@ class RoostThermostat extends RoostBase {
       .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
       .hd .n{font-size:15px;font-weight:600}
       .hr{display:flex;align-items:center;gap:8px}
-      .lk{all:unset;cursor:pointer;width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:${p.inset};color:${p.muted};--mdc-icon-size:16px;transition:transform .12s}
+      .lk{all:unset;cursor:pointer;width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:${p.inset};color:${p.muted};--mdc-icon-size:16px;transition:transform .12s}
       .lk:active{transform:scale(.9)}
       .lk.open{background:linear-gradient(135deg,#F59E0B,#FBBF24);color:#2A1800}
       .card.locked svg{cursor:not-allowed}
@@ -1666,7 +1905,7 @@ class RoostThermostat extends RoostBase {
       @container (max-width: 300px){:host .modes{grid-template-columns:repeat(2,minmax(0,1fr))}}
       .md{min-height:42px;border-radius:14px;border:0;background:${p.inset};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:6px 4px}
       .md.on{background:${nest ? "linear-gradient(135deg,#2F6BFF,#38BDF8)" : `linear-gradient(135deg,${g[0]},${g[1]})`};color:${nest ? "#fff" : g[3]}}
-      ${nest ? ".md{min-height:0;padding:10px 0}" : ""}
+      ${nest ? ".md{min-height:40px;padding:10px 0}" : ""}
     </style>
     <div class="card${this.locked() ? ` locked${this.lockKind() === "all" ? " locked-all" : ""}` : ""}">
       <div class="hd"><span class="n t">${esc(this.name(c.entity))}</span><span class="hr">${this.lockKind() ? `<button class="lk${this.locked() ? "" : " open"}" aria-label="${this.locked() ? "Unlock to change" : "Lock"}"><ha-icon icon="${this.locked() ? "mdi:lock" : "mdi:lock-open-variant"}"></ha-icon></button>` : ""}<span class="pill">${esc(status)}</span></span></div>
@@ -3650,6 +3889,7 @@ function ringSvg({ size = 210, r = 80, width = 14, f = 0, track, id = "g", from,
 
 // A switch like the tiles' one.
 const switchCss = (p, g) => `.sw{position:relative;width:44px;height:24px;border-radius:999px;background:${p.track};flex:none;cursor:pointer;transition:background .12s}
+  .sw::before{content:"";position:absolute;inset:-10px -4px}
   .sw::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:${p.knob};transition:transform .12s,background .12s}
   .sw.on{background:linear-gradient(135deg,${g[0]},${g[1]})}
   .sw.on::after{transform:translateX(20px);background:#fff}`;
@@ -3792,7 +4032,7 @@ class RoostAutomations extends ticking(RoostBase, 60000) {
       .tx{flex:1;min-width:0}
       .n{font-size:14px;font-weight:600;line-height:1.25;overflow-wrap:normal;word-break:normal;hyphens:none}
       .l{font-size:12px;color:${p.muted};margin-top:2px}
-      .run{flex:none;width:34px;height:34px;border-radius:50%;border:1px solid ${p.border};background:${p.panel};${p.fx || ""};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer}
+      .run{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid ${p.border};background:${p.panel};${p.fx || ""};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer}
       .run ha-icon{--mdc-icon-size:18px}
       .run.go ha-icon{animation:roost-pulse .8s ease-in-out 2}
       .empty{padding:18px;border-radius:${c.radius}px;border:1px dashed ${p.border};color:${p.muted};text-align:center;font-size:14px}
@@ -4297,7 +4537,7 @@ class RoostPrayer extends ticking(RoostBase, 15000) {
       .cp b{font-size:15px}.cp span{margin-left:auto;font-size:13px;color:${p.muted};font-weight:600}
       .src{font-size:12px;color:${p.muted};padding:0 6px 2px}
       .empty{font-size:14px;color:${p.muted};text-align:center;padding:14px}
-      .bl{width:32px;height:32px;border-radius:10px;border:0;background:transparent;color:inherit;opacity:.6;display:flex;align-items:center;justify-content:center;cursor:pointer;--mdc-icon-size:18px}
+      .bl{width:40px;height:40px;border-radius:10px;border:0;background:transparent;color:inherit;opacity:.6;display:flex;align-items:center;justify-content:center;cursor:pointer;--mdc-icon-size:18px}
       .bl.on{opacity:1}
       .pr{grid-template-columns:36px minmax(0,1fr) auto auto auto}
       .rm{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:${Math.max(12, Number(c.radius) - 6)}px;background:linear-gradient(135deg,#1B1E52,#5B3290);color:#fff}
@@ -4571,7 +4811,7 @@ class RoostTitle extends RoostBase {
       .t1{font-size:${c.size}px;font-weight:700;letter-spacing:-.2px;line-height:1.2}
       .t2{font-size:13px;color:${p.muted};margin-top:2px}
       .bd{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;vertical-align:middle;background:${g[0]}2E;color:${g[this.dark ? 1 : 0]}}
-      .ln{flex:none;font-size:13px;font-weight:600;color:${g[this.dark ? 1 : 0]};background:none;border:0;cursor:pointer;padding:6px 4px;font-family:inherit;display:flex;align-items:center;gap:2px}
+      .ln{flex:none;min-height:40px;font-size:13px;font-weight:600;color:${g[this.dark ? 1 : 0]};background:none;border:0;cursor:pointer;padding:6px 4px;font-family:inherit;display:flex;align-items:center;gap:2px}
       .ln ha-icon{--mdc-icon-size:18px;color:inherit}
       .bk{flex:none;width:44px;height:44px;border-radius:15px;border:0;background:${p.inset};color:${p.text};display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
       .bk:active{transform:scale(.94)}
@@ -5488,7 +5728,7 @@ class RoostLight extends RoostBase {
       .bar .f{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,${on && a.rgb_color && !warmTone(a.rgb_color) ? `color-mix(in srgb, ${tint} 70%, #fff)` : g[0]},${tint});border-radius:18px}
       .bar ha-icon{position:absolute;left:14px;top:14px;--mdc-icon-size:24px;color:${on ? (a.rgb_color && !warmTone(a.rgb_color) ? "#fff" : g[3]) : p.muted}}
       .chips{display:flex;flex-wrap:wrap;gap:8px}
-      .chips button{flex:none;height:36px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+      .chips button{flex:none;height:40px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
       .chips button i{display:block;width:14px;height:14px;border-radius:50%}
       .dotc{width:36px;padding:0!important;justify-content:center}
     </style>
@@ -5940,7 +6180,7 @@ class RoostRemote extends RoostBase {
       schema: [
         { name: "sample", label: "Show sample data (try the card without the device)", selector: { boolean: {} } },
         { name: "athom_remote", label: "Athom Hub remote (its name)", selector: { text: {} } },
-        { name: "entity", label: "Or a remote / TV entity", selector: { entity: { domain: ["remote", "media_player"] } } },
+        { name: "entity", label: "Or a remote or TV", selector: { entity: { domain: ["remote", "media_player"] } } },
         { name: "buttons", label: "Or pick buttons (named Power, Up, OK, Vol up and so on)", selector: { entity: { multiple: true, domain: "button" } } },
         { name: "name", selector: { text: {} } },
         { type: "expandable", name: "", title: "What the remote shows", icon: "mdi:remote-tv", schema: [
@@ -6193,7 +6433,7 @@ class RoostPresence extends RoostBase {
       .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
       .n{font-size:15px;font-weight:600}
       .l{font-size:13px;font-weight:600;color:${n ? g[this.dark ? 1 : 0] : p.muted};margin-left:auto}
-      .gear{width:36px;height:36px;border-radius:12px;border:0;background:${this._panel ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${this._panel ? "#fff" : p.muted};display:flex;align-items:center;justify-content:center;cursor:pointer;--mdc-icon-size:20px;flex:none}
+      .gear{width:40px;height:40px;border-radius:12px;border:0;background:${this._panel ? `linear-gradient(135deg,${g[0]},${g[1]})` : p.inset};color:${this._panel ? "#fff" : p.muted};display:flex;align-items:center;justify-content:center;cursor:pointer;--mdc-icon-size:20px;flex:none}
       svg{display:block;width:100%;height:auto;touch-action:${this._panel === "zones" ? "none" : "auto"}}
       .dot{transition:transform .12s linear}
       .chips{display:flex;flex-wrap:wrap;gap:6px}.chips span{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:${p.inset};color:${p.muted};--mdc-icon-size:14px}
@@ -6201,7 +6441,7 @@ class RoostPresence extends RoostBase {
       .row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px}
       .row b{font-weight:600}.row small{display:block;font-size:12px;color:${p.muted};font-weight:400}
       .seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:${p.inset}}
-      .seg button{flex:1;height:36px;border:0;border-radius:10px;background:transparent;color:${p.muted};font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+      .seg button{flex:1;height:40px;border:0;border-radius:10px;background:transparent;color:${p.muted};font:inherit;font-size:13px;font-weight:600;cursor:pointer}
       .seg button.on{background:linear-gradient(135deg,${g[0]},${g[1]});color:#fff}
       .tg{width:46px;height:28px;border-radius:999px;border:0;background:${p.track};position:relative;cursor:pointer;flex:none}
       .tg i{position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .12s}
@@ -6593,7 +6833,7 @@ class RoostTimer extends RoostBase {
       .b.main{background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};border-color:transparent;box-shadow:0 10px 22px -10px ${g[2]}}
       .b ha-icon{--mdc-icon-size:24px}
       .q{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
-      .q button{height:32px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+      .q button{height:40px;padding:0 12px;border-radius:999px;border:1px solid ${p.border};background:${p.off};${p.fx || ""};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer}
     </style>
     <div class="card">
       <div class="n t"><ha-icon icon="${esc(c.icon || "mdi:timer-outline")}"></ha-icon>${esc(this.name(c.entity, "Timer"))}</div>
@@ -6919,7 +7159,7 @@ class RoostVacuum extends RoostBase {
         { type: "expandable", name: "", title: "Picture", icon: "mdi:robot-vacuum", schema: [
           { name: "shape", label: "Drawing of the robot", selector: pick(VAC_SHAPES) },
           { name: "image", label: "Or a picture of your robot from above (for example /local/robot.png)", selector: { text: {} } },
-          { name: "map", label: "Map from the robot (a camera or image entity, optional)", selector: { entity: { domain: ["camera", "image"] } } },
+          { name: "map", label: "Map from the robot (its camera or picture, optional)", selector: { entity: { domain: ["camera", "image"] } } },
           { name: "view", label: "Show first", selector: pick([["robot", "The robot on its floor"], ["map", "The map (when there is one)"]]) },
         ] },
         { type: "expandable", name: "", title: "Rooms to clean", icon: "mdi:floor-plan", schema: [
@@ -9404,7 +9644,7 @@ class RoostValues extends RoostBase {
       .rng::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;margin-top:-8px;background:#fff;border:3px solid ${g[0]};box-shadow:0 2px 6px rgba(0,0,0,.25)}
       .rng::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid ${g[0]}}
       .ops{display:flex;flex-wrap:wrap;gap:6px}
-      .op{min-height:36px;padding:0 14px;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+      .op{min-height:40px;padding:0 14px;border-radius:999px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:13px;font-weight:600;cursor:pointer}
       .op.on{background:linear-gradient(135deg,${ACTIVE[0]},${ACTIVE[1]});color:#fff;border-color:transparent}
       .sw{width:44px;height:26px;border-radius:999px;background:${p.track};position:relative}
       .sw i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:${p.knob}}
@@ -9412,7 +9652,7 @@ class RoostValues extends RoostBase {
       .tx2,.dt{width:100%;box-sizing:border-box;min-height:40px;padding:0 12px;border-radius:12px;border:1px solid ${p.border};background:${p.off};color:${p.text};font:inherit;font-size:14px;color-scheme:${this.dark ? "dark" : "light"}}
       .dt{width:auto}
       .cnt{display:flex;align-items:center;gap:10px}.cnt b{font-size:17px;min-width:24px;text-align:center}
-      .cnt button{width:36px;height:36px;border-radius:50%;border:1px solid ${p.border};background:${p.off};color:${p.text};font-size:20px;line-height:1;cursor:pointer}
+      .cnt button{width:40px;height:40px;border-radius:50%;border:1px solid ${p.border};background:${p.off};color:${p.text};font-size:20px;line-height:1;cursor:pointer}
     </style>
     <div class="card">
       ${c.name ? head("mdi:tune-variant", c.name, `${this.items().length} values`) : ""}
@@ -9869,7 +10109,7 @@ class RoostGrocy extends ticking(RoostBase, 60000) {
     }
     this.shadowRoot.innerHTML = `<style>${this.baseCss()}${headCss(p, g, !expired && !late)}${this.menuCss()}
       .tb{display:flex;gap:2px;padding:4px;border-radius:16px;background:${p.inset};overflow-x:auto;scrollbar-width:none}
-      .tb button{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 8px;border:0;border-radius:12px;background:none;color:${p.muted};font:inherit;font-size:13px;font-weight:600;cursor:pointer;--mdc-icon-size:18px}
+      .tb button{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 8px;border:0;border-radius:12px;background:none;color:${p.muted};font:inherit;font-size:13px;font-weight:600;cursor:pointer;--mdc-icon-size:18px}
       .tb button.on{flex:1 0 auto;background:${p.panel};color:${p.text};box-shadow:0 0 0 1px ${p.border}}
       .tb .n{min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:linear-gradient(135deg,${g[0]},${g[1]});color:${g[3]};font-size:11px;line-height:18px}
       .tb button:not(.on) .lb{display:none}
@@ -10167,7 +10407,7 @@ class RoostTodo extends RoostBase {
       .done .ck{background:linear-gradient(135deg,${g[0]},${g[1]});border-color:transparent;color:${g[3]}}
       .done .ck ha-icon{--mdc-icon-size:16px;animation:roost-pulse .4s ease-out 1}
       .done .t{color:${p.muted};text-decoration:line-through}
-      .clr{align-self:flex-start;border:0;background:none;color:${g[this.dark ? 1 : 0]};font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0}
+      .clr{align-self:flex-start;min-height:40px;border:0;background:none;color:${g[this.dark ? 1 : 0]};font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0}
       .empty{font-size:14px;color:${p.muted};text-align:center;padding:10px}
     </style>
     <div class="card">
@@ -12250,7 +12490,7 @@ class RoostNow extends ticking(RoostBase, 30000) {
       .ic{width:44px;height:44px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;color:#FFFFFF;--mdc-icon-size:22px;position:relative}
       .ic.ring::after{content:"";position:absolute;inset:0;border-radius:inherit;animation:roost-ping 2s ease-out infinite;background:inherit}
       .tx{flex:1;min-width:0}.tt{font-size:15px;font-weight:600;line-height:1.25}.sb{font-size:12px;color:${p.muted};margin-top:2px}
-      .act{flex:none;height:36px;padding:0 14px;border-radius:999px;border:0;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:#FFFFFF}
+      .act{flex:none;height:40px;padding:0 14px;border-radius:999px;border:0;font:inherit;font-size:13px;font-weight:600;cursor:pointer;color:#FFFFFF}
       .pic{width:64px;height:44px;border-radius:12px;object-fit:cover;flex:none}
       .calm{display:flex;align-items:center;gap:12px;padding:6px 8px}.calm .ic{background:linear-gradient(135deg,${COLORS.green[0]},${COLORS.green[1]})}
     </style>
