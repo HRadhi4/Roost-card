@@ -789,19 +789,39 @@ zones:
 ```
 
 ### Roost Car
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/ev.gif" width="320" alt="Roost car card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car.gif" width="320" alt="Roost car card in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/car.gif" width="320" alt="Roost car card in action, dark">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car-looks.gif" width="320" alt="Roost car card, picture choices, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/car-looks.gif" width="320" alt="Roost car card, picture choices, dark">
+
+Your car, petrol or electric. The realistic picture comes in seven colours (or keep its own), and its lights tell you what it is doing: a soft glow while unlocked, a blue pulse while it charges, a shine over the grille while the engine runs, cold air while the AC runs, and a flash when you tap **Find**. An open door or boot glows. Prefer a drawing? Pick a drawn SUV, sedan, hatchback or pickup, seen from the side or from above. More than one car? Add them under **More cars** and swipe the picture (or tap the dots) to see the next one.
 
 ```yaml
 type: custom:roost-ev
-battery: sensor.car_battery
+name: Family car
+car: petrol                      # petrol, electric, or auto (finds out from the devices)
+look: photo                      # photo = realistic; suv, sedan, hatch or pickup = drawn
+paint: white                     # auto (the picture's own), white, silver, grey, black, red, blue or sand
+view: side                       # side, or top (from above: shows which door is open)
+animate: true                    # the moving picture: glows, air and flashing lights
+fuel: sensor.car_fuel_level
 range: sensor.car_range
-power: sensor.charger_power
-charging: switch.car_charging   # a switch shows Start / Stop charging
-plugged: binary_sensor.car_plugged_in
-limit: number.car_charge_limit
-capacity: 64                    # battery size in kWh, for “full in”
-image: /local/my-car.png        # optional: your own car from the side instead of the drawing
+engine: binary_sensor.car_engine
+lock: lock.car                   # the lock button on the picture: slide to unlock
+climate: climate.car             # Cool it: a climate, button, script or switch
+find: button.car_flash_lights    # Find flashes the lights (without it, Find shows where it is)
+tracker: device_tracker.car      # hold the picture to see where it is
+doors: binary_sensor.car_doors   # on when a door is open
+boot: binary_sensor.car_boot
+cars:                            # more cars on the same card
+  - name: Layla's car
+    car: electric
+    battery: sensor.layla_car_battery
+    range: sensor.layla_car_range
+    charging: switch.layla_car_charging
+    lock: lock.layla_car
+    paint: red
 ```
+
+An electric car also takes `power`, `plugged`, `limit` and `capacity` (battery size in kWh, for “full in”). `image: /local/my-car.png` shows your own photo instead; it stays on your Home Assistant.
 
 ### Roost Plant
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/plant.gif" width="320" alt="Roost plant card in action">
@@ -1117,19 +1137,6 @@ covered: |
   Router
   Home Assistant
   Cameras
-```
-
-### Roost Car, petrol or hybrid
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car-fuel.gif" width="320" alt="Roost car card, petrol, in action, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/car-fuel.gif" width="320" alt="Roost car card, petrol, in action, dark">
-
-```yaml
-type: custom:roost-ev
-kind: fuel                  # electric (the default) or fuel
-fuel: sensor.car_fuel_level
-range: sensor.car_range
-lock: lock.car_doors        # unlocking asks for a second tap
-climate: climate.car        # or a button or script that starts the AC
-tracker: device_tracker.car
 ```
 
 ### Roost Batteries

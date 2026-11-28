@@ -1,6 +1,6 @@
 # 15 · Guest Wi-Fi, Announce, Kitchen and more
 
-Seven new cards, plus petrol cars in Roost Car. Every one works with **Sample** turned on, so you can try it before you have the devices.
+Seven new cards. Every one works with **Sample** turned on, so you can try it before you have the devices.
 
 ## Guest Wi-Fi
 <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/wifi.gif" width="300" alt="Roost guest Wi-Fi card">
@@ -52,9 +52,4 @@ Seven new cards, plus petrol cars in Roost Car. Every one works with **Sample** 
 2. *Add card →* **Roost Power backup**, pick the battery, and if you have them, the time left and the status.
 3. Under **What it keeps on**, write one thing per line (Router, Cameras).
 
-## Petrol or hybrid car
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car-fuel.gif" width="300" alt="Roost car card, petrol">
-
-1. *Add card →* **Roost Car**, and choose **Petrol or hybrid** at the top.
-2. Open **Petrol or hybrid car** and pick the fuel level, lock, air conditioning and where it is.
-3. Unlocking asks for a second tap, so it never opens by mistake.
+Your car has its own guide: [16 · Your car](16-your-car.md).

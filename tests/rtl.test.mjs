@@ -30,7 +30,9 @@ const check = (rule, ok, msg) => { checks++; if (!ok) { fails++; console.error(`
   const allowed = [/ev\.clientY - b\.top\) \/ b\.height\) \* 250/, /lift\(at\(e\.clientX/, /el = at\(e\.clientX/, /touches\[0\]\.clientX; y0/, /changedTouches\[0\]\.clientX - x0/,
     /_winDrag = /, /const dx = e\.clientX - d\.x/, /sim\.poke/, /x0 = ev\.clientX; y0/, /dot\.style\.left/, /const dx = ev\.clientX - x0/, /createSVGPoint/, /Math\.atan2/,
     /const dx = ev\.clientX - \(b\.left/, /dir \* /, /touches\[0\]\?\.clientX/, /const dx = t\.clientX - x0/, /start\(e\.touches\[0\]\.clientX/, /move\(e\.touches\[0\]\.clientX/,
-    /start\(e\.clientX, e\.clientY/, /move\(ev\.clientX/, /ptrs\.set/, /start = \{ yaw/, /this\.yaw = start\.yaw/, /this\.roomAt\(e\.clientX/, /at = \[e\.clientX/, /this\.pan\.ry \+=/];
+    /start\(e\.clientX, e\.clientY/, /move\(ev\.clientX/, /ptrs\.set/, /start = \{ yaw/, /this\.yaw = start\.yaw/, /this\.roomAt\(e\.clientX/, /at = \[e\.clientX/, /this\.pan\.ry \+=/,
+    // the car card: swiping to the next car, reversed in Arabic like the rooms (rule 5)
+    /this\._x0 = e\.clientX; this\._held/, /Math\.abs\(e\.clientX - this\._x0\) > 12/, /const dx = e\.clientX - this\._x0; this\._x0 = null/];
   const bad = [];
   lines.forEach((l, i) => { if (/clientX/.test(l) && !/rtlX\(/.test(l) && !allowed.some((r) => r.test(l))) bad.push(i + 1); });
   check(2, !bad.length, `a finger read without rtlX() on line ${bad.join(", ")}: a slider must use rtlX(el, x); anything else (a dial, a swipe, a 360° view) goes in this test's list with its reason`);

@@ -18,8 +18,15 @@ Every version of Roost Cards, newest first.
   - **Roost Family notes**: sticky notes for the whole family, kept in a to-do list so every screen shows the same.
   - **Roost Deliveries**: parcels with a step bar and the day they arrive.
   - **Roost Power backup**: UPS battery ring, how long the home keeps running in a power cut, and what it keeps on.
-- **Roost Car now does petrol and hybrid cars too** (`kind: fuel`): fuel and range, lock (unlock asks for a second tap), cool it before you go, and find it.
+- **Roost Car, rebuilt.**
+  - **Petrol or electric**, chosen in the settings or found from your devices. A petrol car shows its fuel, range, engine and distance driven; an electric one its charging.
+  - **A realistic car whose lights mean something**: a soft glow while unlocked, a blue pulse while charging, a shine over the grille while the engine runs, and a greeting when you unlock.
+  - **In your car's colour**: white, silver, grey, black, red, blue or sand, picked as dots. Or a drawn SUV, sedan, hatchback or pickup, seen from the side or from above.
+  - **Cool it, find it**: start the AC (cold air moves over the windows), flash the lights to find it, hold the picture to see where it is, and an open door or boot glows.
+  - **More than one car on one card**: swipe the picture or tap the dots.
+  - **A lock button on the car** opens the lock's sheet, where you slide to unlock, so a stray tap never opens your car.
 - Every new card works in sample mode, in Arabic, and in light and dark.
+- **Fix: sample cards follow dark mode and Arabic.** Cards showing sample data were always light and in English.
 
 ## 1.29.3
 
