@@ -47,6 +47,8 @@ const cases = [
   ["roost-tile", { entity: "switch.missing" }],
   ["roost-tile", { entity: "light.kitchen", quick: "button", entities: ["light.hall", "light.color"], stale_hours: 1 }],
   ["roost-batteries", {}],
+  ["roost-ev", { sample: true, look: "photo" }],
+  ["roost-ev", { sample: true, car: "petrol" }],
   ["roost-room", { name: "Living", style: "card", light_slider: true, entities: ["light.kitchen", "light.hall"] }],
   ["roost-batteries", { sample: true, show: "low" }],
   ["roost-timeline", { sample: true }],
@@ -212,6 +214,27 @@ for (const dark of [true, false]) {
       el.remove();
     } catch (e) { fails++; console.error(`FAIL ${tag} ${JSON.stringify(config)} dark=${dark}: ${e.message}`); }
   }
+}
+// The car: electric or petrol, found from the devices or chosen; the lights answer the lock, the charge and the engine.
+{
+  const car = (cfg, extra = {}) => { const h = hass(true); Object.assign(h.states, extra); const el = document.createElement("roost-ev"); el.setConfig(cfg); document.body.appendChild(el); el.hass = h; return el; };
+  const add = { "sensor.car_fuel": st("sensor.car_fuel", "12", { unit_of_measurement: "%" }), "binary_sensor.car_engine": st("binary_sensor.car_engine", "on"), "lock.car": st("lock.car", "locked"), "sensor.car_battery": st("sensor.car_battery", "70", { unit_of_measurement: "%" }), "switch.car_charging": st("switch.car_charging", "on") };
+  const pe = car({ fuel: "sensor.car_fuel", engine: "binary_sensor.car_engine", lock: "lock.car" }, add), ph = pe.shadowRoot.innerHTML;
+  if (pe.kind() !== "petrol" || !/data:image\/webp/.test(ph) || !/class="shine"/.test(ph) || !/Engine running · Fuel low · Locked/.test(ph) || !/mdi:gas-station/.test(ph) || /Charging at/.test(ph)) { fails++; console.error("FAIL car petrol"); }
+  const el = car({ battery: "sensor.car_battery", charging: "switch.car_charging", lock: "lock.car", look: "photo" }, add), eh = el.shadowRoot.innerHTML;
+  if (el.kind() !== "electric" || !/class="run"/.test(eh) || !/beam pulse/.test(eh) || /class="shine"/.test(eh) || !/Stop charging/.test(eh)) { fails++; console.error("FAIL car electric"); }
+  if (car({ battery: "sensor.car_battery" }, add).shadowRoot.querySelector(".stage")) { fails++; console.error("FAIL car keeps the side drawing by default"); }
+  if (!/fuel level/.test(car({ car: "petrol", battery: "sensor.car_battery" }, add)._setup)) { fails++; console.error("FAIL car petrol needs fuel"); }
+  // unlocked now: the electric light bar sweeps once, the petrol headlights flash
+  const h2 = hass(true); Object.assign(h2.states, add, { "lock.car": st("lock.car", "unlocked") }); el._sig = null; el.hass = h2;
+  if (!/class="sweep"/.test(el.shadowRoot.innerHTML)) { fails++; console.error("FAIL car unlock sweep"); }
+  pe._sig = null; pe.hass = h2;
+  if (!/class="blink"/.test(pe.shadowRoot.innerHTML) || !/lk open/.test(pe.shadowRoot.innerHTML)) { fails++; console.error("FAIL car unlock flash"); }
+  // the settings show only what fits the car type
+  const names = (d) => JSON.stringify(window.eval("fitSchema")(customElements.get("roost-ev").getConfigForm().schema, d));
+  if (/"limit"/.test(names({ car: "petrol" })) || !/"fuel"/.test(names({ car: "petrol" })) || /"fuel"/.test(names({ car: "electric" })) || !/"limit"/.test(names({ car: "auto" }))) { fails++; console.error("FAIL car settings by type"); }
+  const sm = car({ sample: true, car: "petrol", look: "photo" }); if (!/Engine running · Locked/.test(sm.shadowRoot.innerHTML)) { fails++; console.error("FAIL car petrol sample"); }
+  for (const x of [pe, el, sm]) x.remove();
 }
 // The chips group lights with a count, and a tap on the bulb opens the list.
 const chips = document.createElement("roost-chips");

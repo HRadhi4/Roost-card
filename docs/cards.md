@@ -788,10 +788,16 @@ zones:
 ```
 
 ### Roost Car
-<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/ev.gif" width="320" alt="Roost car card in action">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car-electric.gif" width="320" alt="Roost car card, electric, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/car-electric.gif" width="320" alt="Roost car card, electric, dark">
+<img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car-petrol.gif" width="320" alt="Roost car card, petrol, light"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards-dark/car-petrol.gif" width="320" alt="Roost car card, petrol, dark">
+
+An electric or a petrol car. The lights tell you what it is doing: a soft glow while it is unlocked, a blue pulse while it charges, headlights and a shine over the grille while the engine runs, and a greeting (a sweep, or two flashes) when you unlock it. [Step by step](tutorials/15-your-car.md)
 
 ```yaml
+# electric
 type: custom:roost-ev
+car: electric                   # electric, petrol, or auto (finds out from the devices)
+look: photo                     # photo = the realistic car, drawing = the side drawing
 battery: sensor.car_battery
 range: sensor.car_range
 power: sensor.charger_power
@@ -799,7 +805,19 @@ charging: switch.car_charging   # a switch shows Start / Stop charging
 plugged: binary_sensor.car_plugged_in
 limit: number.car_charge_limit
 capacity: 64                    # battery size in kWh, for “full in”
-image: /local/my-car.png        # optional: your own car from the side instead of the drawing
+lock: lock.car                  # optional: the lock button on the picture
+```
+
+```yaml
+# petrol
+type: custom:roost-ev
+car: petrol
+fuel: sensor.car_fuel_level
+range: sensor.car_range
+engine: binary_sensor.car_engine   # on while the engine runs
+lock: lock.car
+odometer: sensor.car_odometer      # optional: distance driven
+image: /local/my-car.png           # optional: your own car instead of the built-in one
 ```
 
 ### Roost Plant

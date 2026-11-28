@@ -2,6 +2,13 @@
 
 Every version of Roost Cards, newest first.
 
+## Unreleased
+
+- **Roost Car: electric or petrol.** Choose the car type in the settings, or let the card find out from your devices. A petrol car shows its fuel, range, engine and the distance driven; the settings only show what fits your car type.
+- **A realistic car whose lights mean something.** The new **Realistic car** picture glows softly while the car is unlocked, pulses blue with a light running along the bar while it charges, shows headlights and a shine over the grille while the engine runs, and greets you when you unlock it (a sweep for electric, two flashes for petrol). Locked, the lights are off. In Arabic the car faces the other way. The cars are invented, not any real make.
+- **A lock button on the car.** It opens the lock's sheet, where you slide to lock or unlock, so a stray tap never opens your car.
+- **Fix: sample cards follow dark mode and Arabic.** Cards showing sample data were always light and in English.
+
 ## 1.29.3
 
 - **Arabic numerals or Indian numerals.** In Arabic, choose 123 or ١٢٣ for the whole screen with a new numbers chip or bar button, or for one card with **Numbers in Arabic** in its editor. The clock and prayer cards follow the screen's choice unless you pick one. Units such as °C keep the right order next to Indian numerals.

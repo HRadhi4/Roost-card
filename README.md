@@ -117,6 +117,7 @@ Recorded on a real Home Assistant (its built-in demo devices), so everything you
 12. [Ready dashboards made from your home](docs/tutorials/12-ready-dashboards.md) · no work
 13. [Batteries, Timeline, your own values, group tiles](docs/tutorials/13-batteries-timeline-values.md)
 14. [Real-looking curtains, blinds, garage, plant, pet and pool](docs/tutorials/14-real-looks.md)
+15. [Your car: electric or petrol](docs/tutorials/15-your-car.md)
 
 ## All 64 cards
 
@@ -160,7 +161,7 @@ Each GIF shows the card in use, then in the other colour mode, then as frosted g
 | **Roost Garage** | A garage door that rolls up (or a gate that slides or swings), how long it has been open, and a warning when it stays open. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/garage.gif" width="180" alt="Roost Garage"> |
 | **Roost Energy Flow** | Sun, house, battery and grid with power flowing between them, faster when more power moves. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/flow.gif" width="180" alt="Roost Energy Flow"> |
 | **Roost Irrigation** | Garden zones: tap to water for a few minutes, see what is watering, and skip when rain is coming. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/irrigation.gif" width="180" alt="Roost Irrigation"> |
-| **Roost Car** | An electric car charging: battery cells filling, power flowing down the cable, range, limit and when it will be full. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/ev.gif" width="180" alt="Roost Car"> |
+| **Roost Car** | An electric or petrol car: battery or fuel, range, charging, engine and lock. Its lights glow while unlocked, pulse while charging, shine while the engine runs and greet you when you unlock. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car-electric.gif" width="180" alt="Roost Car, electric"> <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/car-petrol.gif" width="180" alt="Roost Car, petrol"> |
 | **Roost Plant** | A potted plant that droops when it is thirsty and says what it needs: water, light, warmth or food. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/plant.gif" width="180" alt="Roost Plant"> |
 | **Roost Printer** | Ink or toner levels as little bottles, or a 3D print growing layer by layer with time left and temperatures. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/printer.gif" width="180" alt="Roost Printer"> |
 | **Roost Moments** | Your day in moments (morning, day, evening, bedtime) with the scene that fits right now. | <img src="https://raw.githubusercontent.com/HRadhi4/Roost-card/main/docs/gifs/cards/moments.gif" width="180" alt="Roost Moments"> |
